@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function allowedEmail() {
+      return signedIn() && request.auth.token.email in [
+        "COLOCAR_EMAIL_EDNEY_AQUI",
+        "COLOCAR_EMAIL_SONIA_AQUI",
+        "COLOCAR_EMAIL_RODNEY_AQUI"
+      ];
+    }
+
+    match /expenses/{expenseId} {
+      allow read, create: if allowedEmail();
+      allow update: if allowedEmail();
+      allow delete: if false;
+    }
+
+    match /settlements/{settlementId} {
+      allow read, create: if allowedEmail();
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,889 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRightLeft,
+  BarChart3,
+  CalendarDays,
+  Check,
+  CircleDollarSign,
+  Home,
+  LogOut,
+  Plus,
+  ReceiptText,
+  UserRound,
+  WalletCards,
+} from "lucide-react";
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
+} from "firebase/firestore";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
+import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
+
+const currencyFormatter = new Intl.NumberFormat("pt-PT", {
+  style: "currency",
+  currency: "EUR",
+});
+
+const emptyForm = {
+  title: "",
+  totalValue: "",
+  dueDate: "",
+  category: "Casa",
+  payerId: "edney",
+  participants: ["edney", "sonia", "rodney"],
+  installment: "",
+};
+
+const navItems = [
+  { id: "dashboard", label: "Painel", icon: BarChart3 },
+  { id: "new", label: "Nova conta", icon: Plus },
+  ...PEOPLE.map((person) => ({ id: person.id, label: person.name, icon: UserRound })),
+  { id: "settlement", label: "Acerto", icon: ArrowRightLeft },
+];
+
+function formatCurrency(value) {
+  return currencyFormatter.format(Number(value || 0));
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function todayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function currentMonthValue() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function monthFromDate(date) {
+  return date.slice(0, 7);
+}
+
+function getShare(expense, personId) {
+  return expense.shares?.[personId];
+}
+
+function personName(id) {
+  return getPersonById(id)?.name || id;
+}
+
+function isSettledStatus(status) {
+  return status === "paid" || status === "settled" || status === "self";
+}
+
+function App() {
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
+  const [activeView, setActiveView] = useState("dashboard");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
+  const [expenses, setExpenses] = useState([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [formError, setFormError] = useState("");
+  const [paymentTarget, setPaymentTarget] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({
+    paidAt: todayInputValue(),
+    type: "PIX",
+    description: "",
+  });
+  const [actionMessage, setActionMessage] = useState("");
+
+  useEffect(() => {
+    if (!hasFirebaseConfig) {
+      setAuthLoading(false);
+      return undefined;
+    }
+
+    return onAuthStateChanged(auth, async (user) => {
+      setFirebaseUser(user);
+      setAuthError("");
+
+      if (!user) {
+        setProfile(null);
+        setActiveView("dashboard");
+        setAuthLoading(false);
+        return;
+      }
+
+      const matchedProfile = getProfileByEmail(user.email);
+      if (!matchedProfile) {
+        setProfile(null);
+        setAuthError("Este e-mail não está cadastrado para acessar o sistema.");
+        await signOut(auth);
+        setAuthLoading(false);
+        return;
+      }
+
+      setProfile(matchedProfile);
+      setActiveView(matchedProfile.id);
+      setAuthLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!profile || !db) return undefined;
+
+    setDataLoading(true);
+    const expensesQuery = query(collection(db, "expenses"), where("monthKey", "==", selectedMonth));
+
+    return onSnapshot(
+      expensesQuery,
+      (snapshot) => {
+        const nextExpenses = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+
+        setExpenses(nextExpenses);
+        setDataLoading(false);
+      },
+      () => {
+        setDataLoading(false);
+        setActionMessage("Não foi possível carregar as contas do mês.");
+      },
+    );
+  }, [profile, selectedMonth]);
+
+  const metrics = useMemo(() => {
+    return expenses.reduce(
+      (acc, expense) => {
+        acc.total += Number(expense.totalValue || 0);
+
+        Object.entries(expense.shares || {}).forEach(([personId, share]) => {
+          if (personId === expense.payerId) return;
+          if (share.status === "pending") acc.pending += Number(share.amount || 0);
+          if (share.status === "paid" || share.status === "settled") acc.paid += Number(share.amount || 0);
+        });
+
+        return acc;
+      },
+      { total: 0, pending: 0, paid: 0 },
+    );
+  }, [expenses]);
+
+  const categoryTotals = useMemo(() => {
+    const totals = CATEGORIES.map((category) => ({
+      category,
+      total: expenses
+        .filter((expense) => expense.category === category)
+        .reduce((sum, expense) => sum + Number(expense.totalValue || 0), 0),
+    }));
+
+    const max = Math.max(...totals.map((item) => item.total), 1);
+    return totals.map((item) => ({ ...item, percent: (item.total / max) * 100 }));
+  }, [expenses]);
+
+  const settlementRows = useMemo(() => calculateSettlementRows(expenses), [expenses]);
+
+  async function handleLogin() {
+    setAuthError("");
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      setAuthError(error.message || "Não foi possível entrar com o Google.");
+    }
+  }
+
+  async function handleLogout() {
+    await signOut(auth);
+  }
+
+  function updateForm(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function toggleParticipant(personId) {
+    setForm((current) => {
+      const hasPerson = current.participants.includes(personId);
+      const participants = hasPerson
+        ? current.participants.filter((item) => item !== personId)
+        : [...current.participants, personId];
+
+      return { ...current, participants };
+    });
+  }
+
+  async function handleCreateExpense(event) {
+    event.preventDefault();
+    setFormError("");
+    setActionMessage("");
+
+    const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
+
+    if (!form.title.trim()) {
+      setFormError("Informe o nome da despesa.");
+      return;
+    }
+
+    if (!totalValue || totalValue <= 0) {
+      setFormError("Informe um valor total válido.");
+      return;
+    }
+
+    if (!form.dueDate) {
+      setFormError("Informe a data de vencimento.");
+      return;
+    }
+
+    if (!form.participants.length) {
+      setFormError("Selecione pelo menos uma pessoa no rateio.");
+      return;
+    }
+
+    const shareAmount = roundMoney(totalValue / form.participants.length);
+    const shares = form.participants.reduce((acc, personId) => {
+      acc[personId] = {
+        amount: shareAmount,
+        status: personId === form.payerId ? "self" : "pending",
+        payment: personId === form.payerId ? { type: "Pagamento original", paidAt: form.dueDate } : null,
+      };
+      return acc;
+    }, {});
+
+    await addDoc(collection(db, "expenses"), {
+      title: form.title.trim(),
+      totalValue,
+      dueDate: form.dueDate,
+      monthKey: monthFromDate(form.dueDate),
+      category: form.category,
+      payerId: form.payerId,
+      participants: form.participants,
+      installment: form.installment.trim(),
+      shares,
+      createdBy: profile.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    setSelectedMonth(monthFromDate(form.dueDate));
+    setForm({ ...emptyForm, dueDate: "" });
+    setActionMessage("Conta cadastrada com rateio automático.");
+    setActiveView("dashboard");
+  }
+
+  function openPayment(expense, personId) {
+    setPaymentTarget({ expense, personId });
+    setPaymentForm({ paidAt: todayInputValue(), type: "PIX", description: "" });
+  }
+
+  async function confirmPayment(event) {
+    event.preventDefault();
+    if (!paymentTarget) return;
+
+    const { expense, personId } = paymentTarget;
+    if (personId !== profile.id) return;
+
+    await updateDoc(doc(db, "expenses", expense.id), {
+      [`shares.${personId}.status`]: "paid",
+      [`shares.${personId}.payment`]: {
+        paidAt: paymentForm.paidAt,
+        type: paymentForm.type,
+        description: paymentForm.description.trim(),
+        registeredBy: profile.id,
+        registeredAt: new Date().toISOString(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+
+    setPaymentTarget(null);
+    setActionMessage("Pagamento registrado.");
+  }
+
+  async function liquidateBalance(row) {
+    const batch = writeBatch(db);
+    const now = new Date().toISOString();
+    const settlementRef = doc(collection(db, "settlements"));
+
+    expenses.forEach((expense) => {
+      const updates = {};
+      const directShare = getShare(expense, row.fromId);
+      const reverseShare = getShare(expense, row.toId);
+
+      if (expense.payerId === row.toId && directShare?.status === "pending") {
+        updates[`shares.${row.fromId}.status`] = "settled";
+        updates[`shares.${row.fromId}.payment`] = {
+          paidAt: todayInputValue(),
+          type: "Acerto de contas",
+          description: `Liquidado no acerto mensal de ${selectedMonth}`,
+          registeredBy: profile.id,
+          registeredAt: now,
+        };
+      }
+
+      if (expense.payerId === row.fromId && reverseShare?.status === "pending") {
+        updates[`shares.${row.toId}.status`] = "settled";
+        updates[`shares.${row.toId}.payment`] = {
+          paidAt: todayInputValue(),
+          type: "Compensação",
+          description: `Compensado no acerto mensal de ${selectedMonth}`,
+          registeredBy: profile.id,
+          registeredAt: now,
+        };
+      }
+
+      if (Object.keys(updates).length) {
+        batch.update(doc(db, "expenses", expense.id), {
+          ...updates,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    batch.set(settlementRef, {
+      monthKey: selectedMonth,
+      fromId: row.fromId,
+      toId: row.toId,
+      amount: row.amount,
+      createdBy: profile.id,
+      createdAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+    setActionMessage("Saldo liquidado para o mês selecionado.");
+  }
+
+  if (authLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!profile) {
+    return <LoginScreen error={authError} onLogin={handleLogin} missingConfig={!hasFirebaseConfig} />;
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">
+            <Home size={24} />
+          </div>
+          <div>
+            <strong>Contas</strong>
+            <span>Compartilhadas</span>
+          </div>
+        </div>
+
+        <nav className="main-nav" aria-label="Navegação principal">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                className={activeView === item.id ? "nav-item active" : "nav-item"}
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                type="button"
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="user-card">
+          <div>
+            <span>Logado como</span>
+            <strong>{profile.name}</strong>
+            <small>{firebaseUser?.email}</small>
+          </div>
+          <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
+            <LogOut size={18} />
+          </button>
+        </div>
+      </aside>
+
+      <section className="content">
+        <header className="topbar">
+          <div>
+            <span className="eyebrow">{selectedMonth}</span>
+            <h1>{getViewTitle(activeView)}</h1>
+          </div>
+
+          <label className="month-filter">
+            <CalendarDays size={18} />
+            <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
+          </label>
+        </header>
+
+        {actionMessage && <div className="notice">{actionMessage}</div>}
+
+        {activeView === "dashboard" && (
+          <Dashboard
+            categoryTotals={categoryTotals}
+            dataLoading={dataLoading}
+            expenses={expenses}
+            metrics={metrics}
+          />
+        )}
+
+        {activeView === "new" && (
+          <NewExpenseForm
+            form={form}
+            formError={formError}
+            onChange={updateForm}
+            onSubmit={handleCreateExpense}
+            onToggleParticipant={toggleParticipant}
+          />
+        )}
+
+        {PEOPLE.some((person) => person.id === activeView) && (
+          <PersonExpenses
+            currentProfile={profile}
+            expenses={expenses}
+            personId={activeView}
+            onPay={openPayment}
+          />
+        )}
+
+        {activeView === "settlement" && (
+          <SettlementPanel rows={settlementRows} onLiquidate={liquidateBalance} />
+        )}
+      </section>
+
+      {paymentTarget && (
+        <PaymentModal
+          form={paymentForm}
+          onChange={setPaymentForm}
+          onClose={() => setPaymentTarget(null)}
+          onSubmit={confirmPayment}
+          target={paymentTarget}
+        />
+      )}
+    </main>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <main className="login-screen">
+      <div className="loader" />
+    </main>
+  );
+}
+
+function LoginScreen({ error, missingConfig, onLogin }) {
+  return (
+    <main className="login-screen">
+      <section className="login-panel">
+        <div className="brand large">
+          <div className="brand-mark">
+            <Home size={28} />
+          </div>
+          <div>
+            <strong>Contas</strong>
+            <span>Compartilhadas</span>
+          </div>
+        </div>
+
+        <h1>Controle familiar de despesas</h1>
+        <p>Entrar com uma das contas autorizadas: Edney, Sônia ou Rodney.</p>
+
+        {missingConfig ? (
+          <div className="error-box">Preencha o arquivo .env com as credenciais do Firebase.</div>
+        ) : (
+          <button className="google-button" onClick={onLogin} type="button">
+            <CircleDollarSign size={20} />
+            Entrar com o Google
+          </button>
+        )}
+
+        {error && <div className="error-box">{error}</div>}
+      </section>
+    </main>
+  );
+}
+
+function Dashboard({ categoryTotals, dataLoading, expenses, metrics }) {
+  return (
+    <div className="view-grid">
+      <section className="metrics-grid">
+        <MetricCard icon={ReceiptText} label="Gastos do mês" value={formatCurrency(metrics.total)} />
+        <MetricCard icon={WalletCards} label="Total pendente" value={formatCurrency(metrics.pending)} tone="warning" />
+        <MetricCard icon={Check} label="Total pago" value={formatCurrency(metrics.paid)} tone="success" />
+      </section>
+
+      <section className="panel chart-panel">
+        <div className="section-heading">
+          <h2>Gastos por categoria</h2>
+        </div>
+
+        <div className="bar-chart">
+          {categoryTotals.map((item) => (
+            <div className="bar-row" key={item.category}>
+              <span>{item.category}</span>
+              <div className="bar-track">
+                <div className="bar-fill" style={{ width: `${item.percent}%` }} />
+              </div>
+              <strong>{formatCurrency(item.total)}</strong>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel table-panel">
+        <div className="section-heading">
+          <h2>Contas cadastradas</h2>
+          <span>{expenses.length} registro(s)</span>
+        </div>
+        {dataLoading ? <div className="empty-state">Carregando...</div> : <ExpensesTable expenses={expenses} />}
+      </section>
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, tone = "default", value }) {
+  return (
+    <article className={`metric-card ${tone}`}>
+      <div className="metric-icon">
+        <Icon size={22} />
+      </div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function ExpensesTable({ expenses }) {
+  if (!expenses.length) {
+    return <div className="empty-state">Nenhuma conta cadastrada neste mês.</div>;
+  }
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Despesa</th>
+            <th>Valor</th>
+            <th>Vencimento</th>
+            <th>Categoria</th>
+            <th>Quem pagou</th>
+            <th>Rateio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {expenses.map((expense) => (
+            <tr key={expense.id}>
+              <td>
+                <strong>{expense.title}</strong>
+                {expense.installment && <small>{expense.installment}</small>}
+              </td>
+              <td>{formatCurrency(expense.totalValue)}</td>
+              <td>{formatDate(expense.dueDate)}</td>
+              <td>
+                <span className="tag">{expense.category}</span>
+              </td>
+              <td>{personName(expense.payerId)}</td>
+              <td>{expense.participants?.map(personName).join(", ")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipant }) {
+  const splitPreview = useMemo(() => {
+    const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
+    if (!totalValue || !form.participants.length) return 0;
+    return roundMoney(totalValue / form.participants.length);
+  }, [form.totalValue, form.participants.length]);
+
+  return (
+    <section className="panel form-panel">
+      <form onSubmit={onSubmit}>
+        <div className="form-grid">
+          <label>
+            <span>Nome da despesa</span>
+            <input
+              placeholder="Aluguel, Internet, Seguro Carro"
+              value={form.title}
+              onChange={(event) => onChange("title", event.target.value)}
+            />
+          </label>
+
+          <label>
+            <span>Valor total em euros</span>
+            <input
+              inputMode="decimal"
+              placeholder="400,00"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.totalValue}
+              onChange={(event) => onChange("totalValue", event.target.value)}
+            />
+          </label>
+
+          <label>
+            <span>Data de vencimento</span>
+            <input type="date" value={form.dueDate} onChange={(event) => onChange("dueDate", event.target.value)} />
+          </label>
+
+          <label>
+            <span>Categoria</span>
+            <select value={form.category} onChange={(event) => onChange("category", event.target.value)}>
+              {CATEGORIES.map((category) => (
+                <option key={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Quem pagou originalmente?</span>
+            <select value={form.payerId} onChange={(event) => onChange("payerId", event.target.value)}>
+              {PEOPLE.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Parcelamento opcional</span>
+            <input
+              placeholder="Parcela 1 de 10"
+              value={form.installment}
+              onChange={(event) => onChange("installment", event.target.value)}
+            />
+          </label>
+        </div>
+
+        <fieldset className="people-fieldset">
+          <legend>Quem deve participar do rateio?</legend>
+          <div className="checkbox-grid">
+            {PEOPLE.map((person) => (
+              <label className="checkbox-card" key={person.id}>
+                <input
+                  checked={form.participants.includes(person.id)}
+                  onChange={() => onToggleParticipant(person.id)}
+                  type="checkbox"
+                />
+                <span>{person.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="split-preview">
+          <span>Valor por pessoa</span>
+          <strong>{formatCurrency(splitPreview)}</strong>
+        </div>
+
+        {formError && <div className="error-box">{formError}</div>}
+
+        <button className="primary-button" type="submit">
+          <Check size={18} />
+          Salvar conta
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function PersonExpenses({ currentProfile, expenses, onPay, personId }) {
+  const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
+  const selectedPerson = getPersonById(personId);
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Contas de {selectedPerson.name}</h2>
+        <span>{personExpenses.length} registro(s)</span>
+      </div>
+
+      {!personExpenses.length ? (
+        <div className="empty-state">Nenhuma conta para este mês.</div>
+      ) : (
+        <div className="expense-list">
+          {personExpenses.map((expense) => {
+            const share = getShare(expense, personId);
+            const isPayer = expense.payerId === personId;
+            const canPay = currentProfile.id === personId && !isPayer && share?.status === "pending";
+
+            return (
+              <article className="expense-card" key={expense.id}>
+                <div className="expense-main">
+                  <span className="tag">{expense.category}</span>
+                  <h3>{expense.title}</h3>
+                  <p>
+                    {personName(expense.payerId)} pagou originalmente • vencimento {formatDate(expense.dueDate)}
+                  </p>
+                </div>
+
+                <div className="expense-side">
+                  <strong>{formatCurrency(share?.amount)}</strong>
+                  <StatusBadge status={isPayer ? "self" : share?.status} />
+                  {canPay && (
+                    <button className="secondary-button" onClick={() => onPay(expense, personId)} type="button">
+                      Marcar como pago
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StatusBadge({ status }) {
+  const labels = {
+    pending: "Pendente",
+    paid: "Pago",
+    settled: "Liquidado",
+    self: "Pagamento original",
+  };
+
+  return <span className={`status-badge ${status}`}>{labels[status] || "Pendente"}</span>;
+}
+
+function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
+  const { expense, personId } = target;
+  const share = getShare(expense, personId);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+        <div className="section-heading">
+          <div>
+            <h2 id="payment-title">Registrar pagamento</h2>
+            <span>
+              {expense.title} • {formatCurrency(share?.amount)}
+            </span>
+          </div>
+          <button className="icon-button" onClick={onClose} type="button">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit}>
+          <label>
+            <span>Data do pagamento</span>
+            <input
+              type="date"
+              value={form.paidAt}
+              onChange={(event) => onChange((current) => ({ ...current, paidAt: event.target.value }))}
+            />
+          </label>
+
+          <label>
+            <span>Tipo de pagamento</span>
+            <select value={form.type} onChange={(event) => onChange((current) => ({ ...current, type: event.target.value }))}>
+              {PAYMENT_TYPES.map((type) => (
+                <option key={type}>{type}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Descrição opcional</span>
+            <textarea
+              rows="3"
+              value={form.description}
+              onChange={(event) => onChange((current) => ({ ...current, description: event.target.value }))}
+            />
+          </label>
+
+          <div className="modal-actions">
+            <button className="secondary-button" onClick={onClose} type="button">
+              Cancelar
+            </button>
+            <button className="primary-button" type="submit">
+              Confirmar pagamento
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function SettlementPanel({ onLiquidate, rows }) {
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Saldos cruzados</h2>
+        <span>{rows.length} saldo(s)</span>
+      </div>
+
+      {!rows.length ? (
+        <div className="empty-state">Nenhum saldo pendente neste mês.</div>
+      ) : (
+        <div className="settlement-grid">
+          {rows.map((row) => (
+            <article className="settlement-card" key={`${row.fromId}-${row.toId}`}>
+              <div>
+                <span>{personName(row.fromId)} deve para</span>
+                <strong>{personName(row.toId)}</strong>
+              </div>
+              <div>
+                <strong>{formatCurrency(row.amount)}</strong>
+                <button className="secondary-button" onClick={() => onLiquidate(row)} type="button">
+                  Liquidar saldo
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function calculateSettlementRows(expenses) {
+  const balances = new Map();
+
+  expenses.forEach((expense) => {
+    Object.entries(expense.shares || {}).forEach(([personId, share]) => {
+      if (personId === expense.payerId || share.status !== "pending") return;
+      const key = `${personId}->${expense.payerId}`;
+      balances.set(key, (balances.get(key) || 0) + Number(share.amount || 0));
+    });
+  });
+
+  const rows = [];
+  for (let index = 0; index < PEOPLE.length; index += 1) {
+    for (let nextIndex = index + 1; nextIndex < PEOPLE.length; nextIndex += 1) {
+      const first = PEOPLE[index].id;
+      const second = PEOPLE[nextIndex].id;
+      const firstOwesSecond = balances.get(`${first}->${second}`) || 0;
+      const secondOwesFirst = balances.get(`${second}->${first}`) || 0;
+      const net = roundMoney(firstOwesSecond - secondOwesFirst);
+
+      if (net > 0) rows.push({ fromId: first, toId: second, amount: net });
+      if (net < 0) rows.push({ fromId: second, toId: first, amount: Math.abs(net) });
+    }
+  }
+
+  return rows;
+}
+
+function getViewTitle(activeView) {
+  if (activeView === "dashboard") return "Dashboard geral";
+  if (activeView === "new") return "Nova conta";
+  if (activeView === "settlement") return "Acerto de contas";
+  return `Minhas contas: ${personName(activeView)}`;
+}
+
+function formatDate(date) {
+  if (!date) return "-";
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+}
+
+export default App;
