@@ -8,9 +8,9 @@ service cloud.firestore {
 
     function allowedEmail() {
       return signedIn() && request.auth.token.email in [
-        "COLOCAR_EMAIL_EDNEY_AQUI",
-        "COLOCAR_EMAIL_SONIA_AQUI",
-        "COLOCAR_EMAIL_RODNEY_AQUI"
+        "edneypugleise@gmail.com",
+        "soniapugleise@gmail.com",
+        "RODNEYPUGLEISEMACHADO@gmail.com"
       ];
     }
 

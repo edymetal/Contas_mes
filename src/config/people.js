@@ -2,17 +2,17 @@ export const PEOPLE = [
   {
     id: "edney",
     name: "Edney",
-    email: "COLOCAR_EMAIL_EDNEY_AQUI",
+    email: "edneypugleise@gmail.com",
   },
   {
     id: "sonia",
     name: "Sônia",
-    email: "COLOCAR_EMAIL_SONIA_AQUI",
+    email: "soniapugleise@gmail.com",
   },
   {
     id: "rodney",
     name: "Rodney",
-    email: "COLOCAR_EMAIL_RODNEY_AQUI",
+    email: "RODNEYPUGLEISEMACHADO@gmail.com",
   },
 ];
 
