@@ -279,7 +279,7 @@ function App() {
         return;
       }
       runs = totalInstallments - currentInstallment + 1;
-      valuePerMonth = roundMoney(rawValue / totalInstallments);
+      valuePerMonth = rawValue;
     } else if (type === "recurring") {
       runs = Number(form.recurringMonths) || 1;
       valuePerMonth = rawValue;
@@ -670,22 +670,12 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
     const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
     if (!totalValue || !form.participants.length) return 0;
     
-    let baseValue = totalValue;
-    if (form.type === "installment") {
-      baseValue = totalValue / Number(form.installmentsCount || 1);
-    }
-    
-    return roundMoney(baseValue / form.participants.length);
-  }, [form.totalValue, form.participants.length, form.type, form.installmentsCount]);
+    return roundMoney(totalValue / form.participants.length);
+  }, [form.totalValue, form.participants.length]);
 
   const monthlyValuePreview = useMemo(() => {
-    const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
-    if (!totalValue) return 0;
-    if (form.type === "installment") {
-      return roundMoney(totalValue / Number(form.installmentsCount || 1));
-    }
-    return totalValue;
-  }, [form.totalValue, form.type, form.installmentsCount]);
+    return roundMoney(Number(String(form.totalValue).replace(",", ".")));
+  }, [form.totalValue]);
 
   return (
     <section className="panel form-panel">
@@ -711,7 +701,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 
           <label>
             <span>
-              {form.type === "installment" ? "Valor Total da Compra" : "Valor Mensal em euros"}
+              {form.type === "installment" ? "Valor da Parcela" : "Valor Mensal em euros"}
             </span>
             <input
               inputMode="decimal"
@@ -806,7 +796,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           }}>
             {form.type === "installment" && (
               <p style={{ margin: 0 }}>
-                💡 <strong>Conta Parcelada:</strong> O valor total de <strong>{formatCurrency(form.totalValue)}</strong> é referente a <strong>{form.installmentsCount} parcelas</strong> de <strong>{formatCurrency(monthlyValuePreview)}</strong>. Serão cadastradas <strong>{Number(form.installmentsCount) - (Number(form.currentInstallment) || 1) + 1} parcelas</strong> (da {form.currentInstallment}ª até a {form.installmentsCount}ª) a partir do mês selecionado.
+                💡 <strong>Conta Parcelada:</strong> Cada parcela tem o valor de <strong>{formatCurrency(form.totalValue)}</strong> (totalizando <strong>{formatCurrency(Number(form.totalValue) * form.installmentsCount)}</strong> para a compra inteira de <strong>{form.installmentsCount} parcelas</strong>). Serão cadastradas <strong>{Number(form.installmentsCount) - (Number(form.currentInstallment) || 1) + 1} parcelas</strong> (da {form.currentInstallment}ª até a {form.installmentsCount}ª) a partir do mês selecionado.
               </p>
             )}
             {form.type === "recurring" && (
