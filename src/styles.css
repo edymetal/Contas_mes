@@ -122,6 +122,13 @@ button {
   z-index: 10;
 }
 
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -240,6 +247,27 @@ button {
   font-size: 0.8rem;
 }
 
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+}
+
+.user-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  border: 2px solid var(--primary);
+}
+
 /* Buttons & Interactive Elements */
 .icon-button {
   display: grid;
@@ -340,10 +368,22 @@ button {
   color: var(--danger);
 }
 
-/* Dashboard View */
 .view-grid {
   display: grid;
   gap: 24px;
+}
+
+.dashboard-main-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-main-content {
+    grid-template-columns: 1fr;
+  }
 }
 
 .metrics-grid {

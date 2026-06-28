@@ -436,13 +436,15 @@ function App() {
       )}
 
       <aside className={`sidebar ${isDrawerOpen ? "open" : ""}`}>
-        <div className="brand">
-          <div className="brand-mark">
-            <Home size={24} />
-          </div>
-          <div>
-            <strong>Contas</strong>
-            <span>Compartilhadas</span>
+        <div className="sidebar-header">
+          <div className="brand">
+            <div className="brand-mark">
+              <Home size={24} />
+            </div>
+            <div>
+              <strong>Contas</strong>
+              <span>Compartilhadas</span>
+            </div>
           </div>
           <button className="drawer-close-button" onClick={() => setIsDrawerOpen(false)} type="button">
             <X size={20} />
@@ -470,10 +472,24 @@ function App() {
         </nav>
 
         <div className="user-card">
-          <div>
-            <span>Logado como</span>
-            <strong>{profile.name}</strong>
-            <small>{firebaseUser?.email}</small>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {firebaseUser?.photoURL ? (
+              <img
+                src={firebaseUser.photoURL}
+                alt={profile.name}
+                className="user-avatar"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="user-avatar-placeholder">
+                {profile.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <span>Logado como</span>
+              <strong>{profile.name}</strong>
+              <small>{firebaseUser?.email}</small>
+            </div>
           </div>
           <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
             <LogOut size={18} />
@@ -615,31 +631,33 @@ function Dashboard({ categoryTotals, dataLoading, expenses, metrics }) {
         <MetricCard icon={Check} label="Total pago" value={formatCurrency(metrics.paid)} tone="success" />
       </section>
 
-      <section className="panel chart-panel">
-        <div className="section-heading">
-          <h2>Gastos por categoria</h2>
-        </div>
+      <div className="dashboard-main-content">
+        <section className="panel chart-panel">
+          <div className="section-heading">
+            <h2>Gastos por categoria</h2>
+          </div>
 
-        <div className="bar-chart">
-          {categoryTotals.map((item) => (
-            <div className="bar-row" key={item.category}>
-              <span>{item.category}</span>
-              <div className="bar-track">
-                <div className="bar-fill" style={{ width: `${item.percent}%` }} />
+          <div className="bar-chart">
+            {categoryTotals.map((item) => (
+              <div className="bar-row" key={item.category}>
+                <span>{item.category}</span>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${item.percent}%` }} />
+                </div>
+                <strong>{formatCurrency(item.total)}</strong>
               </div>
-              <strong>{formatCurrency(item.total)}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      <section className="panel table-panel">
-        <div className="section-heading">
-          <h2>Contas cadastradas</h2>
-          <span>{expenses.length} registro(s)</span>
-        </div>
-        {dataLoading ? <div className="empty-state">Carregando...</div> : <ExpensesTable expenses={expenses} />}
-      </section>
+        <section className="panel table-panel">
+          <div className="section-heading">
+            <h2>Contas cadastradas</h2>
+            <span>{expenses.length} registro(s)</span>
+          </div>
+          {dataLoading ? <div className="empty-state">Carregando...</div> : <ExpensesTable expenses={expenses} />}
+        </section>
+      </div>
     </div>
   );
 }
