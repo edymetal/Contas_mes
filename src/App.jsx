@@ -8,9 +8,12 @@ import {
   Home,
   LogOut,
   Menu,
+  Pencil,
   Plus,
   ReceiptText,
   Settings,
+  SlidersHorizontal,
+  Trash2,
   UserRound,
   WalletCards,
   X,
@@ -18,6 +21,7 @@ import {
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   query,
@@ -67,6 +71,7 @@ const navItems = [
   { id: "new", label: "Nova conta", icon: Plus },
   ...PEOPLE.map((person) => ({ id: person.id, label: person.name, icon: UserRound })),
   { id: "settlement", label: "Acerto", icon: ArrowRightLeft },
+  { id: "manage", label: "Gerenciar contas", icon: SlidersHorizontal },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
@@ -129,6 +134,7 @@ function App() {
     description: "",
   });
   const [actionMessage, setActionMessage] = useState("");
+  const [editingExpense, setEditingExpense] = useState(null);
 
   useEffect(() => {
     if (!hasFirebaseConfig) {
@@ -445,6 +451,70 @@ function App() {
     setActionMessage("Saldo liquidado para o mês selecionado.");
   }
 
+  async function handleDeleteExpense(expenseId) {
+    if (!window.confirm("Tem certeza que deseja excluir esta conta?")) return;
+    try {
+      await deleteDoc(doc(db, "expenses", expenseId));
+      setActionMessage("Conta excluída com sucesso.");
+    } catch (error) {
+      setActionMessage("Erro ao excluir a conta.");
+    }
+  }
+
+  async function handleUpdateExpense(expenseId, updatedData) {
+    const rawValue = Number(String(updatedData.totalValue).replace(",", "."));
+    if (isNaN(rawValue) || rawValue <= 0) {
+      throw new Error("Informe um valor válido.");
+    }
+    if (!updatedData.title.trim()) {
+      throw new Error("Informe o nome da despesa.");
+    }
+    if (!updatedData.participants.length) {
+      throw new Error("Selecione pelo menos uma pessoa no rateio.");
+    }
+
+    const shareAmount = roundMoney(rawValue / updatedData.participants.length);
+    const oldExpense = expenses.find((e) => e.id === expenseId);
+    const oldShares = oldExpense?.shares || {};
+
+    const shares = updatedData.participants.reduce((acc, personId) => {
+      const oldShare = oldShares[personId];
+      const wasPayer = personId === updatedData.payerId;
+
+      if (wasPayer) {
+        acc[personId] = {
+          amount: shareAmount,
+          status: "self",
+          payment: { type: "Pagamento original", paidAt: updatedData.dueDate },
+        };
+      } else {
+        const currentStatus = (oldShare?.status === "self" || !oldShare?.status) ? "pending" : oldShare.status;
+        const currentPayment = (oldShare?.status === "self" || !oldShare?.status) ? null : oldShare.payment;
+        acc[personId] = {
+          amount: shareAmount,
+          status: currentStatus,
+          payment: currentPayment,
+        };
+      }
+      return acc;
+    }, {});
+
+    await updateDoc(doc(db, "expenses", expenseId), {
+      title: updatedData.title.trim(),
+      totalValue: rawValue,
+      dueDate: updatedData.dueDate,
+      monthKey: monthFromDate(updatedData.dueDate),
+      category: updatedData.category,
+      payerId: updatedData.payerId,
+      participants: updatedData.participants,
+      shares,
+      updatedAt: serverTimestamp(),
+    });
+
+    setActionMessage("Conta atualizada com sucesso.");
+    setEditingExpense(null);
+  }
+
   if (authLoading) {
     return <LoadingScreen />;
   }
@@ -590,6 +660,15 @@ function App() {
         {activeView === "settings" && (
           <SettingsPanel theme={theme} setTheme={setTheme} />
         )}
+
+        {activeView === "manage" && (
+          <ManagePanel
+            expenses={expenses}
+            onEdit={setEditingExpense}
+            onDelete={handleDeleteExpense}
+            dataLoading={dataLoading}
+          />
+        )}
       </section>
     </div>
 
@@ -600,6 +679,14 @@ function App() {
           onClose={() => setPaymentTarget(null)}
           onSubmit={confirmPayment}
           target={paymentTarget}
+        />
+      )}
+
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onSave={handleUpdateExpense}
         />
       )}
     </main>
@@ -1166,6 +1253,7 @@ function getViewTitle(activeView) {
   if (activeView === "dashboard") return "Dashboard geral";
   if (activeView === "new") return "Nova conta";
   if (activeView === "settlement") return "Acerto de contas";
+  if (activeView === "manage") return "Gerenciar contas";
   if (activeView === "settings") return "Configurações";
   return `Minhas contas: ${personName(activeView)}`;
 }
@@ -1173,6 +1261,232 @@ function getViewTitle(activeView) {
 function formatDate(date) {
   if (!date) return "-";
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+}
+
+function ManagePanel({ expenses, onEdit, onDelete, dataLoading }) {
+  if (dataLoading) {
+    return <div className="empty-state">Carregando...</div>;
+  }
+
+  if (!expenses.length) {
+    return <div className="empty-state">Nenhuma conta cadastrada neste mês.</div>;
+  }
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Contas do Mês</h2>
+        <span>{expenses.length} registro(s)</span>
+      </div>
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Despesa</th>
+              <th>Valor</th>
+              <th>Vencimento</th>
+              <th>Categoria</th>
+              <th>Quem pagou</th>
+              <th>Rateio</th>
+              <th style={{ textAlign: "right" }}>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {expenses.map((expense) => (
+              <tr key={expense.id}>
+                <td>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <strong>{expense.title}</strong>
+                    {expense.installment && (
+                      <small style={{ display: "block", marginTop: "4px" }}>
+                        {expense.installment}
+                      </small>
+                    )}
+                  </div>
+                </td>
+                <td>{formatCurrency(expense.totalValue)}</td>
+                <td>{formatDate(expense.dueDate)}</td>
+                <td>
+                  <span className="tag">{expense.category}</span>
+                </td>
+                <td>{personName(expense.payerId)}</td>
+                <td>{expense.participants?.map(personName).join(", ")}</td>
+                <td style={{ textAlign: "right" }}>
+                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                    <button
+                      className="icon-button"
+                      onClick={() => onEdit(expense)}
+                      title="Editar despesa"
+                      type="button"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      style={{ color: "var(--danger)" }}
+                      onClick={() => onDelete(expense.id)}
+                      title="Excluir despesa"
+                      type="button"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function EditExpenseModal({ expense, onClose, onSave }) {
+  const [title, setTitle] = useState(expense.title);
+  const [totalValue, setTotalValue] = useState(expense.totalValue);
+  const [dueDate, setDueDate] = useState(expense.dueDate || "");
+  const [category, setCategory] = useState(expense.category);
+  const [payerId, setPayerId] = useState(expense.payerId);
+  const [participants, setParticipants] = useState(expense.participants || []);
+  const [error, setError] = useState("");
+
+  const splitPreview = useMemo(() => {
+    const val = roundMoney(Number(String(totalValue).replace(",", ".")));
+    if (!val || !participants.length) return 0;
+    return roundMoney(val / participants.length);
+  }, [totalValue, participants]);
+
+  function toggleParticipant(personId) {
+    setParticipants((current) =>
+      current.includes(personId)
+        ? current.filter((id) => id !== personId)
+        : [...current, personId]
+    );
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      await onSave(expense.id, {
+        title,
+        totalValue,
+        dueDate,
+        category,
+        payerId,
+        participants,
+      });
+    } catch (err) {
+      setError(err.message || "Erro ao salvar despesa.");
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="modal" style={{ maxWidth: "600px" }} role="dialog" aria-modal="true" aria-labelledby="edit-title">
+        <div className="section-heading">
+          <div>
+            <h2 id="edit-title">Editar despesa</h2>
+            <span>Ajuste os detalhes e o rateio</span>
+          </div>
+          <button className="icon-button" onClick={onClose} type="button">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
+            <label>
+              <span>Nome da despesa</span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </label>
+          </div>
+
+          <div className="form-grid">
+            <label>
+              <span>Valor em euros</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={totalValue}
+                onChange={(e) => setTotalValue(e.target.value)}
+                required
+              />
+            </label>
+
+            <label>
+              <span>Data de vencimento</span>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                required
+              />
+            </label>
+
+            <label>
+              <span>Categoria</span>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat}>{cat}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span>Quem pagou originalmente?</span>
+              <select value={payerId} onChange={(e) => setPayerId(e.target.value)}>
+                {PEOPLE.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <fieldset className="people-fieldset">
+            <legend>Quem participa do rateio?</legend>
+            <div className="checkbox-grid">
+              {PEOPLE.map((person) => (
+                <label className="checkbox-card" key={person.id}>
+                  <input
+                    checked={participants.includes(person.id)}
+                    onChange={() => toggleParticipant(person.id)}
+                    type="checkbox"
+                  />
+                  <span>{person.name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="split-preview">
+            <span>Novo valor por pessoa</span>
+            <strong>{formatCurrency(splitPreview)}</strong>
+          </div>
+
+          {error && <div className="error-box">{error}</div>}
+
+          <div className="modal-actions">
+            <button className="secondary-button" onClick={onClose} type="button">
+              Cancelar
+            </button>
+            <button className="primary-button" type="submit">
+              <Check size={18} />
+              Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 export default App;
