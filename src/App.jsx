@@ -9,6 +9,7 @@ import {
   LogOut,
   Plus,
   ReceiptText,
+  Settings,
   UserRound,
   WalletCards,
 } from "lucide-react";
@@ -47,6 +48,7 @@ const navItems = [
   { id: "new", label: "Nova conta", icon: Plus },
   ...PEOPLE.map((person) => ({ id: person.id, label: person.name, icon: UserRound })),
   { id: "settlement", label: "Acerto", icon: ArrowRightLeft },
+  { id: "settings", label: "Configurações", icon: Settings },
 ];
 
 function formatCurrency(value) {
@@ -82,9 +84,17 @@ function isSettledStatus(status) {
 }
 
 function App() {
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("contas_mes_theme") || "light";
+  });
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("contas_mes_theme", theme);
+  }, [theme]);
   const [authError, setAuthError] = useState("");
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
@@ -448,6 +458,10 @@ function App() {
 
         {activeView === "settlement" && (
           <SettlementPanel rows={settlementRows} onLiquidate={liquidateBalance} />
+        )}
+
+        {activeView === "settings" && (
+          <SettingsPanel theme={theme} setTheme={setTheme} />
         )}
       </section>
 
@@ -874,10 +888,71 @@ function calculateSettlementRows(expenses) {
   return rows;
 }
 
+function SettingsPanel({ theme, setTheme }) {
+  return (
+    <section className="panel settings-panel">
+      <div className="section-heading">
+        <h2>Aparência e Personalização</h2>
+        <span>Configurações visuais do site</span>
+      </div>
+
+      <div style={{ display: "grid", gap: "24px", marginTop: "16px" }}>
+        <div>
+          <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Tema do Sistema</h3>
+          <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: "0.9rem" }}>
+            Escolha como prefere visualizar o painel de despesas.
+          </p>
+
+          <div className="checkbox-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+            <button
+              type="button"
+              className={`checkbox-card ${theme === "light" ? "active" : ""}`}
+              style={{
+                cursor: "pointer",
+                border: theme === "light" ? "2px solid var(--primary)" : "1px solid var(--line)",
+                background: "var(--input-bg)",
+                padding: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontWeight: theme === "light" ? "bold" : "normal"
+              }}
+              onClick={() => setTheme("light")}
+            >
+              <span style={{ color: "var(--text)" }}>☀️ Tema Claro</span>
+              {theme === "light" && <Check size={18} style={{ color: "var(--primary)" }} />}
+            </button>
+
+            <button
+              type="button"
+              className={`checkbox-card ${theme === "dark" ? "active" : ""}`}
+              style={{
+                cursor: "pointer",
+                border: theme === "dark" ? "2px solid var(--primary)" : "1px solid var(--line)",
+                background: "var(--input-bg)",
+                padding: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontWeight: theme === "dark" ? "bold" : "normal"
+              }}
+              onClick={() => setTheme("dark")}
+            >
+              <span style={{ color: "var(--text)" }}>🌙 Tema Escuro</span>
+              {theme === "dark" && <Check size={18} style={{ color: "var(--primary)" }} />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function getViewTitle(activeView) {
   if (activeView === "dashboard") return "Dashboard geral";
   if (activeView === "new") return "Nova conta";
   if (activeView === "settlement") return "Acerto de contas";
+  if (activeView === "settings") return "Configurações";
   return `Minhas contas: ${personName(activeView)}`;
 }
 

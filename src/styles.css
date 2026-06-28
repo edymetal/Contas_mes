@@ -18,6 +18,40 @@
   --danger: #b91c1c;
   --danger-soft: #fee2e2;
   --shadow: 0 18px 45px rgba(18, 33, 31, 0.08);
+
+  --sidebar-bg: rgba(255, 255, 255, 0.86);
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --input-bg: #ffffff;
+  --tag-bg: #eef6f4;
+  --track-bg: #e8efed;
+  --icon-btn-bg: #edf3f1;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1311;
+  --panel: #111e1c;
+  --panel-muted: #0d2825;
+  --text: #e2ece9;
+  --muted: #849692;
+  --line: #223733;
+  --primary: #14b8a6;
+  --primary-dark: #0d9488;
+  --primary-soft: #0f2e2a;
+  --warning: #f59e0b;
+  --warning-soft: #2d1e05;
+  --success: #22c55e;
+  --success-soft: #082f14;
+  --danger: #ef4444;
+  --danger-soft: #2d0c0c;
+  --shadow: 0 18px 45px rgba(0, 0, 0, 0.4);
+
+  --sidebar-bg: rgba(17, 30, 28, 0.86);
+  --panel-bg: rgba(17, 30, 28, 0.92);
+  --input-bg: #162a27;
+  --tag-bg: #14322e;
+  --track-bg: #1a2f2b;
+  --icon-btn-bg: #1a2f2b;
 }
 
 * {
@@ -61,7 +95,7 @@ button {
   height: 100vh;
   padding: 24px;
   border-right: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--sidebar-bg);
   backdrop-filter: blur(16px);
 }
 
@@ -172,7 +206,7 @@ button {
   place-items: center;
   min-width: 38px;
   height: 38px;
-  background: #edf3f1;
+  background: var(--icon-btn-bg);
   color: var(--text);
 }
 
@@ -265,7 +299,7 @@ button {
 .settlement-card {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--panel-bg);
   box-shadow: var(--shadow);
 }
 
@@ -352,7 +386,7 @@ button {
   height: 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e8efed;
+  background: var(--track-bg);
 }
 
 .bar-fill {
@@ -401,7 +435,7 @@ td small {
   min-height: 28px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #eef6f4;
+  background: var(--tag-bg);
   color: var(--primary-dark);
   font-size: 0.82rem;
   font-weight: 700;
@@ -448,7 +482,7 @@ textarea {
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--input-bg);
   color: var(--text);
   outline: 0;
   padding: 10px 12px;
@@ -488,7 +522,7 @@ textarea:focus {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--input-bg);
 }
 
 .checkbox-card input {
@@ -544,7 +578,7 @@ textarea:focus {
 
 .secondary-button {
   border: 1px solid var(--line);
-  background: white;
+  background: var(--input-bg);
   color: var(--primary-dark);
 }
 
@@ -648,7 +682,7 @@ textarea:focus {
   overflow-y: auto;
   padding: 20px;
   border-radius: 8px;
-  background: white;
+  background: var(--panel);
   box-shadow: 0 24px 80px rgba(18, 33, 31, 0.28);
 }
 
