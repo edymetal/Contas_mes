@@ -39,6 +39,7 @@ const emptyForm = {
   title: "",
   totalValue: "",
   dueDate: "",
+  dueDay: new Date().getDate(),
   category: "Casa",
   payerId: "edney",
   participants: ["edney", "sonia", "rodney"],
@@ -259,17 +260,40 @@ function App() {
       return;
     }
 
-    if (!form.dueDate) {
-      setFormError("Informe a data de vencimento.");
-      return;
-    }
-
     if (!form.participants.length) {
       setFormError("Selecione pelo menos uma pessoa no rateio.");
       return;
     }
 
     const type = form.type || "normal";
+    let computedDueDate = form.dueDate;
+
+    if (type === "installment") {
+      const today = new Date();
+      const currentDay = String(today.getDate()).padStart(2, "0");
+      const [selYear, selMonth] = selectedMonth.split("-");
+      const maxDays = new Date(Number(selYear), Number(selMonth), 0).getDate();
+      const finalDay = Math.min(Number(currentDay), maxDays);
+      const paddedDay = String(finalDay).padStart(2, "0");
+      computedDueDate = `${selYear}-${selMonth}-${paddedDay}`;
+    } else if (type === "recurring") {
+      const dueDay = Number(form.dueDay) || 1;
+      if (dueDay < 1 || dueDay > 31) {
+        setFormError("Informe um dia de vencimento válido (1 a 31).");
+        return;
+      }
+      const [selYear, selMonth] = selectedMonth.split("-");
+      const maxDays = new Date(Number(selYear), Number(selMonth), 0).getDate();
+      const finalDay = Math.min(dueDay, maxDays);
+      const paddedDay = String(finalDay).padStart(2, "0");
+      computedDueDate = `${selYear}-${selMonth}-${paddedDay}`;
+    } else {
+      if (!computedDueDate) {
+        setFormError("Informe a data de vencimento.");
+        return;
+      }
+    }
+
     let runs = 1;
     let valuePerMonth = rawValue;
 
@@ -291,7 +315,7 @@ function App() {
     const batch = writeBatch(db);
 
     for (let index = 0; index < runs; index += 1) {
-      const currentDueDate = addMonths(form.dueDate, index);
+      const currentDueDate = addMonths(computedDueDate, index);
       const currentMonthKey = monthFromDate(currentDueDate);
       
       const shareAmount = roundMoney(valuePerMonth / form.participants.length);
@@ -330,7 +354,7 @@ function App() {
 
     await batch.commit();
 
-    setSelectedMonth(monthFromDate(form.dueDate));
+    setSelectedMonth(monthFromDate(computedDueDate));
     setForm({ ...emptyForm, dueDate: "" });
     setActionMessage(
       type === "normal"
@@ -810,10 +834,25 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
             </label>
           )}
 
-          <label>
-            <span>Data de vencimento (1º mês)</span>
-            <input type="date" value={form.dueDate} onChange={(event) => onChange("dueDate", event.target.value)} />
-          </label>
+          {form.type === "normal" && (
+            <label>
+              <span>Data de vencimento</span>
+              <input type="date" value={form.dueDate} onChange={(event) => onChange("dueDate", event.target.value)} />
+            </label>
+          )}
+
+          {form.type === "recurring" && (
+            <label>
+              <span>Dia do vencimento</span>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={form.dueDay}
+                onChange={(event) => onChange("dueDay", Number(event.target.value))}
+              />
+            </label>
+          )}
 
           <label>
             <span>Categoria</span>
