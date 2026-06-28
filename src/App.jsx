@@ -40,8 +40,17 @@ const emptyForm = {
   category: "Casa",
   payerId: "edney",
   participants: ["edney", "sonia", "rodney"],
-  installment: "",
+  type: "normal", // normal, installment, recurring
+  installmentsCount: 12,
+  recurringMonths: 12,
 };
+
+function addMonths(dateStr, months) {
+  if (!dateStr) return "";
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  return date.toISOString().slice(0, 10);
+}
 
 const navItems = [
   { id: "dashboard", label: "Painel", icon: BarChart3 },
@@ -229,15 +238,14 @@ function App() {
     setFormError("");
     setActionMessage("");
 
-    const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
-
-    if (!form.title.trim()) {
-      setFormError("Informe o nome da despesa.");
+    const rawValue = Number(String(form.totalValue).replace(",", "."));
+    if (isNaN(rawValue) || rawValue <= 0) {
+      setFormError("Informe um valor válido.");
       return;
     }
 
-    if (!totalValue || totalValue <= 0) {
-      setFormError("Informe um valor total válido.");
+    if (!form.title.trim()) {
+      setFormError("Informe o nome da despesa.");
       return;
     }
 
@@ -251,34 +259,67 @@ function App() {
       return;
     }
 
-    const shareAmount = roundMoney(totalValue / form.participants.length);
-    const shares = form.participants.reduce((acc, personId) => {
-      acc[personId] = {
-        amount: shareAmount,
-        status: personId === form.payerId ? "self" : "pending",
-        payment: personId === form.payerId ? { type: "Pagamento original", paidAt: form.dueDate } : null,
-      };
-      return acc;
-    }, {});
+    const type = form.type || "normal";
+    let runs = 1;
+    let valuePerMonth = rawValue;
 
-    await addDoc(collection(db, "expenses"), {
-      title: form.title.trim(),
-      totalValue,
-      dueDate: form.dueDate,
-      monthKey: monthFromDate(form.dueDate),
-      category: form.category,
-      payerId: form.payerId,
-      participants: form.participants,
-      installment: form.installment.trim(),
-      shares,
-      createdBy: profile.id,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    if (type === "installment") {
+      runs = Number(form.installmentsCount) || 1;
+      valuePerMonth = roundMoney(rawValue / runs);
+    } else if (type === "recurring") {
+      runs = Number(form.recurringMonths) || 1;
+      valuePerMonth = rawValue;
+    }
+
+    const batch = writeBatch(db);
+
+    for (let index = 0; index < runs; index += 1) {
+      const currentDueDate = addMonths(form.dueDate, index);
+      const currentMonthKey = monthFromDate(currentDueDate);
+      
+      const shareAmount = roundMoney(valuePerMonth / form.participants.length);
+      const shares = form.participants.reduce((acc, personId) => {
+        acc[personId] = {
+          amount: shareAmount,
+          status: personId === form.payerId ? "self" : "pending",
+          payment: personId === form.payerId ? { type: "Pagamento original", paidAt: currentDueDate } : null,
+        };
+        return acc;
+      }, {});
+
+      let label = "";
+      if (type === "installment") {
+        label = `Parcela ${index + 1} de ${runs}`;
+      } else if (type === "recurring") {
+        label = `Fixo (Mês ${index + 1}/${runs})`;
+      }
+
+      const docRef = doc(collection(db, "expenses"));
+      batch.set(docRef, {
+        title: form.title.trim(),
+        totalValue: valuePerMonth,
+        dueDate: currentDueDate,
+        monthKey: currentMonthKey,
+        category: form.category,
+        payerId: form.payerId,
+        participants: form.participants,
+        installment: label,
+        shares,
+        createdBy: profile.id,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
 
     setSelectedMonth(monthFromDate(form.dueDate));
     setForm({ ...emptyForm, dueDate: "" });
-    setActionMessage("Conta cadastrada com rateio automático.");
+    setActionMessage(
+      type === "normal"
+        ? "Conta cadastrada com sucesso."
+        : `Lançadas ${runs} parcelas/meses com sucesso.`
+    );
     setActiveView("dashboard");
   }
 
@@ -612,8 +653,23 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   const splitPreview = useMemo(() => {
     const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
     if (!totalValue || !form.participants.length) return 0;
-    return roundMoney(totalValue / form.participants.length);
-  }, [form.totalValue, form.participants.length]);
+    
+    let baseValue = totalValue;
+    if (form.type === "installment") {
+      baseValue = totalValue / Number(form.installmentsCount || 1);
+    }
+    
+    return roundMoney(baseValue / form.participants.length);
+  }, [form.totalValue, form.participants.length, form.type, form.installmentsCount]);
+
+  const monthlyValuePreview = useMemo(() => {
+    const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
+    if (!totalValue) return 0;
+    if (form.type === "installment") {
+      return roundMoney(totalValue / Number(form.installmentsCount || 1));
+    }
+    return totalValue;
+  }, [form.totalValue, form.type, form.installmentsCount]);
 
   return (
     <section className="panel form-panel">
@@ -629,7 +685,18 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           </label>
 
           <label>
-            <span>Valor total em euros</span>
+            <span>Tipo de Lançamento</span>
+            <select value={form.type || "normal"} onChange={(event) => onChange("type", event.target.value)}>
+              <option value="normal">Normal (Única)</option>
+              <option value="installment">Parcelada (Cartão, etc.)</option>
+              <option value="recurring">Fixa / Contínua (Mensal)</option>
+            </select>
+          </label>
+
+          <label>
+            <span>
+              {form.type === "installment" ? "Valor Total da Compra" : "Valor Mensal em euros"}
+            </span>
             <input
               inputMode="decimal"
               placeholder="400,00"
@@ -641,8 +708,40 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
             />
           </label>
 
+          {form.type === "installment" && (
+            <label>
+              <span>Quantidade de parcelas</span>
+              <select
+                value={form.installmentsCount}
+                onChange={(event) => onChange("installmentsCount", Number(event.target.value))}
+              >
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36, 48].map((num) => (
+                  <option key={num} value={num}>
+                    {num}x
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {form.type === "recurring" && (
+            <label>
+              <span>Lançar para quantos meses?</span>
+              <select
+                value={form.recurringMonths}
+                onChange={(event) => onChange("recurringMonths", Number(event.target.value))}
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24].map((num) => (
+                  <option key={num} value={num}>
+                    {num} {num === 1 ? "mês" : "meses"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label>
-            <span>Data de vencimento</span>
+            <span>Data de vencimento (1º mês)</span>
             <input type="date" value={form.dueDate} onChange={(event) => onChange("dueDate", event.target.value)} />
           </label>
 
@@ -665,16 +764,29 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
               ))}
             </select>
           </label>
-
-          <label>
-            <span>Parcelamento opcional</span>
-            <input
-              placeholder="Parcela 1 de 10"
-              value={form.installment}
-              onChange={(event) => onChange("installment", event.target.value)}
-            />
-          </label>
         </div>
+
+        {form.type !== "normal" && (
+          <div style={{
+            background: "var(--panel-muted)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--radius-md)",
+            padding: "16px",
+            fontSize: "0.9rem",
+            color: "var(--muted)"
+          }}>
+            {form.type === "installment" && (
+              <p style={{ margin: 0 }}>
+                💡 <strong>Conta Parcelada:</strong> O valor total de <strong>{formatCurrency(form.totalValue)}</strong> será dividido em <strong>{form.installmentsCount} parcelas</strong> de <strong>{formatCurrency(monthlyValuePreview)}</strong> nos próximos meses.
+              </p>
+            )}
+            {form.type === "recurring" && (
+              <p style={{ margin: 0 }}>
+                💡 <strong>Conta Fixa:</strong> Esta despesa de <strong>{formatCurrency(form.totalValue)}</strong> será replicada mensalmente pelos próximos <strong>{form.recurringMonths} meses</strong>.
+              </p>
+            )}
+          </div>
+        )}
 
         <fieldset className="people-fieldset">
           <legend>Quem deve participar do rateio?</legend>
@@ -693,7 +805,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
         </fieldset>
 
         <div className="split-preview">
-          <span>Valor por pessoa</span>
+          <span>Valor por pessoa (por mês)</span>
           <strong>{formatCurrency(splitPreview)}</strong>
         </div>
 
