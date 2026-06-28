@@ -7,11 +7,13 @@ import {
   CircleDollarSign,
   Home,
   LogOut,
+  Menu,
   Plus,
   ReceiptText,
   Settings,
   UserRound,
   WalletCards,
+  X,
 } from "lucide-react";
 import {
   addDoc,
@@ -106,6 +108,7 @@ function App() {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -428,7 +431,11 @@ function App() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
+      {isDrawerOpen && (
+        <div className="drawer-backdrop" onClick={() => setIsDrawerOpen(false)} />
+      )}
+
+      <aside className={`sidebar ${isDrawerOpen ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">
             <Home size={24} />
@@ -437,6 +444,9 @@ function App() {
             <strong>Contas</strong>
             <span>Compartilhadas</span>
           </div>
+          <button className="drawer-close-button" onClick={() => setIsDrawerOpen(false)} type="button">
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="main-nav" aria-label="Navegação principal">
@@ -446,7 +456,10 @@ function App() {
               <button
                 className={activeView === item.id ? "nav-item active" : "nav-item"}
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => {
+                  setActiveView(item.id);
+                  setIsDrawerOpen(false);
+                }}
                 type="button"
               >
                 <Icon size={18} />
@@ -468,18 +481,37 @@ function App() {
         </div>
       </aside>
 
-      <section className="content">
-        <header className="topbar">
-          <div>
-            <span className="eyebrow">{selectedMonth}</span>
-            <h1>{getViewTitle(activeView)}</h1>
+      <div className="content-wrapper">
+        <header className="mobile-header">
+          <button className="icon-button menu-toggle" onClick={() => setIsDrawerOpen(true)} type="button">
+            <Menu size={22} />
+          </button>
+          <div className="mobile-user-tabs">
+            {PEOPLE.map((person) => (
+              <button
+                key={person.id}
+                className={`user-tab ${activeView === person.id ? "active" : ""}`}
+                onClick={() => setActiveView(person.id)}
+                type="button"
+              >
+                {person.name}
+              </button>
+            ))}
           </div>
-
-          <label className="month-filter">
-            <CalendarDays size={18} />
-            <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
-          </label>
         </header>
+
+        <section className="content">
+          <header className="topbar">
+            <div>
+              <span className="eyebrow">{selectedMonth}</span>
+              <h1>{getViewTitle(activeView)}</h1>
+            </div>
+
+            <label className="month-filter">
+              <CalendarDays size={18} />
+              <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
+            </label>
+          </header>
 
         {actionMessage && <div className="notice">{actionMessage}</div>}
 
@@ -519,6 +551,7 @@ function App() {
           <SettingsPanel theme={theme} setTheme={setTheme} />
         )}
       </section>
+    </div>
 
       {paymentTarget && (
         <PaymentModal
