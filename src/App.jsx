@@ -308,7 +308,7 @@ function App() {
       runs = totalInstallments - currentInstallment + 1;
       valuePerMonth = rawValue;
     } else if (type === "recurring") {
-      runs = Number(form.recurringMonths) || 1;
+      runs = 12;
       valuePerMonth = rawValue;
     }
 
@@ -818,21 +818,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
             </>
           )}
 
-          {form.type === "recurring" && (
-            <label>
-              <span>Lançar para quantos meses?</span>
-              <select
-                value={form.recurringMonths}
-                onChange={(event) => onChange("recurringMonths", Number(event.target.value))}
-              >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24].map((num) => (
-                  <option key={num} value={num}>
-                    {num} {num === 1 ? "mês" : "meses"}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+
 
           {form.type === "normal" && (
             <label>
@@ -891,7 +877,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
             )}
             {form.type === "recurring" && (
               <p style={{ margin: 0 }}>
-                💡 <strong>Conta Fixa:</strong> Esta despesa de <strong>{formatCurrency(form.totalValue)}</strong> será replicada mensalmente pelos próximos <strong>{form.recurringMonths} meses</strong>.
+                💡 <strong>Conta Fixa:</strong> Esta despesa de <strong>{formatCurrency(form.totalValue)}</strong> será replicada mensalmente pelos próximos <strong>12 meses</strong>.
               </p>
             )}
           </div>
