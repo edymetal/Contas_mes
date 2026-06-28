@@ -41,15 +41,22 @@ const emptyForm = {
   payerId: "edney",
   participants: ["edney", "sonia", "rodney"],
   type: "normal", // normal, installment, recurring
+  currentInstallment: 1,
   installmentsCount: 12,
   recurringMonths: 12,
 };
 
 function addMonths(dateStr, months) {
   if (!dateStr) return "";
-  const date = new Date(`${dateStr}T00:00:00Z`);
-  date.setUTCMonth(date.getUTCMonth() + months);
-  return date.toISOString().slice(0, 10);
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1 + months, 1));
+  const yearOut = d.getUTCFullYear();
+  const monthOut = d.getUTCMonth();
+  const maxDays = new Date(Date.UTC(yearOut, monthOut + 1, 0)).getUTCDate();
+  const dayOut = Math.min(day, maxDays);
+  const paddedMonth = String(monthOut + 1).padStart(2, "0");
+  const paddedDay = String(dayOut).padStart(2, "0");
+  return `${yearOut}-${paddedMonth}-${paddedDay}`;
 }
 
 const navItems = [
@@ -263,9 +270,16 @@ function App() {
     let runs = 1;
     let valuePerMonth = rawValue;
 
+    const currentInstallment = Number(form.currentInstallment) || 1;
+    const totalInstallments = Number(form.installmentsCount) || 12;
+
     if (type === "installment") {
-      runs = Number(form.installmentsCount) || 1;
-      valuePerMonth = roundMoney(rawValue / runs);
+      if (currentInstallment > totalInstallments) {
+        setFormError("A parcela atual não pode ser maior que o total de parcelas.");
+        return;
+      }
+      runs = totalInstallments - currentInstallment + 1;
+      valuePerMonth = roundMoney(rawValue / totalInstallments);
     } else if (type === "recurring") {
       runs = Number(form.recurringMonths) || 1;
       valuePerMonth = rawValue;
@@ -289,7 +303,7 @@ function App() {
 
       let label = "";
       if (type === "installment") {
-        label = `Parcela ${index + 1} de ${runs}`;
+        label = `Parcela ${currentInstallment + index} de ${totalInstallments}`;
       } else if (type === "recurring") {
         label = `Fixo (Mês ${index + 1}/${runs})`;
       }
@@ -631,8 +645,10 @@ function ExpensesTable({ expenses }) {
           {expenses.map((expense) => (
             <tr key={expense.id}>
               <td>
-                <strong>{expense.title}</strong>
-                {expense.installment && <small>{expense.installment}</small>}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <strong>{expense.title}</strong>
+                  {expense.installment && <small style={{ display: "block", marginTop: "4px" }}>{expense.installment}</small>}
+                </div>
               </td>
               <td>{formatCurrency(expense.totalValue)}</td>
               <td>{formatDate(expense.dueDate)}</td>
@@ -709,19 +725,32 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           </label>
 
           {form.type === "installment" && (
-            <label>
-              <span>Quantidade de parcelas</span>
-              <select
-                value={form.installmentsCount}
-                onChange={(event) => onChange("installmentsCount", Number(event.target.value))}
-              >
-                {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36, 48].map((num) => (
-                  <option key={num} value={num}>
-                    {num}x
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label>
+                <span>Parcela atual</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={form.installmentsCount}
+                  value={form.currentInstallment}
+                  onChange={(event) => onChange("currentInstallment", Number(event.target.value))}
+                />
+              </label>
+
+              <label>
+                <span>Total de parcelas</span>
+                <select
+                  value={form.installmentsCount}
+                  onChange={(event) => onChange("installmentsCount", Number(event.target.value))}
+                >
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36, 48].map((num) => (
+                    <option key={num} value={num}>
+                      {num}x
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           )}
 
           {form.type === "recurring" && (
@@ -777,7 +806,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           }}>
             {form.type === "installment" && (
               <p style={{ margin: 0 }}>
-                💡 <strong>Conta Parcelada:</strong> O valor total de <strong>{formatCurrency(form.totalValue)}</strong> será dividido em <strong>{form.installmentsCount} parcelas</strong> de <strong>{formatCurrency(monthlyValuePreview)}</strong> nos próximos meses.
+                💡 <strong>Conta Parcelada:</strong> O valor total de <strong>{formatCurrency(form.totalValue)}</strong> é referente a <strong>{form.installmentsCount} parcelas</strong> de <strong>{formatCurrency(monthlyValuePreview)}</strong>. Serão cadastradas <strong>{Number(form.installmentsCount) - (Number(form.currentInstallment) || 1) + 1} parcelas</strong> (da {form.currentInstallment}ª até a {form.installmentsCount}ª) a partir do mês selecionado.
               </p>
             )}
             {form.type === "recurring" && (
@@ -843,7 +872,14 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId }) {
             return (
               <article className="expense-card" key={expense.id}>
                 <div className="expense-main">
-                  <span className="tag">{expense.category}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span className="tag">{expense.category}</span>
+                    {expense.installment && (
+                      <span className="tag" style={{ background: "var(--panel-muted)", color: "var(--muted)", borderColor: "var(--line)" }}>
+                        {expense.installment}
+                      </span>
+                    )}
+                  </div>
                   <h3>{expense.title}</h3>
                   <p>
                     {personName(expense.payerId)} pagou originalmente • vencimento {formatDate(expense.dueDate)}
