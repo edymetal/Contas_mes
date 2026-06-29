@@ -465,7 +465,8 @@ function App() {
       await deleteDoc(doc(db, "expenses", expenseId));
       setActionMessage("Conta excluída com sucesso.");
     } catch (error) {
-      setActionMessage("Erro ao excluir a conta.");
+      console.error("Erro ao excluir conta:", error);
+      setActionMessage(`Erro ao excluir a conta: ${error.message || error}`);
     }
   }
 
