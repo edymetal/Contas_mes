@@ -4,6 +4,8 @@ import {
   BarChart3,
   CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   Home,
   LogOut,
@@ -66,6 +68,15 @@ function addMonths(dateStr, months) {
   const paddedMonth = String(monthOut + 1).padStart(2, "0");
   const paddedDay = String(dayOut).padStart(2, "0");
   return `${yearOut}-${paddedMonth}-${paddedDay}`;
+}
+
+function shiftMonth(monthStr, delta) {
+  if (!monthStr) return "";
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+  const yearOut = d.getUTCFullYear();
+  const monthOut = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${yearOut}-${monthOut}`;
 }
 
 const navItems = [
@@ -667,6 +678,8 @@ function App() {
             expenses={expenses}
             personId={activeView}
             onPay={openPayment}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
           />
         )}
 
@@ -1015,15 +1028,62 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ currentProfile, expenses, onPay, personId }) {
+function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMonth, onMonthChange }) {
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
 
+  const formattedMonthName = useMemo(() => {
+    if (!selectedMonth) return "";
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, 1));
+    return new Intl.DateTimeFormat("pt-BR", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC"
+    }).format(date);
+  }, [selectedMonth]);
+
+  function handlePrevMonth() {
+    onMonthChange(shiftMonth(selectedMonth, -1));
+  }
+
+  function handleNextMonth() {
+    onMonthChange(shiftMonth(selectedMonth, 1));
+  }
+
   return (
     <section className="panel">
-      <div className="section-heading">
-        <h2>Contas de {selectedPerson.name}</h2>
-        <span>{personExpenses.length} registro(s)</span>
+      <div className="section-heading" style={{ flexWrap: "wrap", gap: "12px" }}>
+        <div>
+          <h2>Contas de {selectedPerson.name}</h2>
+          <span>{personExpenses.length} registro(s)</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--panel-muted)", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--line)" }}>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={handlePrevMonth}
+            style={{ padding: "4px" }}
+            title="Mês Anterior"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          
+          <span style={{ fontWeight: "600", fontSize: "0.9rem", minWidth: "140px", textAlign: "center", textTransform: "capitalize" }}>
+            {formattedMonthName}
+          </span>
+
+          <button
+            type="button"
+            className="icon-button"
+            onClick={handleNextMonth}
+            style={{ padding: "4px" }}
+            title="Próximo Mês"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </div>
 
       {!personExpenses.length ? (
