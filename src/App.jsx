@@ -288,13 +288,10 @@ function App() {
     let computedDueDate = form.dueDate;
 
     if (type === "installment") {
-      const today = new Date();
-      const currentDay = String(today.getDate()).padStart(2, "0");
-      const [selYear, selMonth] = selectedMonth.split("-");
-      const maxDays = new Date(Number(selYear), Number(selMonth), 0).getDate();
-      const finalDay = Math.min(Number(currentDay), maxDays);
-      const paddedDay = String(finalDay).padStart(2, "0");
-      computedDueDate = `${selYear}-${selMonth}-${paddedDay}`;
+      if (!computedDueDate) {
+        setFormError("Informe a data do próximo vencimento.");
+        return;
+      }
     } else if (type === "recurring") {
       const dueDay = Number(form.dueDay) || 1;
       if (dueDay < 1 || dueDay > 31) {
@@ -908,6 +905,15 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 
           {form.type === "installment" && (
             <>
+              <label>
+                <span>Próximo vencimento</span>
+                <input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(event) => onChange("dueDate", event.target.value)}
+                />
+              </label>
+
               <label>
                 <span>Parcela atual</span>
                 <input
