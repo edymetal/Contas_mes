@@ -307,6 +307,14 @@ function App() {
     const totalInstallments = Number(form.installmentsCount) || 12;
 
     if (type === "installment") {
+      if (totalInstallments < 1 || !Number.isInteger(totalInstallments)) {
+        setFormError("O total de parcelas deve ser um número inteiro maior ou igual a 1.");
+        return;
+      }
+      if (currentInstallment < 1 || !Number.isInteger(currentInstallment)) {
+        setFormError("A parcela atual deve ser um número inteiro maior ou igual a 1.");
+        return;
+      }
       if (currentInstallment > totalInstallments) {
         setFormError("A parcela atual não pode ser maior que o total de parcelas.");
         return;
@@ -891,16 +899,12 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 
               <label>
                 <span>Total de parcelas</span>
-                <select
+                <input
+                  type="number"
+                  min="1"
                   value={form.installmentsCount}
-                  onChange={(event) => onChange("installmentsCount", Number(event.target.value))}
-                >
-                  {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36, 48].map((num) => (
-                    <option key={num} value={num}>
-                      {num}x
-                    </option>
-                  ))}
-                </select>
+                  onChange={(event) => onChange("installmentsCount", event.target.value === "" ? "" : Number(event.target.value))}
+                />
               </label>
             </>
           )}
