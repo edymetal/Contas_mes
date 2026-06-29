@@ -17,7 +17,7 @@ service cloud.firestore {
     match /expenses/{expenseId} {
       allow read, create: if allowedEmail();
       allow update: if allowedEmail();
-      allow delete: if false;
+      allow delete: if allowedEmail();
     }
 
     match /settlements/{settlementId} {

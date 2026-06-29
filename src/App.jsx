@@ -507,7 +507,7 @@ function App() {
       return acc;
     }, {});
 
-    await updateDoc(doc(db, "expenses", expenseId), {
+    const updateFields = {
       title: updatedData.title.trim(),
       totalValue: rawValue,
       dueDate: updatedData.dueDate,
@@ -517,7 +517,13 @@ function App() {
       participants: updatedData.participants,
       shares,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (updatedData.installment !== undefined) {
+      updateFields.installment = updatedData.installment;
+    }
+
+    await updateDoc(doc(db, "expenses", expenseId), updateFields);
 
     setActionMessage("Conta atualizada com sucesso.");
     setEditingExpense(null);
@@ -1355,6 +1361,11 @@ function EditExpenseModal({ expense, onClose, onSave }) {
   const [participants, setParticipants] = useState(expense.participants || []);
   const [error, setError] = useState("");
 
+  const match = expense.installment ? expense.installment.match(/Parcela (\d+) de (\d+)/) : null;
+  const isInstallment = !!match;
+  const [currentInstallment, setCurrentInstallment] = useState(match ? Number(match[1]) : 1);
+  const [totalInstallments, setTotalInstallments] = useState(match ? Number(match[2]) : 1);
+
   const splitPreview = useMemo(() => {
     const val = roundMoney(Number(String(totalValue).replace(",", ".")));
     if (!val || !participants.length) return 0;
@@ -1372,6 +1383,22 @@ function EditExpenseModal({ expense, onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+
+    if (isInstallment) {
+      if (totalInstallments < 1 || !Number.isInteger(totalInstallments)) {
+        setError("O total de parcelas deve ser um número inteiro maior ou igual a 1.");
+        return;
+      }
+      if (currentInstallment < 1 || !Number.isInteger(currentInstallment)) {
+        setError("A parcela atual deve ser um número inteiro maior ou igual a 1.");
+        return;
+      }
+      if (currentInstallment > totalInstallments) {
+        setError("A parcela atual não pode ser maior que o total de parcelas.");
+        return;
+      }
+    }
+
     try {
       await onSave(expense.id, {
         title,
@@ -1380,6 +1407,7 @@ function EditExpenseModal({ expense, onClose, onSave }) {
         category,
         payerId,
         participants,
+        installment: isInstallment ? `Parcela ${currentInstallment} de ${totalInstallments}` : null,
       });
     } catch (err) {
       setError(err.message || "Erro ao salvar despesa.");
@@ -1410,6 +1438,33 @@ function EditExpenseModal({ expense, onClose, onSave }) {
               />
             </label>
           </div>
+
+          {isInstallment && (
+            <div className="form-grid">
+              <label>
+                <span>Parcela atual</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalInstallments}
+                  value={currentInstallment}
+                  onChange={(e) => setCurrentInstallment(Number(e.target.value))}
+                  required
+                />
+              </label>
+
+              <label>
+                <span>Total de parcelas</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={totalInstallments}
+                  onChange={(e) => setTotalInstallments(e.target.value === "" ? "" : Number(e.target.value))}
+                  required
+                />
+              </label>
+            </div>
+          )}
 
           <div className="form-grid">
             <label>
