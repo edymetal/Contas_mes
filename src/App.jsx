@@ -23,9 +23,11 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
   writeBatch,
@@ -1201,6 +1203,172 @@ function calculateSettlementRows(expenses) {
 }
 
 function SettingsPanel({ theme, setTheme }) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [backupMessage, setBackupMessage] = useState(null);
+
+  async function handleExport() {
+    setIsExporting(true);
+    setBackupMessage(null);
+    try {
+      const expensesSnap = await getDocs(collection(db, "expenses"));
+      const settlementsSnap = await getDocs(collection(db, "settlements"));
+
+      const expenses = expensesSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      const settlements = settlementsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      const exportObj = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        expenses,
+        settlements
+      };
+
+      const jsonString = JSON.stringify(exportObj, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `contas_compartilhadas_backup_${new Date().toISOString().split("T")[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      setBackupMessage({ type: "success", text: "Backup exportado com sucesso!" });
+    } catch (error) {
+      console.error("Erro ao exportar backup:", error);
+      setBackupMessage({ type: "error", text: `Erro ao exportar backup: ${error.message || error}` });
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function restoreTimestamps(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== "object") return obj;
+
+    if (
+      typeof obj.seconds === "number" &&
+      typeof obj.nanoseconds === "number" &&
+      Object.keys(obj).length === 2
+    ) {
+      return new Timestamp(obj.seconds, obj.nanoseconds);
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(restoreTimestamps);
+    }
+
+    const restored = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        restored[key] = restoreTimestamps(obj[key]);
+      }
+    }
+    return restored;
+  }
+
+  async function handleImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm("A importação irá adicionar ou atualizar as contas com base no backup. Deseja continuar?")) {
+      event.target.value = "";
+      return;
+    }
+
+    setIsImporting(true);
+    setBackupMessage(null);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target.result;
+        const data = JSON.parse(text);
+
+        if (!data || (!data.expenses && !data.settlements)) {
+          throw new Error("Formato de backup inválido. O arquivo JSON deve conter as coleções de contas.");
+        }
+
+        let importedExpensesCount = 0;
+        let importedSettlementsCount = 0;
+
+        // Import expenses
+        if (data.expenses && data.expenses.length > 0) {
+          let batch = writeBatch(db);
+          let count = 0;
+          for (const item of data.expenses) {
+            const { id, ...docData } = item;
+            const restoredData = restoreTimestamps(docData);
+
+            const docRef = doc(db, "expenses", id);
+            batch.set(docRef, restoredData, { merge: true });
+            count++;
+            importedExpensesCount++;
+
+            if (count === 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              count = 0;
+            }
+          }
+          if (count > 0) {
+            await batch.commit();
+          }
+        }
+
+        // Import settlements
+        if (data.settlements && data.settlements.length > 0) {
+          let batch = writeBatch(db);
+          let count = 0;
+          for (const item of data.settlements) {
+            const { id, ...docData } = item;
+            const restoredData = restoreTimestamps(docData);
+
+            const docRef = doc(db, "settlements", id);
+            batch.set(docRef, restoredData, { merge: true });
+            count++;
+            importedSettlementsCount++;
+
+            if (count === 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              count = 0;
+            }
+          }
+          if (count > 0) {
+            await batch.commit();
+          }
+        }
+
+        setBackupMessage({
+          type: "success",
+          text: `Backup importado com sucesso! ${importedExpensesCount} contas e ${importedSettlementsCount} acertos processados.`
+        });
+      } catch (error) {
+        console.error("Erro ao importar backup:", error);
+        setBackupMessage({ type: "error", text: `Erro ao importar backup: ${error.message || error}` });
+      } finally {
+        setIsImporting(false);
+        event.target.value = "";
+      }
+    };
+
+    reader.onerror = () => {
+      setBackupMessage({ type: "error", text: "Erro ao ler o arquivo selecionado." });
+      setIsImporting(false);
+      event.target.value = "";
+    };
+
+    reader.readAsText(file);
+  }
+
   return (
     <section className="panel settings-panel">
       <div className="section-heading">
@@ -1254,6 +1422,65 @@ function SettingsPanel({ theme, setTheme }) {
               {theme === "dark" && <Check size={18} style={{ color: "var(--primary)" }} />}
             </button>
           </div>
+        </div>
+
+        <hr style={{ border: "0", borderTop: "1px solid var(--line)", margin: "8px 0" }} />
+
+        <div>
+          <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Backup de Dados</h3>
+          <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: "0.9rem" }}>
+            Exporte suas contas e acertos para um arquivo JSON ou importe um backup existente.
+          </p>
+
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleExport}
+              disabled={isExporting || isImporting}
+              style={{ minWidth: "150px" }}
+            >
+              {isExporting ? "Exportando..." : "📥 Exportar JSON"}
+            </button>
+
+            <label
+              className="secondary-button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: isImporting || isExporting ? "not-allowed" : "pointer",
+                minWidth: "150px",
+                margin: 0,
+                textAlign: "center"
+              }}
+            >
+              {isImporting ? "Importando..." : "📤 Importar JSON"}
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                disabled={isImporting || isExporting}
+                style={{ display: "none" }}
+              />
+            </label>
+          </div>
+
+          {backupMessage && (
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "12px",
+                borderRadius: "var(--radius-md)",
+                background: backupMessage.type === "success" ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                color: backupMessage.type === "success" ? "#10b981" : "#ef4444",
+                border: backupMessage.type === "success" ? "1px solid #10b981" : "1px solid #ef4444",
+                fontSize: "0.9rem"
+              }}
+            >
+              {backupMessage.text}
+            </div>
+          )}
         </div>
       </div>
     </section>
