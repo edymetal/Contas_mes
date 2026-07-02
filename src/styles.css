@@ -746,7 +746,7 @@ textarea:focus {
 
 .person-payment-summary {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   margin: 20px 0;
 }

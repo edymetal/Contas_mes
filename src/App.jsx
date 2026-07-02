@@ -1166,11 +1166,6 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
       </div>
 
       <div className="person-payment-summary">
-        <div className="person-total-card">
-          <span>Total a pagar no mês</span>
-          <strong>{formatCurrency(paymentSummary.totalToPay)}</strong>
-        </div>
-
         <div className="person-debt-grid">
           {paymentSummary.totalsByPayer.map(({ person, amount }) => (
             <div className="person-debt-card" key={person.id}>
@@ -1178,6 +1173,11 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
               <strong>{formatCurrency(amount)}</strong>
             </div>
           ))}
+        </div>
+
+        <div className="person-total-card">
+          <span>Total a pagar no mês</span>
+          <strong>{formatCurrency(paymentSummary.totalToPay)}</strong>
         </div>
       </div>
 
