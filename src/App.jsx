@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRightLeft,
   BarChart3,
-  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -840,7 +839,6 @@ function App() {
             </div>
 
             <label className="month-filter">
-              <CalendarDays size={18} />
               <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
             </label>
           </header>

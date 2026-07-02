@@ -1356,17 +1356,6 @@ textarea:focus {
     color: var(--primary);
   }
 
-  .mobile-user-tab.active::before {
-    content: "";
-    position: absolute;
-    left: 10px;
-    top: 25%;
-    width: 4px;
-    height: 50%;
-    border-radius: 999px;
-    background: var(--primary);
-  }
-
   /* Main Navigation inside Mobile Drawer */
   .main-nav {
     display: grid;
