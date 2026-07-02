@@ -885,6 +885,46 @@ textarea:focus {
   color: var(--text);
 }
 
+.settlement-payment-card {
+  display: grid;
+  align-items: stretch;
+  gap: 18px;
+}
+
+.settlement-card-heading {
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settlement-balance-summary {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.settlement-balance-summary strong {
+  color: var(--primary);
+}
+
+.settlement-payment-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settlement-description-field,
+.settlement-payment-actions {
+  grid-column: 1 / -1;
+}
+
+.settlement-payment-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 /* Modals */
 .modal-backdrop {
   position: fixed;
@@ -1223,6 +1263,23 @@ textarea:focus {
     align-items: stretch;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .settlement-card-heading,
+  .settlement-payment-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .settlement-card-heading {
+    flex-direction: column;
+  }
+
+  .settlement-balance-summary {
+    text-align: left;
+  }
+
+  .settlement-payment-form {
+    grid-template-columns: 1fr;
   }
 
   .expense-side {

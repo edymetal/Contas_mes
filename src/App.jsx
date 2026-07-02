@@ -146,6 +146,7 @@ function App() {
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
   const [expenses, setExpenses] = useState([]);
+  const [settlementPayments, setSettlementPayments] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState("");
@@ -213,6 +214,21 @@ function App() {
     );
   }, [profile, selectedMonth]);
 
+  useEffect(() => {
+    if (!profile || !db) return undefined;
+
+    const settlementsQuery = query(collection(db, "settlements"), where("monthKey", "==", selectedMonth));
+
+    return onSnapshot(settlementsQuery, (snapshot) => {
+      const nextPayments = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .filter((item) => item.kind === "payment")
+        .sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || ""));
+
+      setSettlementPayments(nextPayments);
+    });
+  }, [profile, selectedMonth]);
+
   const metrics = useMemo(() => {
     return expenses.reduce(
       (acc, expense) => {
@@ -242,7 +258,10 @@ function App() {
     return totals.map((item) => ({ ...item, percent: (item.total / max) * 100 }));
   }, [expenses]);
 
-  const settlementRows = useMemo(() => calculateSettlementRows(expenses), [expenses]);
+  const settlementRows = useMemo(
+    () => calculateSettlementRows(expenses, settlementPayments),
+    [expenses, settlementPayments],
+  );
 
   async function handleLogin() {
     setAuthError("");
@@ -440,57 +459,84 @@ function App() {
     setActionMessage("Pagamento registrado.");
   }
 
-  async function liquidateBalance(row) {
+  async function registerSettlementPayment(row, paymentData) {
+    const rawAmount = Number(String(paymentData.amount).replace(",", "."));
+    if (isNaN(rawAmount) || rawAmount <= 0) {
+      setActionMessage("Informe um valor de pagamento válido.");
+      return false;
+    }
+
+    const paymentAmount = roundMoney(rawAmount);
+    const remainingAmount = roundMoney(row.amount);
+    if (paymentAmount > remainingAmount) {
+      setActionMessage(`O valor não pode passar do saldo restante de ${formatCurrency(remainingAmount)}.`);
+      return false;
+    }
+
+    const isFullPayment = paymentAmount >= remainingAmount;
+    const paidAt = paymentData.paidAt || todayInputValue();
+    const paymentType = paymentData.type || "PIX";
+    const description = paymentData.description?.trim() || "";
     const batch = writeBatch(db);
     const now = new Date().toISOString();
     const settlementRef = doc(collection(db, "settlements"));
 
-    expenses.forEach((expense) => {
-      const updates = {};
-      const directShare = getShare(expense, row.fromId);
-      const reverseShare = getShare(expense, row.toId);
+    if (isFullPayment) {
+      expenses.forEach((expense) => {
+        const updates = {};
+        const directShare = getShare(expense, row.fromId);
+        const reverseShare = getShare(expense, row.toId);
 
-      if (expense.payerId === row.toId && directShare?.status === "pending") {
-        updates[`shares.${row.fromId}.status`] = "settled";
-        updates[`shares.${row.fromId}.payment`] = {
-          paidAt: todayInputValue(),
-          type: "Acerto de contas",
-          description: `Liquidado no acerto mensal de ${selectedMonth}`,
-          registeredBy: profile.id,
-          registeredAt: now,
-        };
-      }
+        if (expense.payerId === row.toId && directShare?.status === "pending") {
+          updates[`shares.${row.fromId}.status`] = "settled";
+          updates[`shares.${row.fromId}.payment`] = {
+            paidAt,
+            type: paymentType,
+            description: `Liquidado no acerto mensal de ${selectedMonth}`,
+            registeredBy: profile.id,
+            registeredAt: now,
+          };
+        }
 
-      if (expense.payerId === row.fromId && reverseShare?.status === "pending") {
-        updates[`shares.${row.toId}.status`] = "settled";
-        updates[`shares.${row.toId}.payment`] = {
-          paidAt: todayInputValue(),
-          type: "Compensação",
-          description: `Compensado no acerto mensal de ${selectedMonth}`,
-          registeredBy: profile.id,
-          registeredAt: now,
-        };
-      }
+        if (expense.payerId === row.fromId && reverseShare?.status === "pending") {
+          updates[`shares.${row.toId}.status`] = "settled";
+          updates[`shares.${row.toId}.payment`] = {
+            paidAt,
+            type: "Compensação",
+            description: `Compensado no acerto mensal de ${selectedMonth}`,
+            registeredBy: profile.id,
+            registeredAt: now,
+          };
+        }
 
-      if (Object.keys(updates).length) {
-        batch.update(doc(db, "expenses", expense.id), {
-          ...updates,
-          updatedAt: serverTimestamp(),
-        });
-      }
-    });
+        if (Object.keys(updates).length) {
+          batch.update(doc(db, "expenses", expense.id), {
+            ...updates,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      });
+    }
 
     batch.set(settlementRef, {
+      kind: "payment",
       monthKey: selectedMonth,
       fromId: row.fromId,
       toId: row.toId,
-      amount: row.amount,
+      amount: paymentAmount,
+      paidAt,
+      type: paymentType,
+      description,
+      status: isFullPayment ? "settled" : "partial",
+      balanceBeforePayment: remainingAmount,
+      balanceAfterPayment: roundMoney(remainingAmount - paymentAmount),
       createdBy: profile.id,
       createdAt: serverTimestamp(),
     });
 
     await batch.commit();
-    setActionMessage("Saldo liquidado para o mês selecionado.");
+    setActionMessage(isFullPayment ? "Dívida quitada com sucesso." : "Pagamento parcial registrado.");
+    return true;
   }
 
   async function handleDeleteExpense(expenseId) {
@@ -698,6 +744,7 @@ function App() {
             currentProfile={profile}
             expenses={expenses}
             personId={activeView}
+            settlementRows={settlementRows}
             onPay={openPayment}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
@@ -705,7 +752,7 @@ function App() {
         )}
 
         {activeView === "settlement" && (
-          <SettlementPanel rows={settlementRows} onLiquidate={liquidateBalance} />
+          <SettlementPanel rows={settlementRows} onRegisterPayment={registerSettlementPayment} />
         )}
 
         {activeView === "settings" && (
@@ -1096,7 +1143,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMonth, onMonthChange }) {
+function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMonth, onMonthChange, settlementRows }) {
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
@@ -1104,13 +1151,11 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
       .filter((person) => person.id !== personId)
       .map((person) => ({ person, amount: 0 }));
 
-    const totalToPay = personExpenses.reduce((sum, expense) => {
-      const share = getShare(expense, personId);
-      const shouldPay = expense.payerId !== personId && share?.status === "pending";
-      if (!shouldPay) return sum;
+    const totalToPay = settlementRows.reduce((sum, row) => {
+      if (row.fromId !== personId) return sum;
 
-      const amount = Number(share.amount || 0);
-      const payerRow = totalsByPayer.find((row) => row.person.id === expense.payerId);
+      const amount = Number(row.amount || 0);
+      const payerRow = totalsByPayer.find((item) => item.person.id === row.toId);
       if (payerRow) {
         payerRow.amount = roundMoney(payerRow.amount + amount);
       }
@@ -1119,7 +1164,7 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
     }, 0);
 
     return { totalsByPayer, totalToPay };
-  }, [personExpenses, personId]);
+  }, [settlementRows, personId]);
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
@@ -1307,7 +1352,55 @@ function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
   );
 }
 
-function SettlementPanel({ onLiquidate, rows }) {
+function SettlementPanel({ onRegisterPayment, rows }) {
+  const [paymentForms, setPaymentForms] = useState({});
+
+  function getRowKey(row) {
+    return `${row.fromId}->${row.toId}`;
+  }
+
+  function getPaymentForm(row) {
+    return paymentForms[getRowKey(row)] || {
+      amount: "",
+      paidAt: todayInputValue(),
+      type: "PIX",
+      description: "",
+    };
+  }
+
+  function updatePaymentForm(row, field, value) {
+    const key = getRowKey(row);
+    setPaymentForms((current) => ({
+      ...current,
+      [key]: {
+        ...getPaymentForm(row),
+        ...current[key],
+        [field]: value,
+      },
+    }));
+  }
+
+  async function submitPayment(event, row, amountOverride) {
+    event?.preventDefault();
+    const key = getRowKey(row);
+    const form = getPaymentForm(row);
+    const saved = await onRegisterPayment(row, {
+      ...form,
+      amount: amountOverride ?? form.amount,
+    });
+
+    if (!saved) return;
+
+    setPaymentForms((current) => ({
+      ...current,
+      [key]: {
+        ...form,
+        amount: "",
+        description: "",
+      },
+    }));
+  }
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -1319,28 +1412,90 @@ function SettlementPanel({ onLiquidate, rows }) {
         <div className="empty-state">Nenhum saldo pendente neste mês.</div>
       ) : (
         <div className="settlement-grid">
-          {rows.map((row) => (
-            <article className="settlement-card" key={`${row.fromId}-${row.toId}`}>
-              <div>
-                <span>{personName(row.fromId)} deve para</span>
-                <strong>{personName(row.toId)}</strong>
-              </div>
-              <div>
-                <strong>{formatCurrency(row.amount)}</strong>
-                <button className="secondary-button" onClick={() => onLiquidate(row)} type="button">
-                  Liquidar saldo
-                </button>
-              </div>
-            </article>
-          ))}
+          {rows.map((row) => {
+            const form = getPaymentForm(row);
+
+            return (
+              <article className="settlement-card settlement-payment-card" key={getRowKey(row)}>
+                <div className="settlement-card-heading">
+                  <div>
+                    <span>{personName(row.fromId)} deve para</span>
+                    <strong>{personName(row.toId)}</strong>
+                  </div>
+                  <div className="settlement-balance-summary">
+                    <span>Total: {formatCurrency(row.originalAmount)}</span>
+                    <span>Pago: {formatCurrency(row.paidAmount)}</span>
+                    <strong>Restante: {formatCurrency(row.amount)}</strong>
+                  </div>
+                </div>
+
+                <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
+                  <label>
+                    <span>Valor do pagamento</span>
+                    <input
+                      inputMode="decimal"
+                      min="0.01"
+                      step="0.01"
+                      type="number"
+                      value={form.amount}
+                      onChange={(event) => updatePaymentForm(row, "amount", event.target.value)}
+                      placeholder={String(row.amount).replace(".", ",")}
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Data</span>
+                    <input
+                      type="date"
+                      value={form.paidAt}
+                      onChange={(event) => updatePaymentForm(row, "paidAt", event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    <span>Tipo</span>
+                    <select value={form.type} onChange={(event) => updatePaymentForm(row, "type", event.target.value)}>
+                      {PAYMENT_TYPES.map((type) => (
+                        <option key={type}>{type}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="settlement-description-field">
+                    <span>Descrição opcional</span>
+                    <input
+                      value={form.description}
+                      onChange={(event) => updatePaymentForm(row, "description", event.target.value)}
+                      placeholder="Ex: transferência recebida"
+                    />
+                  </label>
+
+                  <div className="settlement-payment-actions">
+                    <button className="primary-button" type="submit">
+                      Registrar pagamento
+                    </button>
+                    <button
+                      className="secondary-button"
+                      onClick={(event) => submitPayment(event, row, row.amount)}
+                      type="button"
+                    >
+                      Pagar restante
+                    </button>
+                  </div>
+                </form>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
   );
 }
 
-function calculateSettlementRows(expenses) {
+function calculateSettlementRows(expenses, settlementPayments = []) {
   const balances = new Map();
+  const paidBalances = new Map();
 
   expenses.forEach((expense) => {
     Object.entries(expense.shares || {}).forEach(([personId, share]) => {
@@ -1348,6 +1503,11 @@ function calculateSettlementRows(expenses) {
       const key = `${personId}->${expense.payerId}`;
       balances.set(key, (balances.get(key) || 0) + Number(share.amount || 0));
     });
+  });
+
+  settlementPayments.forEach((payment) => {
+    const key = `${payment.fromId}->${payment.toId}`;
+    paidBalances.set(key, roundMoney((paidBalances.get(key) || 0) + Number(payment.amount || 0)));
   });
 
   const rows = [];
@@ -1359,8 +1519,34 @@ function calculateSettlementRows(expenses) {
       const secondOwesFirst = balances.get(`${second}->${first}`) || 0;
       const net = roundMoney(firstOwesSecond - secondOwesFirst);
 
-      if (net > 0) rows.push({ fromId: first, toId: second, amount: net });
-      if (net < 0) rows.push({ fromId: second, toId: first, amount: Math.abs(net) });
+      if (net > 0) {
+        const paidAmount = Math.min(paidBalances.get(`${first}->${second}`) || 0, net);
+        const remainingAmount = roundMoney(net - paidAmount);
+        if (remainingAmount > 0) {
+          rows.push({
+            fromId: first,
+            toId: second,
+            originalAmount: net,
+            paidAmount,
+            amount: remainingAmount,
+          });
+        }
+      }
+
+      if (net < 0) {
+        const originalAmount = Math.abs(net);
+        const paidAmount = Math.min(paidBalances.get(`${second}->${first}`) || 0, originalAmount);
+        const remainingAmount = roundMoney(originalAmount - paidAmount);
+        if (remainingAmount > 0) {
+          rows.push({
+            fromId: second,
+            toId: first,
+            originalAmount,
+            paidAmount,
+            amount: remainingAmount,
+          });
+        }
+      }
     }
   }
 
