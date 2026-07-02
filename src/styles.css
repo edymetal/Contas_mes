@@ -744,6 +744,54 @@ textarea:focus {
   gap: 16px;
 }
 
+.person-payment-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2fr);
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.person-total-card,
+.person-debt-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+  padding: 16px;
+}
+
+.person-total-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 96px;
+}
+
+.person-debt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.person-total-card span,
+.person-debt-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.person-total-card strong,
+.person-debt-card strong {
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+.person-total-card strong {
+  color: var(--primary);
+  font-size: 1.6rem;
+}
+
 .expense-card,
 .settlement-card {
   display: flex;
@@ -1133,7 +1181,8 @@ textarea:focus {
   }
 
   .metrics-grid,
-  .settlement-grid {
+  .settlement-grid,
+  .person-payment-summary {
     grid-template-columns: 1fr;
     gap: 16px;
   }

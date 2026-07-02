@@ -1089,6 +1089,27 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMonth, onMonthChange }) {
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
+  const paymentSummary = useMemo(() => {
+    const totalsByPayer = PEOPLE
+      .filter((person) => person.id !== personId)
+      .map((person) => ({ person, amount: 0 }));
+
+    const totalToPay = personExpenses.reduce((sum, expense) => {
+      const share = getShare(expense, personId);
+      const shouldPay = expense.payerId !== personId && share?.status === "pending";
+      if (!shouldPay) return sum;
+
+      const amount = Number(share.amount || 0);
+      const payerRow = totalsByPayer.find((row) => row.person.id === expense.payerId);
+      if (payerRow) {
+        payerRow.amount = roundMoney(payerRow.amount + amount);
+      }
+
+      return roundMoney(sum + amount);
+    }, 0);
+
+    return { totalsByPayer, totalToPay };
+  }, [personExpenses, personId]);
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
@@ -1141,6 +1162,22 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
           >
             <ChevronRight size={18} />
           </button>
+        </div>
+      </div>
+
+      <div className="person-payment-summary">
+        <div className="person-total-card">
+          <span>Total a pagar no mês</span>
+          <strong>{formatCurrency(paymentSummary.totalToPay)}</strong>
+        </div>
+
+        <div className="person-debt-grid">
+          {paymentSummary.totalsByPayer.map(({ person, amount }) => (
+            <div className="person-debt-card" key={person.id}>
+              <span>Deve para {person.name}</span>
+              <strong>{formatCurrency(amount)}</strong>
+            </div>
+          ))}
         </div>
       </div>
 
