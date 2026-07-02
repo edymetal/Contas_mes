@@ -46,6 +46,7 @@ const currencyFormatter = new Intl.NumberFormat("pt-PT", {
 const emptyForm = {
   title: "",
   totalValue: "",
+  expenseDate: "",
   dueDate: "",
   dueDay: new Date().getDate(),
   category: "Casa",
@@ -360,9 +361,10 @@ function App() {
       }
 
       const docRef = doc(collection(db, "expenses"));
-      batch.set(docRef, {
+      const expenseData = {
         title: form.title.trim(),
         totalValue: valuePerMonth,
+        expenseDate: type === "normal" ? form.expenseDate || "" : "",
         dueDate: currentDueDate,
         monthKey: currentMonthKey,
         category: form.category,
@@ -373,13 +375,15 @@ function App() {
         createdBy: profile.id,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      batch.set(docRef, expenseData);
     }
 
     await batch.commit();
 
     setSelectedMonth(monthFromDate(computedDueDate));
-    setForm({ ...emptyForm, dueDate: "" });
+    setForm({ ...emptyForm, expenseDate: "", dueDate: "" });
     setActionMessage(
       type === "normal"
         ? "Conta cadastrada com sucesso."
@@ -882,7 +886,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           <label>
             <span>Tipo de Lançamento</span>
             <select value={form.type || "normal"} onChange={(event) => onChange("type", event.target.value)}>
-              <option value="normal">Normal (Única)</option>
+              <option value="normal">Conta Única</option>
               <option value="installment">Parcelada (Cartão, etc.)</option>
               <option value="recurring">Fixa / Contínua (Mensal)</option>
             </select>
@@ -940,10 +944,21 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 
 
           {form.type === "normal" && (
-            <label>
-              <span>Data de vencimento</span>
-              <input type="date" value={form.dueDate} onChange={(event) => onChange("dueDate", event.target.value)} />
-            </label>
+            <>
+              <label>
+                <span>Data da despesa</span>
+                <input
+                  type="date"
+                  value={form.expenseDate}
+                  onChange={(event) => onChange("expenseDate", event.target.value)}
+                />
+              </label>
+
+              <label>
+                <span>Data de vencimento</span>
+                <input type="date" value={form.dueDate} onChange={(event) => onChange("dueDate", event.target.value)} />
+              </label>
+            </>
           )}
 
           {form.type === "recurring" && (
