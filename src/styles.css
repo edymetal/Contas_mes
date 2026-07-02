@@ -809,8 +809,9 @@ textarea:focus {
 }
 
 .expense-main h3 {
-  margin: 8px 0 4px;
-  font-size: 1.1rem;
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  line-height: 1.2;
   color: var(--text);
 }
 

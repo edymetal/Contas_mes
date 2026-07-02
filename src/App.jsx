@@ -119,6 +119,12 @@ function personName(id) {
   return getPersonById(id)?.name || id;
 }
 
+function formatInstallmentLabel(label) {
+  if (!label) return "";
+  if (label.startsWith("Fixo")) return "Fixo";
+  return label;
+}
+
 function isSettledStatus(status) {
   return status === "paid" || status === "settled" || status === "self";
 }
@@ -359,7 +365,7 @@ function App() {
       if (type === "installment") {
         label = `Parcela ${currentInstallment + index} de ${totalInstallments}`;
       } else if (type === "recurring") {
-        label = `Fixo (Mês ${index + 1}/${runs})`;
+        label = "Fixo";
       }
 
       const docRef = doc(collection(db, "expenses"));
@@ -854,7 +860,11 @@ function ExpensesTable({ expenses }) {
               <td>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <strong>{expense.title}</strong>
-                  {expense.installment && <small style={{ display: "block", marginTop: "4px" }}>{expense.installment}</small>}
+                  {expense.installment && (
+                    <small style={{ display: "block", marginTop: "4px" }}>
+                      {formatInstallmentLabel(expense.installment)}
+                    </small>
+                  )}
                 </div>
               </td>
               <td>{formatCurrency(expense.totalValue)}</td>
@@ -1193,17 +1203,17 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
             return (
               <article className="expense-card" key={expense.id}>
                 <div className="expense-main">
+                  <h3>{expense.title}</h3>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <span className="tag">{expense.category}</span>
                     {expense.installment && (
                       <span className="tag" style={{ background: "var(--panel-muted)", color: "var(--muted)", borderColor: "var(--line)" }}>
-                        {expense.installment}
+                        {formatInstallmentLabel(expense.installment)}
                       </span>
                     )}
                   </div>
-                  <h3>{expense.title}</h3>
                   <p>
-                    {personName(expense.payerId)} pagou originalmente • vencimento {formatDate(expense.dueDate)}
+                    {personName(expense.payerId)} pagou • vencimento {formatDate(expense.dueDate)}
                   </p>
                 </div>
 
@@ -1693,7 +1703,7 @@ function ManagePanel({ expenses, onEdit, onDelete, dataLoading }) {
                     <strong>{expense.title}</strong>
                     {expense.installment && (
                       <small style={{ display: "block", marginTop: "4px" }}>
-                        {expense.installment}
+                        {formatInstallmentLabel(expense.installment)}
                       </small>
                     )}
                   </div>
