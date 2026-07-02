@@ -876,7 +876,7 @@ textarea:focus {
 /* Settlement Panel */
 .settlement-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(560px, 660px));
+  grid-template-columns: minmax(0, 600px);
   gap: 20px;
   justify-content: center;
 }
@@ -939,14 +939,14 @@ textarea:focus {
   display: grid;
   align-items: stretch;
   gap: 22px;
-  justify-items: stretch;
+  justify-items: center;
   min-width: 0;
   padding: 24px;
 }
 
 .settlement-card-heading {
   display: block !important;
-  width: 100%;
+  width: min(100%, 520px);
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
 }
@@ -972,10 +972,10 @@ textarea:focus {
 
 .settlement-balance-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   text-align: left;
-  width: 100%;
+  width: min(100%, 520px);
 }
 
 .settlement-balance-summary div {
@@ -1000,7 +1000,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 16px;
-  width: 100%;
+  width: min(100%, 520px);
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1345,7 +1345,7 @@ textarea:focus {
   }
 
   .settlement-grid {
-    grid-template-columns: repeat(auto-fit, minmax(460px, 640px));
+    grid-template-columns: minmax(0, 560px);
     gap: 16px;
     justify-content: center;
   }
