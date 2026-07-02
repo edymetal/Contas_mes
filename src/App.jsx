@@ -1653,12 +1653,12 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                     <strong>{formatCurrency(row.originalAmount)}</strong>
                   </div>
                   <div>
-                    <span>Já abatido</span>
-                    <strong>{formatCurrency(row.paidAmount)}</strong>
+                    <span>Abatido</span>
+                    <strong>{formatCurrency(row.crossPaidAmount)}</strong>
                   </div>
                   <div>
-                    <span>Pago pela outra pessoa</span>
-                    <strong>{formatCurrency(row.crossPaidAmount)}</strong>
+                    <span>Pago</span>
+                    <strong>{formatCurrency(row.paidAmount)}</strong>
                   </div>
                   <div className="settlement-remaining-box">
                     <span>Restante</span>
