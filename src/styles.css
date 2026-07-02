@@ -746,36 +746,41 @@ textarea:focus {
 
 .person-payment-summary {
   display: grid;
+  justify-items: center;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 14px;
   margin: 20px 0;
 }
 
 .person-total-card,
 .person-debt-card {
+  width: min(100%, 420px);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--panel-muted);
-  padding: 16px;
+  padding: 14px;
+  text-align: center;
 }
 
 .person-total-card {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 96px;
+  min-height: 88px;
 }
 
 .person-debt-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 300px));
+  justify-content: center;
+  width: 100%;
   gap: 12px;
 }
 
 .person-total-card span,
 .person-debt-card span {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 600;
@@ -784,18 +789,18 @@ textarea:focus {
 .person-total-card strong,
 .person-debt-card strong {
   color: var(--text);
-  font-size: 1.25rem;
+  font-size: 1.15rem;
 }
 
 .person-total-card strong {
   color: var(--primary);
-  font-size: 1.6rem;
+  font-size: 1.45rem;
 }
 
 .person-debt-breakdown {
   display: grid;
   gap: 4px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .person-debt-breakdown small {
