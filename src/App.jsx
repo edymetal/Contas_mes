@@ -1149,21 +1149,26 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
   const paymentSummary = useMemo(() => {
     const totalsByPayer = PEOPLE
       .filter((person) => person.id !== personId)
-      .map((person) => ({ person, amount: 0 }));
+      .map((person) => ({ person, originalAmount: 0, paidAmount: 0, amount: 0 }));
 
-    const totalToPay = settlementRows.reduce((sum, row) => {
-      if (row.fromId !== personId) return sum;
+    const totals = settlementRows.reduce((acc, row) => {
+      if (row.fromId !== personId) return acc;
 
-      const amount = Number(row.amount || 0);
       const payerRow = totalsByPayer.find((item) => item.person.id === row.toId);
       if (payerRow) {
-        payerRow.amount = roundMoney(payerRow.amount + amount);
+        payerRow.originalAmount = roundMoney(payerRow.originalAmount + Number(row.originalAmount || 0));
+        payerRow.paidAmount = roundMoney(payerRow.paidAmount + Number(row.paidAmount || 0));
+        payerRow.amount = roundMoney(payerRow.amount + Number(row.amount || 0));
       }
 
-      return roundMoney(sum + amount);
-    }, 0);
+      return {
+        originalAmount: roundMoney(acc.originalAmount + Number(row.originalAmount || 0)),
+        paidAmount: roundMoney(acc.paidAmount + Number(row.paidAmount || 0)),
+        amount: roundMoney(acc.amount + Number(row.amount || 0)),
+      };
+    }, { originalAmount: 0, paidAmount: 0, amount: 0 });
 
-    return { totalsByPayer, totalToPay };
+    return { totalsByPayer, totals };
   }, [settlementRows, personId]);
 
   const formattedMonthName = useMemo(() => {
@@ -1222,17 +1227,25 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
 
       <div className="person-payment-summary">
         <div className="person-debt-grid">
-          {paymentSummary.totalsByPayer.map(({ person, amount }) => (
+          {paymentSummary.totalsByPayer.map(({ person, originalAmount, paidAmount, amount }) => (
             <div className="person-debt-card" key={person.id}>
               <span>Deve para {person.name}</span>
               <strong>{formatCurrency(amount)}</strong>
+              <div className="person-debt-breakdown">
+                <small>Total da dívida: {formatCurrency(originalAmount)}</small>
+                <small>Abatido: {formatCurrency(paidAmount)}</small>
+              </div>
             </div>
           ))}
         </div>
 
         <div className="person-total-card">
           <span>Total a pagar no mês</span>
-          <strong>{formatCurrency(paymentSummary.totalToPay)}</strong>
+          <strong>{formatCurrency(paymentSummary.totals.amount)}</strong>
+          <div className="person-debt-breakdown">
+            <small>Total original: {formatCurrency(paymentSummary.totals.originalAmount)}</small>
+            <small>Total abatido: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
+          </div>
         </div>
       </div>
 

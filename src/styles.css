@@ -792,6 +792,17 @@ textarea:focus {
   font-size: 1.6rem;
 }
 
+.person-debt-breakdown {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.person-debt-breakdown small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .expense-card,
 .settlement-card {
   display: flex;
