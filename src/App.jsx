@@ -765,9 +765,6 @@ function App() {
               <span>Compartilhadas</span>
             </div>
           </div>
-          <button className="drawer-close-button" onClick={() => setIsDrawerOpen(false)} type="button">
-            <X size={20} />
-          </button>
         </div>
 
         <nav className="main-nav" aria-label="Navegação principal">
@@ -817,7 +814,7 @@ function App() {
       </aside>
 
       <div className="content-wrapper">
-        <header className={`mobile-header ${isDrawerOpen ? "drawer-active" : ""}`}>
+        <header className="mobile-header">
           <button className="icon-button menu-toggle" onClick={() => setIsDrawerOpen(true)} type="button">
             <Menu size={22} />
           </button>
