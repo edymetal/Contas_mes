@@ -1668,6 +1668,10 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                     <span>Já abatido</span>
                     <strong>{formatCurrency(row.paidAmount)}</strong>
                   </div>
+                  <div>
+                    <span>Pago pela outra pessoa</span>
+                    <strong>{formatCurrency(row.crossPaidAmount)}</strong>
+                  </div>
                   <div className="settlement-remaining-box">
                     <span>Restante</span>
                     <strong>{formatCurrency(row.amount)}</strong>
@@ -1884,34 +1888,41 @@ function calculateSettlementRows(expenses, settlementPayments = []) {
     for (let nextIndex = index + 1; nextIndex < PEOPLE.length; nextIndex += 1) {
       const first = PEOPLE[index].id;
       const second = PEOPLE[nextIndex].id;
-      const firstOwesSecond = balances.get(`${first}->${second}`) || 0;
-      const secondOwesFirst = balances.get(`${second}->${first}`) || 0;
-      const net = roundMoney(firstOwesSecond - secondOwesFirst);
+      const firstOwesSecond = roundMoney(balances.get(`${first}->${second}`) || 0);
+      const secondOwesFirst = roundMoney(balances.get(`${second}->${first}`) || 0);
+      const firstPaidSecond = roundMoney(paidBalances.get(`${first}->${second}`) || 0);
+      const secondPaidFirst = roundMoney(paidBalances.get(`${second}->${first}`) || 0);
+      const firstOpenDebt = roundMoney(Math.max(firstOwesSecond - firstPaidSecond, 0));
+      const secondOpenDebt = roundMoney(Math.max(secondOwesFirst - secondPaidFirst, 0));
+      const net = roundMoney(firstOpenDebt - secondOpenDebt);
 
       if (net > 0) {
-        const paidAmount = Math.min(paidBalances.get(`${first}->${second}`) || 0, net);
-        const remainingAmount = roundMoney(net - paidAmount);
+        const paidAmount = Math.min(firstPaidSecond, firstOwesSecond);
+        const crossPaidAmount = Math.min(secondOpenDebt, firstOwesSecond - paidAmount);
+        const remainingAmount = roundMoney(firstOwesSecond - paidAmount - crossPaidAmount);
         if (remainingAmount > 0) {
           rows.push({
             fromId: first,
             toId: second,
-            originalAmount: net,
+            originalAmount: firstOwesSecond,
             paidAmount,
+            crossPaidAmount,
             amount: remainingAmount,
           });
         }
       }
 
       if (net < 0) {
-        const originalAmount = Math.abs(net);
-        const paidAmount = Math.min(paidBalances.get(`${second}->${first}`) || 0, originalAmount);
-        const remainingAmount = roundMoney(originalAmount - paidAmount);
+        const paidAmount = Math.min(secondPaidFirst, secondOwesFirst);
+        const crossPaidAmount = Math.min(firstOpenDebt, secondOwesFirst - paidAmount);
+        const remainingAmount = roundMoney(secondOwesFirst - paidAmount - crossPaidAmount);
         if (remainingAmount > 0) {
           rows.push({
             fromId: second,
             toId: first,
-            originalAmount,
+            originalAmount: secondOwesFirst,
             paidAmount,
+            crossPaidAmount,
             amount: remainingAmount,
           });
         }
