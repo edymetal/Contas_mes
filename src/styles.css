@@ -881,6 +881,44 @@ textarea:focus {
   justify-content: center;
 }
 
+.settlement-selector {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.settlement-person-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.settlement-person-tab:hover,
+.settlement-person-tab.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.settlement-person-tab small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.settlement-person-tab.active small {
+  color: var(--primary);
+}
+
 .settlement-card div {
   display: grid;
   gap: 4px;

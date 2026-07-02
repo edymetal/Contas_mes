@@ -1384,6 +1384,7 @@ function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
 
 function SettlementPanel({ onRegisterPayment, rows }) {
   const [paymentForms, setPaymentForms] = useState({});
+  const [activeSettlementKey, setActiveSettlementKey] = useState(null);
 
   function getRowKey(row) {
     return `${row.fromId}->${row.toId}`;
@@ -1397,6 +1398,12 @@ function SettlementPanel({ onRegisterPayment, rows }) {
       description: "",
     };
   }
+
+  useEffect(() => {
+    if (activeSettlementKey && !rows.some((row) => getRowKey(row) === activeSettlementKey)) {
+      setActiveSettlementKey(null);
+    }
+  }, [activeSettlementKey, rows]);
 
   function updatePaymentForm(row, field, value) {
     const key = getRowKey(row);
@@ -1431,6 +1438,8 @@ function SettlementPanel({ onRegisterPayment, rows }) {
     }));
   }
 
+  const selectedRow = rows.find((row) => getRowKey(row) === activeSettlementKey);
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -1441,8 +1450,30 @@ function SettlementPanel({ onRegisterPayment, rows }) {
       {!rows.length ? (
         <div className="empty-state">Nenhum saldo pendente neste mês.</div>
       ) : (
-        <div className="settlement-grid">
-          {rows.map((row) => {
+        <>
+          <div className="settlement-selector" aria-label="Escolha o saldo para visualizar">
+            {rows.map((row) => {
+              const key = getRowKey(row);
+              const isActive = key === activeSettlementKey;
+
+              return (
+                <button
+                  className={`settlement-person-tab${isActive ? " active" : ""}`}
+                  key={key}
+                  onClick={() => setActiveSettlementKey((current) => (current === key ? null : key))}
+                  type="button"
+                  aria-expanded={isActive}
+                >
+                  <span>{personName(row.fromId)}</span>
+                  <small>{formatCurrency(row.amount)}</small>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedRow ? (
+            <div className="settlement-grid">
+              {[selectedRow].map((row) => {
             const form = getPaymentForm(row);
 
             return (
@@ -1538,8 +1569,10 @@ function SettlementPanel({ onRegisterPayment, rows }) {
                 </form>
               </article>
             );
-          })}
-        </div>
+              })}
+            </div>
+          ) : null}
+        </>
       )}
     </section>
   );
