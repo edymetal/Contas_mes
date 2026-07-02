@@ -111,6 +111,14 @@ function monthFromDate(date) {
   return date.slice(0, 7);
 }
 
+function getExpenseMonthKey({ dueDate, expenseDate, type }) {
+  if ((type || "normal") === "normal") {
+    return monthFromDate(expenseDate || dueDate);
+  }
+
+  return monthFromDate(dueDate);
+}
+
 function getShare(expense, personId) {
   return expense.shares?.[personId];
 }
@@ -368,7 +376,12 @@ function App() {
 
     for (let index = 0; index < runs; index += 1) {
       const currentDueDate = addMonths(computedDueDate, index);
-      const currentMonthKey = monthFromDate(currentDueDate);
+      const currentExpenseDate = type === "normal" ? form.expenseDate || "" : "";
+      const currentMonthKey = getExpenseMonthKey({
+        dueDate: currentDueDate,
+        expenseDate: currentExpenseDate,
+        type,
+      });
       
       const shareAmount = roundMoney(valuePerMonth / form.participants.length);
       const shares = form.participants.reduce((acc, personId) => {
@@ -391,7 +404,7 @@ function App() {
       const expenseData = {
         title: form.title.trim(),
         totalValue: valuePerMonth,
-        expenseDate: type === "normal" ? form.expenseDate || "" : "",
+        expenseDate: currentExpenseDate,
         expensePaymentMethod:
           type === "normal"
             ? form.expensePaymentMethod === "Personalizado"
@@ -415,7 +428,13 @@ function App() {
 
     await batch.commit();
 
-    setSelectedMonth(monthFromDate(computedDueDate));
+    setSelectedMonth(
+      getExpenseMonthKey({
+        dueDate: computedDueDate,
+        expenseDate: type === "normal" ? form.expenseDate || "" : "",
+        type,
+      }),
+    );
     setForm({
       ...emptyForm,
       expenseDate: "",
@@ -592,7 +611,11 @@ function App() {
       title: updatedData.title.trim(),
       totalValue: rawValue,
       dueDate: updatedData.dueDate,
-      monthKey: monthFromDate(updatedData.dueDate),
+      monthKey: getExpenseMonthKey({
+        dueDate: updatedData.dueDate,
+        expenseDate: oldExpense?.expenseDate || "",
+        type: oldExpense?.installment ? "installment" : "normal",
+      }),
       category: updatedData.category,
       payerId: updatedData.payerId,
       participants: updatedData.participants,
