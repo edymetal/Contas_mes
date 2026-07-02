@@ -187,7 +187,7 @@ function App() {
       const matchedProfile = getProfileByEmail(user.email);
       if (!matchedProfile) {
         setProfile(null);
-        setAuthError("Este e-mail não está cadastrado para acessar o sistema.");
+        setAuthError(`A conta ${user.email} nao tem acesso ao sistema. Entre com uma conta autorizada ou solicite a liberacao.`);
         await signOut(auth);
         setAuthLoading(false);
         return;
@@ -950,7 +950,7 @@ function LoginScreen({ error, missingConfig, onLogin }) {
         </div>
 
         <h1>Controle familiar de despesas</h1>
-        <p>Entrar com uma das contas autorizadas: Edney, Sônia ou Rodney.</p>
+        <p>Entre com uma conta Google autorizada para acessar as despesas compartilhadas.</p>
 
         {missingConfig ? (
           <div className="error-box">Preencha o arquivo .env com as credenciais do Firebase.</div>
@@ -2508,3 +2508,4 @@ function EditExpenseModal({ expense, onClose, onSave }) {
 }
 
 export default App;
+

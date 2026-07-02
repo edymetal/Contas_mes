@@ -3,6 +3,7 @@ export const PEOPLE = [
     id: "edney",
     name: "Edney",
     email: "edneypugleise@gmail.com",
+    emails: ["edneypugleise@gmail.com", "edneypugliese.dev@gmail.com"],
   },
   {
     id: "sonia",
@@ -25,5 +26,8 @@ export function getPersonById(id) {
 }
 
 export function getProfileByEmail(email) {
-  return PEOPLE.find((person) => person.email.toLowerCase() === email?.toLowerCase());
+  const normalizedEmail = email?.toLowerCase();
+  return PEOPLE.find((person) =>
+    [person.email, ...(person.emails || [])].some((allowedEmail) => allowedEmail.toLowerCase() === normalizedEmail),
+  );
 }
