@@ -478,6 +478,47 @@ function App() {
     setActionMessage("Pagamento registrado.");
   }
 
+  function queueSettlementShareUpdates(batch, row, { isSettled, paidAt, paymentType, now }) {
+    expenses.forEach((expense) => {
+      const updates = {};
+      const directShare = getShare(expense, row.fromId);
+      const reverseShare = getShare(expense, row.toId);
+
+      if (expense.payerId === row.toId && ["pending", "settled"].includes(directShare?.status)) {
+        updates[`shares.${row.fromId}.status`] = isSettled ? "settled" : "pending";
+        updates[`shares.${row.fromId}.payment`] = isSettled
+          ? {
+              paidAt,
+              type: paymentType,
+              description: `Liquidado no acerto mensal de ${selectedMonth}`,
+              registeredBy: profile.id,
+              registeredAt: now,
+            }
+          : null;
+      }
+
+      if (expense.payerId === row.fromId && ["pending", "settled"].includes(reverseShare?.status)) {
+        updates[`shares.${row.toId}.status`] = isSettled ? "settled" : "pending";
+        updates[`shares.${row.toId}.payment`] = isSettled
+          ? {
+              paidAt,
+              type: "Compensacao",
+              description: `Compensado no acerto mensal de ${selectedMonth}`,
+              registeredBy: profile.id,
+              registeredAt: now,
+            }
+          : null;
+      }
+
+      if (Object.keys(updates).length) {
+        batch.update(doc(db, "expenses", expense.id), {
+          ...updates,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+  }
+
   async function registerSettlementPayment(row, paymentData) {
     const rawAmount = Number(String(paymentData.amount).replace(",", "."));
     if (isNaN(rawAmount) || rawAmount <= 0) {
@@ -556,6 +597,72 @@ function App() {
     await batch.commit();
     setActionMessage(isFullPayment ? "Dívida quitada com sucesso." : "Pagamento parcial registrado.");
     return true;
+  }
+
+  async function updateSettlementPayment(payment, paymentData) {
+    const rawAmount = Number(String(paymentData.amount).replace(",", "."));
+    if (isNaN(rawAmount) || rawAmount <= 0) {
+      setActionMessage("Informe um valor de pagamento valido.");
+      return false;
+    }
+
+    const paymentAmount = roundMoney(rawAmount);
+    const balanceBeforePayment = Number(payment.balanceBeforePayment || payment.amount || 0);
+    if (balanceBeforePayment > 0 && paymentAmount > balanceBeforePayment) {
+      setActionMessage(`O valor nao pode passar de ${formatCurrency(balanceBeforePayment)}.`);
+      return false;
+    }
+
+    const paidAt = paymentData.paidAt || todayInputValue();
+    const paymentType = paymentData.type || "PIX";
+    const description = paymentData.description?.trim() || "";
+
+    const isSettled = balanceBeforePayment > 0 && paymentAmount >= balanceBeforePayment;
+    const batch = writeBatch(db);
+    const now = new Date().toISOString();
+
+    if (payment.status === "settled" || isSettled) {
+      queueSettlementShareUpdates(batch, payment, {
+        isSettled,
+        paidAt,
+        paymentType,
+        now,
+      });
+    }
+
+    batch.update(doc(db, "settlements", payment.id), {
+      amount: paymentAmount,
+      paidAt,
+      type: paymentType,
+      description,
+      status: isSettled ? "settled" : "partial",
+      balanceAfterPayment: balanceBeforePayment > 0 ? roundMoney(balanceBeforePayment - paymentAmount) : 0,
+      updatedAt: serverTimestamp(),
+      updatedBy: profile.id,
+    });
+
+    await batch.commit();
+
+    setActionMessage("Pagamento de acerto atualizado.");
+    return true;
+  }
+
+  async function deleteSettlementPayment(payment) {
+    if (!window.confirm("Tem certeza que deseja apagar este pagamento do historico?")) return;
+
+    const batch = writeBatch(db);
+    if (payment.status === "settled") {
+      queueSettlementShareUpdates(batch, payment, {
+        isSettled: false,
+        paidAt: payment.paidAt || todayInputValue(),
+        paymentType: payment.type || "PIX",
+        now: new Date().toISOString(),
+      });
+    }
+
+    batch.delete(doc(db, "settlements", payment.id));
+    await batch.commit();
+    setActionMessage("Pagamento de acerto apagado.");
   }
 
   async function handleDeleteExpense(expenseId) {
@@ -775,7 +882,13 @@ function App() {
         )}
 
         {activeView === "settlement" && (
-          <SettlementPanel rows={settlementRows} onRegisterPayment={registerSettlementPayment} />
+          <SettlementPanel
+            rows={settlementRows}
+            settlementPayments={settlementPayments}
+            onDeletePayment={deleteSettlementPayment}
+            onRegisterPayment={registerSettlementPayment}
+            onUpdatePayment={updateSettlementPayment}
+          />
         )}
 
         {activeView === "settings" && (
@@ -1405,9 +1518,16 @@ function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
   );
 }
 
-function SettlementPanel({ onRegisterPayment, rows }) {
+function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, rows, settlementPayments = [] }) {
   const [paymentForms, setPaymentForms] = useState({});
   const [activeSettlementKey, setActiveSettlementKey] = useState(null);
+  const [editingPaymentId, setEditingPaymentId] = useState(null);
+  const [editingPaymentForm, setEditingPaymentForm] = useState({
+    amount: "",
+    paidAt: todayInputValue(),
+    type: "PIX",
+    description: "",
+  });
 
   function getRowKey(row) {
     return `${row.fromId}->${row.toId}`;
@@ -1459,6 +1579,30 @@ function SettlementPanel({ onRegisterPayment, rows }) {
         description: "",
       },
     }));
+  }
+
+  function startEditingPayment(payment) {
+    setEditingPaymentId(payment.id);
+    setEditingPaymentForm({
+      amount: String(payment.amount || ""),
+      paidAt: payment.paidAt || todayInputValue(),
+      type: payment.type || "PIX",
+      description: payment.description || "",
+    });
+  }
+
+  async function submitPaymentEdit(event, payment) {
+    event.preventDefault();
+    const saved = await onUpdatePayment(payment, editingPaymentForm);
+    if (!saved) return;
+
+    setEditingPaymentId(null);
+    setEditingPaymentForm({
+      amount: "",
+      paidAt: todayInputValue(),
+      type: "PIX",
+      description: "",
+    });
   }
 
   const selectedRow = rows.find((row) => getRowKey(row) === activeSettlementKey);
@@ -1597,6 +1741,123 @@ function SettlementPanel({ onRegisterPayment, rows }) {
           ) : null}
         </>
       )}
+
+      <div className="settlement-history">
+        <div className="section-heading settlement-history-heading">
+          <h2>Historico de pagamentos</h2>
+          <span>{settlementPayments.length} pagamento(s)</span>
+        </div>
+
+        {!settlementPayments.length ? (
+          <div className="empty-state settlement-history-empty">Nenhum pagamento registrado neste mes.</div>
+        ) : (
+          <div className="settlement-history-list">
+            {settlementPayments.map((payment) => {
+              const isEditing = editingPaymentId === payment.id;
+
+              return (
+                <article className="settlement-history-item" key={payment.id}>
+                  {isEditing ? (
+                    <form className="settlement-history-edit" onSubmit={(event) => submitPaymentEdit(event, payment)}>
+                      <label>
+                        <span>Valor</span>
+                        <input
+                          inputMode="decimal"
+                          min="0.01"
+                          step="0.01"
+                          type="number"
+                          value={editingPaymentForm.amount}
+                          onChange={(event) =>
+                            setEditingPaymentForm((current) => ({ ...current, amount: event.target.value }))
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>Data</span>
+                        <input
+                          type="date"
+                          value={editingPaymentForm.paidAt}
+                          onChange={(event) =>
+                            setEditingPaymentForm((current) => ({ ...current, paidAt: event.target.value }))
+                          }
+                        />
+                      </label>
+
+                      <label>
+                        <span>Tipo</span>
+                        <select
+                          value={editingPaymentForm.type}
+                          onChange={(event) =>
+                            setEditingPaymentForm((current) => ({ ...current, type: event.target.value }))
+                          }
+                        >
+                          {PAYMENT_TYPES.map((type) => (
+                            <option key={type}>{type}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="settlement-history-description">
+                        <span>Descricao</span>
+                        <input
+                          value={editingPaymentForm.description}
+                          onChange={(event) =>
+                            setEditingPaymentForm((current) => ({ ...current, description: event.target.value }))
+                          }
+                          placeholder="Ex: transferencia recebida"
+                        />
+                      </label>
+
+                      <div className="settlement-history-actions">
+                        <button className="primary-button" type="submit">
+                          Salvar
+                        </button>
+                        <button className="secondary-button" onClick={() => setEditingPaymentId(null)} type="button">
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="settlement-history-main">
+                        <strong>{formatCurrency(payment.amount)}</strong>
+                        <span>
+                          {personName(payment.fromId)} pagou {personName(payment.toId)}
+                        </span>
+                        <small>
+                          {formatDate(payment.paidAt)} - {payment.type || "PIX"}
+                          {payment.description ? ` - ${payment.description}` : ""}
+                        </small>
+                      </div>
+
+                      <div className="settlement-history-actions">
+                        <button
+                          className="icon-button"
+                          onClick={() => startEditingPayment(payment)}
+                          title="Editar pagamento"
+                          type="button"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          className="icon-button"
+                          onClick={() => onDeletePayment(payment)}
+                          title="Apagar pagamento"
+                          type="button"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -1607,7 +1868,7 @@ function calculateSettlementRows(expenses, settlementPayments = []) {
 
   expenses.forEach((expense) => {
     Object.entries(expense.shares || {}).forEach(([personId, share]) => {
-      if (personId === expense.payerId || share.status !== "pending") return;
+      if (personId === expense.payerId || !["pending", "settled"].includes(share.status)) return;
       const key = `${personId}->${expense.payerId}`;
       balances.set(key, (balances.get(key) || 0) + Number(share.amount || 0));
     });

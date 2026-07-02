@@ -1042,6 +1042,83 @@ textarea:focus {
   min-width: 0;
 }
 
+.settlement-history {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.settlement-history-heading {
+  margin-bottom: 0;
+}
+
+.settlement-history-empty {
+  min-height: 120px;
+}
+
+.settlement-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.settlement-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.settlement-history-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settlement-history-main strong {
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+.settlement-history-main span {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.settlement-history-main small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.settlement-history-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settlement-history-edit {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.settlement-history-description,
+.settlement-history-edit .settlement-history-actions {
+  grid-column: 1 / -1;
+}
+
+.settlement-history-edit label,
+.settlement-history-edit input,
+.settlement-history-edit select,
+.settlement-history-edit button {
+  min-width: 0;
+}
+
 /* Modals */
 .modal-backdrop {
   position: fixed;
@@ -1394,8 +1471,22 @@ textarea:focus {
 
   .settlement-people,
   .settlement-balance-summary,
-  .settlement-payment-form {
+  .settlement-payment-form,
+  .settlement-history-edit {
     grid-template-columns: 1fr;
+  }
+
+  .settlement-history-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settlement-history-actions {
+    justify-content: stretch;
+  }
+
+  .settlement-history-actions button {
+    flex: 1;
   }
 
   .settlement-grid {
