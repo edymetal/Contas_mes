@@ -876,7 +876,7 @@ textarea:focus {
 /* Settlement Panel */
 .settlement-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 640px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
   gap: 20px;
 }
 
@@ -900,12 +900,14 @@ textarea:focus {
   display: grid;
   align-items: stretch;
   gap: 22px;
+  justify-items: stretch;
   min-width: 0;
   padding: 24px;
 }
 
 .settlement-card-heading {
   display: block !important;
+  width: 100%;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
 }
@@ -934,6 +936,7 @@ textarea:focus {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   text-align: left;
+  width: 100%;
 }
 
 .settlement-balance-summary div {
@@ -958,6 +961,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 16px;
+  width: 100%;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1296,9 +1300,13 @@ textarea:focus {
   }
 
   .metrics-grid,
-  .settlement-grid,
   .person-payment-summary {
     grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .settlement-grid {
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
     gap: 16px;
   }
 }
@@ -1347,6 +1355,10 @@ textarea:focus {
   .settlement-people,
   .settlement-balance-summary,
   .settlement-payment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .settlement-grid {
     grid-template-columns: 1fr;
   }
 
