@@ -135,6 +135,13 @@ button {
   gap: 14px;
 }
 
+.brand > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .brand.large {
   margin-bottom: 32px;
   justify-content: center;
@@ -154,14 +161,18 @@ button {
 }
 
 .brand strong {
+  display: block;
   font-size: 1.15rem;
+  line-height: 1.1;
   color: var(--text);
 }
 
 .brand span {
+  display: block;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 500;
+  line-height: 1.1;
 }
 
 /* Navigation */
