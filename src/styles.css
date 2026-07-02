@@ -1302,10 +1302,10 @@ textarea:focus {
 
   /* Mobile Top Bar (Users Only + Hamburger) */
   .mobile-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    gap: 12px;
     padding: 12px 16px;
     background: var(--sidebar-bg);
     border-bottom: 1px solid var(--line);
@@ -1318,11 +1318,16 @@ textarea:focus {
 
   .mobile-user-tabs {
     display: flex;
-    gap: 8px;
+    gap: 10px;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none; /* Firefox */
     -webkit-overflow-scrolling: touch;
-    padding: 2px 0;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: rgba(148, 163, 184, 0.08);
   }
 
   .mobile-user-tabs::-webkit-scrollbar {
@@ -1330,13 +1335,18 @@ textarea:focus {
   }
 
   .user-tab {
-    padding: 8px 18px;
-    border-radius: 99px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
     border: 1px solid var(--line);
     background: var(--panel);
     color: var(--muted);
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     font-weight: 700;
+    line-height: 1;
     white-space: nowrap;
     cursor: pointer;
     box-shadow: var(--shadow);
@@ -1429,6 +1439,16 @@ textarea:focus {
 }
 
 @media (max-width: 680px) {
+  .mobile-header {
+    padding: 10px 12px;
+  }
+
+  .user-tab {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+  }
+
   .topbar {
     align-items: stretch;
     flex-direction: column;
