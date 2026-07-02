@@ -1231,12 +1231,6 @@ textarea:focus {
   to { transform: rotate(360deg); }
 }
 
-/* Responsive Design Styles (Mobile first / tablet) */
-@media (max-width: 980px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
 /* Desktop default styling for new layout elements */
 .drawer-backdrop {
   display: none;
