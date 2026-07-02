@@ -871,11 +871,9 @@ function App() {
 
         {PEOPLE.some((person) => person.id === activeView) && (
           <PersonExpenses
-            currentProfile={profile}
             expenses={expenses}
             personId={activeView}
             settlementRows={settlementRows}
-            onPay={openPayment}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
           />
@@ -1279,7 +1277,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMonth, onMonthChange, settlementRows }) {
+function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementRows }) {
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
@@ -1409,7 +1407,6 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
           {personExpenses.map((expense) => {
             const share = getShare(expense, personId);
             const isPayer = expense.payerId === personId;
-            const canPay = currentProfile.id === personId && !isPayer && share?.status === "pending";
 
             return (
               <article className="expense-card" key={expense.id}>
@@ -1431,11 +1428,6 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
                 <div className="expense-side">
                   <strong>{formatCurrency(share?.amount)}</strong>
                   <StatusBadge status={isPayer ? "self" : share?.status} />
-                  {canPay && (
-                    <button className="secondary-button" onClick={() => onPay(expense, personId)} type="button">
-                      Marcar como pago
-                    </button>
-                  )}
                 </div>
               </article>
             );
