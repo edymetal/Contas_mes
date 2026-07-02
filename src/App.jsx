@@ -1151,25 +1151,42 @@ function PersonExpenses({ currentProfile, expenses, onPay, personId, selectedMon
       .filter((person) => person.id !== personId)
       .map((person) => ({ person, originalAmount: 0, paidAmount: 0, amount: 0 }));
 
-    const totals = settlementRows.reduce((acc, row) => {
-      if (row.fromId !== personId) return acc;
+    personExpenses.forEach((expense) => {
+      if (expense.payerId === personId) return;
+
+      const share = getShare(expense, personId);
+      if (!share) return;
+
+      const payerRow = totalsByPayer.find((item) => item.person.id === expense.payerId);
+      if (payerRow) {
+        payerRow.originalAmount = roundMoney(payerRow.originalAmount + Number(share.amount || 0));
+      }
+    });
+
+    settlementRows.forEach((row) => {
+      if (row.fromId !== personId) return;
 
       const payerRow = totalsByPayer.find((item) => item.person.id === row.toId);
       if (payerRow) {
-        payerRow.originalAmount = roundMoney(payerRow.originalAmount + Number(row.originalAmount || 0));
-        payerRow.paidAmount = roundMoney(payerRow.paidAmount + Number(row.paidAmount || 0));
         payerRow.amount = roundMoney(payerRow.amount + Number(row.amount || 0));
       }
+    });
 
-      return {
-        originalAmount: roundMoney(acc.originalAmount + Number(row.originalAmount || 0)),
-        paidAmount: roundMoney(acc.paidAmount + Number(row.paidAmount || 0)),
-        amount: roundMoney(acc.amount + Number(row.amount || 0)),
-      };
-    }, { originalAmount: 0, paidAmount: 0, amount: 0 });
+    totalsByPayer.forEach((row) => {
+      row.paidAmount = roundMoney(Math.max(row.originalAmount - row.amount, 0));
+    });
+
+    const totals = totalsByPayer.reduce(
+      (acc, row) => ({
+        originalAmount: roundMoney(acc.originalAmount + row.originalAmount),
+        paidAmount: roundMoney(acc.paidAmount + row.paidAmount),
+        amount: roundMoney(acc.amount + row.amount),
+      }),
+      { originalAmount: 0, paidAmount: 0, amount: 0 },
+    );
 
     return { totalsByPayer, totals };
-  }, [settlementRows, personId]);
+  }, [personExpenses, settlementRows, personId]);
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
