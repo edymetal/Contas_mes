@@ -139,7 +139,7 @@ function isSettledStatus(status) {
 
 function App() {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("contas_mes_theme") || "light";
+    return localStorage.getItem("contas_mes_theme") || "dark";
   });
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
