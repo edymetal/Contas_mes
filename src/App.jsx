@@ -47,6 +47,7 @@ const emptyForm = {
   title: "",
   totalValue: "",
   expenseDate: "",
+  expensePaymentMethod: "Dinheiro",
   dueDate: "",
   dueDay: new Date().getDate(),
   category: "Casa",
@@ -365,6 +366,7 @@ function App() {
         title: form.title.trim(),
         totalValue: valuePerMonth,
         expenseDate: type === "normal" ? form.expenseDate || "" : "",
+        expensePaymentMethod: type === "normal" ? form.expensePaymentMethod || "" : "",
         dueDate: currentDueDate,
         monthKey: currentMonthKey,
         category: form.category,
@@ -383,7 +385,7 @@ function App() {
     await batch.commit();
 
     setSelectedMonth(monthFromDate(computedDueDate));
-    setForm({ ...emptyForm, expenseDate: "", dueDate: "" });
+    setForm({ ...emptyForm, expenseDate: "", expensePaymentMethod: "Dinheiro", dueDate: "" });
     setActionMessage(
       type === "normal"
         ? "Conta cadastrada com sucesso."
@@ -952,6 +954,17 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
                   value={form.expenseDate}
                   onChange={(event) => onChange("expenseDate", event.target.value)}
                 />
+              </label>
+
+              <label>
+                <span>Forma de pagamento</span>
+                <select
+                  value={form.expensePaymentMethod || "Dinheiro"}
+                  onChange={(event) => onChange("expensePaymentMethod", event.target.value)}
+                >
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="Cartão">Cartão</option>
+                </select>
               </label>
 
               <label>
