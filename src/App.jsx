@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   BarChart3,
@@ -1269,6 +1269,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 }
 
 function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementRows }) {
+  const monthPickerRef = useRef(null);
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
@@ -1332,6 +1333,24 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
     onMonthChange(shiftMonth(selectedMonth, 1));
   }
 
+  function handleOpenMonthPicker(event) {
+    event?.preventDefault();
+    const picker = monthPickerRef.current;
+    if (!picker) return;
+
+    if (typeof picker.showPicker === "function") {
+      try {
+        picker.showPicker();
+        return;
+      } catch {
+        picker.focus();
+        return;
+      }
+    }
+
+    picker.focus();
+  }
+
   return (
     <section className="panel">
       <div className="section-heading" style={{ flexWrap: "wrap", gap: "12px" }}>
@@ -1350,9 +1369,10 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
             <ChevronLeft size={18} />
           </button>
           
-          <label className="person-month-picker" title="Escolher mes e ano">
+          <label className="person-month-picker" onClick={handleOpenMonthPicker} title="Escolher mes e ano">
             <span>{formattedMonthName}</span>
             <input
+              ref={monthPickerRef}
               aria-label="Escolher mes e ano"
               type="month"
               value={selectedMonth}

@@ -389,7 +389,7 @@ button {
   height: 100%;
   border: 0;
   opacity: 0;
-  cursor: pointer;
+  pointer-events: none;
 }
 
 /* Notice & Error Boxes */
