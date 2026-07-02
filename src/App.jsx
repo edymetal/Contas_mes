@@ -817,7 +817,7 @@ function App() {
       </aside>
 
       <div className="content-wrapper">
-        <header className="mobile-header">
+        <header className={`mobile-header ${isDrawerOpen ? "drawer-active" : ""}`}>
           <button className="icon-button menu-toggle" onClick={() => setIsDrawerOpen(true)} type="button">
             <Menu size={22} />
           </button>
@@ -825,7 +825,7 @@ function App() {
             {PEOPLE.map((person) => (
               <button
                 key={person.id}
-                className={`user-tab ${activeView === person.id ? "active" : ""}`}
+                className={`mobile-user-tab ${activeView === person.id ? "active" : ""}`}
                 onClick={() => setActiveView(person.id)}
                 type="button"
               >

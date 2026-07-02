@@ -1330,11 +1330,16 @@ textarea:focus {
     background: rgba(148, 163, 184, 0.08);
   }
 
+  .mobile-header.drawer-active .mobile-user-tabs {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   .mobile-user-tabs::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
 
-  .user-tab {
+  .mobile-user-tab {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1352,12 +1357,12 @@ textarea:focus {
     box-shadow: var(--shadow);
   }
 
-  .user-tab:hover {
+  .mobile-user-tab:hover {
     border-color: var(--primary);
     color: var(--primary);
   }
 
-  .user-tab.active {
+  .mobile-user-tab.active {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
@@ -1443,7 +1448,7 @@ textarea:focus {
     padding: 10px 12px;
   }
 
-  .user-tab {
+  .mobile-user-tab {
     min-height: 36px;
     padding: 8px 12px;
     font-size: 0.86rem;
