@@ -1723,14 +1723,14 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
 
                   <div className="settlement-payment-actions">
                     <button className="primary-button" type="submit">
-                      Registrar pagamento
+                      Pagamento
                     </button>
                     <button
                       className="secondary-button"
                       onClick={(event) => submitPayment(event, row, row.amount)}
                       type="button"
                     >
-                      Pagar restante
+                      Pagar Tudo
                     </button>
                   </div>
                 </form>
