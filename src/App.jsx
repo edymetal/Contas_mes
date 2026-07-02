@@ -837,10 +837,6 @@ function App() {
               <span className="eyebrow">{selectedMonth}</span>
               <h1>{getViewTitle(activeView)}</h1>
             </div>
-
-            <label className="month-filter">
-              <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
-            </label>
           </header>
 
         {actionMessage && <div className="notice">{actionMessage}</div>}
@@ -1344,26 +1340,30 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
           <span>{personExpenses.length} registro(s)</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--panel-muted)", padding: "6px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--line)" }}>
+        <div className="person-month-switcher">
           <button
             type="button"
             className="icon-button"
             onClick={handlePrevMonth}
-            style={{ padding: "4px" }}
             title="Mês Anterior"
           >
             <ChevronLeft size={18} />
           </button>
           
-          <span style={{ fontWeight: "600", fontSize: "0.9rem", minWidth: "140px", textAlign: "center", textTransform: "capitalize" }}>
-            {formattedMonthName}
-          </span>
+          <label className="person-month-picker" title="Escolher mes e ano">
+            <span>{formattedMonthName}</span>
+            <input
+              aria-label="Escolher mes e ano"
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => onMonthChange(event.target.value)}
+            />
+          </label>
 
           <button
             type="button"
             className="icon-button"
             onClick={handleNextMonth}
-            style={{ padding: "4px" }}
             title="Próximo Mês"
           >
             <ChevronRight size={18} />
