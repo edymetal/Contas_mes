@@ -876,8 +876,8 @@ textarea:focus {
 /* Settlement Panel */
 .settlement-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 20px;
 }
 
 .settlement-card div {
@@ -899,30 +899,84 @@ textarea:focus {
 .settlement-payment-card {
   display: grid;
   align-items: stretch;
-  gap: 18px;
+  gap: 22px;
+  padding: 24px;
 }
 
 .settlement-card-heading {
-  display: flex !important;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  display: block !important;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settlement-people {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.settlement-people svg {
+  color: var(--primary);
+}
+
+.settlement-people div:last-child {
+  text-align: right;
+}
+
+.settlement-people strong {
+  font-size: 1.35rem;
 }
 
 .settlement-balance-summary {
   display: grid;
-  gap: 4px;
-  text-align: right;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  text-align: left;
+}
+
+.settlement-balance-summary div {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
 }
 
 .settlement-balance-summary strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.1rem;
+}
+
+.settlement-remaining-box strong {
   color: var(--primary);
+  font-size: 1.35rem;
 }
 
 .settlement-payment-form {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(160px, 0.9fr) minmax(160px, 0.9fr) minmax(180px, 1fr);
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.settlement-form-title {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  padding-bottom: 2px;
+}
+
+.settlement-form-title strong {
+  font-size: 1rem;
+}
+
+.settlement-form-title span {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .settlement-description-field,
@@ -933,7 +987,8 @@ textarea:focus {
 .settlement-payment-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
+  margin-top: 2px;
 }
 
 /* Modals */
@@ -1281,16 +1336,26 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
-  .settlement-card-heading {
-    flex-direction: column;
+  .settlement-people,
+  .settlement-balance-summary,
+  .settlement-payment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .settlement-people {
+    justify-items: start;
+  }
+
+  .settlement-people div:last-child {
+    text-align: left;
+  }
+
+  .settlement-people svg {
+    transform: rotate(90deg);
   }
 
   .settlement-balance-summary {
     text-align: left;
-  }
-
-  .settlement-payment-form {
-    grid-template-columns: 1fr;
   }
 
   .expense-side {

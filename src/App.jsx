@@ -1431,18 +1431,40 @@ function SettlementPanel({ onRegisterPayment, rows }) {
             return (
               <article className="settlement-card settlement-payment-card" key={getRowKey(row)}>
                 <div className="settlement-card-heading">
-                  <div>
-                    <span>{personName(row.fromId)} deve para</span>
-                    <strong>{personName(row.toId)}</strong>
+                  <div className="settlement-people">
+                    <div>
+                      <span>Quem paga</span>
+                      <strong>{personName(row.fromId)}</strong>
+                    </div>
+                    <ArrowRightLeft size={20} />
+                    <div>
+                      <span>Quem recebe</span>
+                      <strong>{personName(row.toId)}</strong>
+                    </div>
                   </div>
-                  <div className="settlement-balance-summary">
-                    <span>Total: {formatCurrency(row.originalAmount)}</span>
-                    <span>Pago: {formatCurrency(row.paidAmount)}</span>
-                    <strong>Restante: {formatCurrency(row.amount)}</strong>
+                </div>
+
+                <div className="settlement-balance-summary" aria-label="Resumo do saldo">
+                  <div>
+                    <span>Total da dívida</span>
+                    <strong>{formatCurrency(row.originalAmount)}</strong>
+                  </div>
+                  <div>
+                    <span>Já abatido</span>
+                    <strong>{formatCurrency(row.paidAmount)}</strong>
+                  </div>
+                  <div className="settlement-remaining-box">
+                    <span>Restante</span>
+                    <strong>{formatCurrency(row.amount)}</strong>
                   </div>
                 </div>
 
                 <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
+                  <div className="settlement-form-title">
+                    <strong>Registrar pagamento</strong>
+                    <span>Informe um valor parcial ou quite o restante da dívida.</span>
+                  </div>
+
                   <label>
                     <span>Valor do pagamento</span>
                     <input
