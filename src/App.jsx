@@ -48,6 +48,7 @@ const emptyForm = {
   totalValue: "",
   expenseDate: "",
   expensePaymentMethod: "Dinheiro",
+  customExpensePaymentMethod: "",
   dueDate: "",
   dueDay: new Date().getDate(),
   category: "Casa",
@@ -366,7 +367,12 @@ function App() {
         title: form.title.trim(),
         totalValue: valuePerMonth,
         expenseDate: type === "normal" ? form.expenseDate || "" : "",
-        expensePaymentMethod: type === "normal" ? form.expensePaymentMethod || "" : "",
+        expensePaymentMethod:
+          type === "normal"
+            ? form.expensePaymentMethod === "Personalizado"
+              ? form.customExpensePaymentMethod.trim()
+              : form.expensePaymentMethod || ""
+            : "",
         dueDate: currentDueDate,
         monthKey: currentMonthKey,
         category: form.category,
@@ -385,7 +391,13 @@ function App() {
     await batch.commit();
 
     setSelectedMonth(monthFromDate(computedDueDate));
-    setForm({ ...emptyForm, expenseDate: "", expensePaymentMethod: "Dinheiro", dueDate: "" });
+    setForm({
+      ...emptyForm,
+      expenseDate: "",
+      expensePaymentMethod: "Dinheiro",
+      customExpensePaymentMethod: "",
+      dueDate: "",
+    });
     setActionMessage(
       type === "normal"
         ? "Conta cadastrada com sucesso."
@@ -964,8 +976,20 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
                 >
                   <option value="Dinheiro">Dinheiro</option>
                   <option value="Cartão">Cartão</option>
+                  <option value="Personalizado">Personalizado</option>
                 </select>
               </label>
+
+              {form.expensePaymentMethod === "Personalizado" && (
+                <label>
+                  <span>Forma personalizada</span>
+                  <input
+                    placeholder="Ex: MB Way, cheque, vale"
+                    value={form.customExpensePaymentMethod}
+                    onChange={(event) => onChange("customExpensePaymentMethod", event.target.value)}
+                  />
+                </label>
+              )}
 
               <label>
                 <span>Data de vencimento</span>
