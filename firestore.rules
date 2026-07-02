@@ -22,7 +22,7 @@ service cloud.firestore {
 
     match /settlements/{settlementId} {
       allow read, create: if allowedEmail();
-      allow update, delete: if false;
+      allow update, delete: if allowedEmail();
     }
   }
 }
