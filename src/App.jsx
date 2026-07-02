@@ -1420,9 +1420,8 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
                       </span>
                     )}
                   </div>
-                  <p>
-                    {personName(expense.payerId)} pagou • vencimento {formatDate(expense.dueDate)}
-                  </p>
+                  <p>Pago: {personName(expense.payerId)}</p>
+                  <p>Vencimento: {formatDate(expense.dueDate)}</p>
                 </div>
 
                 <div className="expense-side">
