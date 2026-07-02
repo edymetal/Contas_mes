@@ -876,8 +876,9 @@ textarea:focus {
 /* Settlement Panel */
 .settlement-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(560px, 660px));
   gap: 20px;
+  justify-content: center;
 }
 
 .settlement-card div {
@@ -1306,8 +1307,9 @@ textarea:focus {
   }
 
   .settlement-grid {
-    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(460px, 640px));
     gap: 16px;
+    justify-content: center;
   }
 }
 
