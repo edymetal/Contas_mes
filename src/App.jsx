@@ -242,6 +242,33 @@ function getFinishedPaidInstallmentExpenses(expenses) {
     .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
 }
 
+function getNormalizedExpenses(expenses) {
+  const installmentsBySlot = new Map();
+  const regularExpenses = [];
+
+  expenses.filter(isValidInstallmentExpense).forEach((expense) => {
+    const installmentInfo = getInstallmentInfo(expense);
+    if (!installmentInfo) {
+      regularExpenses.push(expense);
+      return;
+    }
+
+    const key = `${getInstallmentSeriesKey(expense, installmentInfo)}|${installmentInfo.current}`;
+    const current = installmentsBySlot.get(key);
+    if (!current || (expense.dueDate || "") < (current.dueDate || "")) {
+      installmentsBySlot.set(key, expense);
+    }
+  });
+
+  return [...regularExpenses, ...installmentsBySlot.values()];
+}
+
+function getExpensesForMonth(expenses, monthKey) {
+  return getNormalizedExpenses(expenses)
+    .filter((expense) => expense.monthKey === monthKey)
+    .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+}
+
 function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("contas_mes_theme") || "dark";
@@ -258,7 +285,7 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
-  const [expenses, setExpenses] = useState([]);
+  const [monthlyExpenses, setMonthlyExpenses] = useState([]);
   const [allExpenses, setAllExpenses] = useState([]);
   const [settlementPayments, setSettlementPayments] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -319,7 +346,7 @@ function App() {
           .filter(isValidInstallmentExpense)
           .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
 
-        setExpenses(nextExpenses);
+        setMonthlyExpenses(nextExpenses);
         setDataLoading(false);
       },
       () => {
@@ -358,6 +385,11 @@ function App() {
       setSettlementPayments(nextPayments);
     });
   }, [profile]);
+
+  const expenses = useMemo(() => {
+    const sourceExpenses = allExpenses.length ? allExpenses : monthlyExpenses;
+    return getExpensesForMonth(sourceExpenses, selectedMonth);
+  }, [allExpenses, monthlyExpenses, selectedMonth]);
 
   const metrics = useMemo(() => {
     return expenses.reduce(
