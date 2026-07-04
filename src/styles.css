@@ -861,9 +861,9 @@ textarea:focus {
 
 .person-debt-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(300px, 1.2fr);
+  align-items: start;
+  gap: 18px;
   padding: 18px 22px;
   border-bottom: 1px solid var(--line);
 }
@@ -875,7 +875,7 @@ textarea:focus {
 .person-debt-card strong {
   color: var(--primary);
   font-size: 1.5rem;
-  text-align: right;
+  text-align: left;
 }
 
 .person-debt-breakdown {
@@ -887,6 +887,43 @@ textarea:focus {
 .person-debt-breakdown small {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.person-settlement-form {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: grid;
+  grid-template-columns: minmax(96px, 0.8fr) minmax(130px, 1fr) minmax(110px, 0.8fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.person-settlement-form input,
+.person-settlement-form select,
+.person-settlement-form button {
+  min-width: 0;
+}
+
+.person-settlement-form button {
+  min-height: 42px;
+}
+
+.person-settlement-form .primary-button {
+  grid-column: span 2;
+}
+
+.person-debt-paid {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  justify-self: end;
+  padding: 8px 12px;
+  border: 1px solid var(--success);
+  border-radius: var(--radius-sm);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .expense-card,
@@ -1569,8 +1606,18 @@ textarea:focus {
     padding: 16px;
   }
 
-  .person-debt-card strong {
-    text-align: left;
+  .person-settlement-form,
+  .person-debt-paid {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .person-settlement-form {
+    grid-template-columns: 1fr;
+  }
+
+  .person-settlement-form .primary-button {
+    grid-column: auto;
   }
 
   .person-total-card .person-debt-breakdown {

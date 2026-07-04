@@ -891,6 +891,7 @@ function App() {
             settlementRows={settlementRows}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
+            onRegisterPayment={registerSettlementPayment}
           />
         )}
 
@@ -1292,8 +1293,9 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementRows }) {
+function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, onRegisterPayment, settlementRows }) {
   const monthPickerRef = useRef(null);
+  const [personPaymentForms, setPersonPaymentForms] = useState({});
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
@@ -1375,6 +1377,55 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
     picker.focus();
   }
 
+  function getPersonPaymentForm(row) {
+    return personPaymentForms[row.person.id] || {
+      amount: "",
+      paidAt: todayInputValue(),
+      type: "PIX",
+    };
+  }
+
+  function updatePersonPaymentForm(row, field, value) {
+    setPersonPaymentForms((current) => ({
+      ...current,
+      [row.person.id]: {
+        ...(current[row.person.id] || {
+          amount: "",
+          paidAt: todayInputValue(),
+          type: "PIX",
+        }),
+        [field]: value,
+      },
+    }));
+  }
+
+  async function submitPersonPayment(event, row, amountOverride) {
+    event.preventDefault();
+    if (!onRegisterPayment || row.amount <= 0) return;
+
+    const form = getPersonPaymentForm(row);
+    const saved = await onRegisterPayment(
+      { fromId: personId, toId: row.person.id, amount: row.amount },
+      {
+        amount: amountOverride ?? form.amount,
+        paidAt: form.paidAt,
+        type: form.type,
+        description: `Registrado em Minhas contas de ${selectedPerson.name}`,
+      },
+    );
+
+    if (saved) {
+      setPersonPaymentForms((current) => ({
+        ...current,
+        [row.person.id]: {
+          amount: "",
+          paidAt: todayInputValue(),
+          type: "PIX",
+        },
+      }));
+    }
+  }
+
   return (
     <section className="panel">
       <div className="section-heading" style={{ flexWrap: "wrap", gap: "12px" }}>
@@ -1417,7 +1468,11 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
 
       <div className="person-payment-summary">
         <div className="person-debt-grid">
-          {paymentSummary.totalsByPayer.map(({ person, originalAmount, paidAmount, amount }) => (
+          {paymentSummary.totalsByPayer.map((row) => {
+            const { person, originalAmount, paidAmount, amount } = row;
+            const form = getPersonPaymentForm(row);
+
+            return (
             <div className="person-debt-card" key={person.id}>
               <span>Deve para {person.name}</span>
               <strong>{formatCurrency(amount)}</strong>
@@ -1425,8 +1480,48 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
                 <small>Total da dívida: {formatCurrency(originalAmount)}</small>
                 <small>Abatido: {formatCurrency(paidAmount)}</small>
               </div>
+              {amount > 0 ? (
+                <form className="person-settlement-form" onSubmit={(event) => submitPersonPayment(event, row)}>
+                  <input
+                    aria-label={`Valor pago para ${person.name}`}
+                    inputMode="decimal"
+                    min="0.01"
+                    max={amount}
+                    step="0.01"
+                    type="number"
+                    value={form.amount}
+                    onChange={(event) => updatePersonPaymentForm(row, "amount", event.target.value)}
+                    placeholder={String(amount).replace(".", ",")}
+                    required
+                  />
+                  <input
+                    aria-label={`Data do pagamento para ${person.name}`}
+                    type="date"
+                    value={form.paidAt}
+                    onChange={(event) => updatePersonPaymentForm(row, "paidAt", event.target.value)}
+                  />
+                  <select
+                    aria-label={`Tipo de pagamento para ${person.name}`}
+                    value={form.type}
+                    onChange={(event) => updatePersonPaymentForm(row, "type", event.target.value)}
+                  >
+                    {PAYMENT_TYPES.map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
+                  </select>
+                  <button className="primary-button" type="submit">
+                    Registrar
+                  </button>
+                  <button className="secondary-button" onClick={(event) => submitPersonPayment(event, row, amount)} type="button">
+                    Pagar tudo
+                  </button>
+                </form>
+              ) : (
+                <span className="person-debt-paid">Quitado</span>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="person-total-card">
