@@ -1359,8 +1359,15 @@ textarea:focus {
     bottom: 0;
     width: 280px;
     height: 100vh;
+    height: 100dvh;
+    opacity: 0;
     transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.2s ease,
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0s linear 0.3s;
     z-index: 110;
     display: flex;
     flex-direction: column;
@@ -1376,7 +1383,14 @@ textarea:focus {
   }
 
   .sidebar.open {
+    opacity: 1;
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity 0.2s ease,
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0s;
   }
 
   /* Backdrop for Mobile Drawer */
