@@ -118,6 +118,11 @@ function getPaidAtMonthKey(payment) {
   return monthFromDate(payment.paidAt || payment.monthKey || "");
 }
 
+function capitalizeFirst(value) {
+  if (!value) return "";
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
 function formatMonthLabel(monthKey) {
   if (!monthKey) return "Sem mes";
   const [year, month] = monthKey.split("-").map(Number);
@@ -126,7 +131,7 @@ function formatMonthLabel(monthKey) {
     month: "long",
     timeZone: "UTC",
   }).format(date);
-  return `${monthLabel} ${year}`;
+  return `${capitalizeFirst(monthLabel)} ${year}`;
 }
 
 function getExpenseMonthKey({ dueDate, expenseDate, type }) {
@@ -1353,13 +1358,7 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const date = new Date(Date.UTC(year, month - 1, 1));
-    return new Intl.DateTimeFormat("pt-BR", {
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC"
-    }).format(date);
+    return formatMonthLabel(selectedMonth);
   }, [selectedMonth]);
 
   function handlePrevMonth() {
