@@ -1116,6 +1116,36 @@ textarea:focus {
   gap: 12px;
 }
 
+.settlement-history-month {
+  display: grid;
+  gap: 10px;
+}
+
+.settlement-history-month-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+
+.settlement-history-month-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.settlement-history-month-heading span {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.settlement-history-month-list {
+  display: grid;
+  gap: 10px;
+}
+
 .settlement-history-item {
   display: flex;
   align-items: center;

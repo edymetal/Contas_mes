@@ -110,6 +110,21 @@ function monthFromDate(date) {
   return date.slice(0, 7);
 }
 
+function getPaymentMonthKey(payment) {
+  return payment.monthKey || monthFromDate(payment.paidAt || "");
+}
+
+function formatMonthLabel(monthKey) {
+  if (!monthKey) return "Sem mes";
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 function getExpenseMonthKey({ dueDate, expenseDate, type }) {
   if ((type || "normal") === "normal") {
     return monthFromDate(expenseDate || dueDate);
@@ -224,7 +239,7 @@ function App() {
   useEffect(() => {
     if (!profile || !db) return undefined;
 
-    const settlementsQuery = query(collection(db, "settlements"), where("monthKey", "==", selectedMonth));
+    const settlementsQuery = query(collection(db, "settlements"));
 
     return onSnapshot(settlementsQuery, (snapshot) => {
       const nextPayments = snapshot.docs
@@ -234,7 +249,7 @@ function App() {
 
       setSettlementPayments(nextPayments);
     });
-  }, [profile, selectedMonth]);
+  }, [profile]);
 
   const metrics = useMemo(() => {
     return expenses.reduce(
@@ -265,9 +280,14 @@ function App() {
     return totals.map((item) => ({ ...item, percent: (item.total / max) * 100 }));
   }, [expenses]);
 
+  const selectedMonthSettlementPayments = useMemo(
+    () => settlementPayments.filter((payment) => getPaymentMonthKey(payment) === selectedMonth),
+    [selectedMonth, settlementPayments],
+  );
+
   const settlementRows = useMemo(
-    () => calculateSettlementRows(expenses, settlementPayments),
-    [expenses, settlementPayments],
+    () => calculateSettlementRows(expenses, selectedMonthSettlementPayments),
+    [expenses, selectedMonthSettlementPayments],
   );
 
   async function handleLogin() {
@@ -1534,6 +1554,23 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
     type: "PIX",
     description: "",
   });
+  const paymentsByMonth = useMemo(() => {
+    const grouped = settlementPayments.reduce((acc, payment) => {
+      const monthKey = getPaymentMonthKey(payment);
+      const currentGroup = acc.get(monthKey) || {
+        monthKey,
+        total: 0,
+        payments: [],
+      };
+
+      currentGroup.total = roundMoney(currentGroup.total + Number(payment.amount || 0));
+      currentGroup.payments.push(payment);
+      acc.set(monthKey, currentGroup);
+      return acc;
+    }, new Map());
+
+    return Array.from(grouped.values()).sort((a, b) => (b.monthKey || "").localeCompare(a.monthKey || ""));
+  }, [settlementPayments]);
 
   function getRowKey(row) {
     return `${row.fromId}->${row.toId}`;
@@ -1759,14 +1796,22 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
         </div>
 
         {!settlementPayments.length ? (
-          <div className="empty-state settlement-history-empty">Nenhum pagamento registrado neste mes.</div>
+          <div className="empty-state settlement-history-empty">Nenhum pagamento registrado.</div>
         ) : (
           <div className="settlement-history-list">
-            {settlementPayments.map((payment) => {
-              const isEditing = editingPaymentId === payment.id;
+            {paymentsByMonth.map((group) => (
+              <section className="settlement-history-month" key={group.monthKey}>
+                <div className="settlement-history-month-heading">
+                  <h3>{formatMonthLabel(group.monthKey)}</h3>
+                  <span>{formatCurrency(group.total)}</span>
+                </div>
 
-              return (
-                <article className="settlement-history-item" key={payment.id}>
+                <div className="settlement-history-month-list">
+                  {group.payments.map((payment) => {
+                    const isEditing = editingPaymentId === payment.id;
+
+                    return (
+                      <article className="settlement-history-item" key={payment.id}>
                   {isEditing ? (
                     <form className="settlement-history-edit" onSubmit={(event) => submitPaymentEdit(event, payment)}>
                       <label>
@@ -1862,9 +1907,12 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                       </div>
                     </>
                   )}
-                </article>
-              );
-            })}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </div>
