@@ -122,11 +122,11 @@ function formatMonthLabel(monthKey) {
   if (!monthKey) return "Sem mes";
   const [year, month] = monthKey.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, 1));
-  return new Intl.DateTimeFormat("pt-BR", {
+  const monthLabel = new Intl.DateTimeFormat("pt-BR", {
     month: "long",
-    year: "numeric",
     timeZone: "UTC",
   }).format(date);
+  return `${monthLabel} ${year}`;
 }
 
 function getExpenseMonthKey({ dueDate, expenseDate, type }) {
