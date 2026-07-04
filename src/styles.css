@@ -527,6 +527,15 @@ button {
   font-weight: 500;
 }
 
+.manage-heading {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.manage-heading button {
+  flex-shrink: 0;
+}
+
 /* Category Charts */
 .bar-chart {
   display: grid;

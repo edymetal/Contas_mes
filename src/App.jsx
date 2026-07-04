@@ -160,6 +160,88 @@ function isSettledStatus(status) {
   return status === "paid" || status === "settled" || status === "self";
 }
 
+function getInstallmentInfo(expense) {
+  const meta = expense?.installmentMeta;
+  if (meta) {
+    const current = Number(meta.current);
+    const total = Number(meta.total);
+    if (Number.isInteger(current) && Number.isInteger(total) && current >= 1 && total >= 1) {
+      return {
+        current,
+        total,
+        finalDueDate: meta.finalDueDate || "",
+      };
+    }
+  }
+
+  const match = expense?.installment?.match(/^Parcela\s+(\d+)\s+de\s+(\d+)$/i);
+  if (!match) return null;
+
+  return {
+    current: Number(match[1]),
+    total: Number(match[2]),
+    finalDueDate: "",
+  };
+}
+
+function isValidInstallmentExpense(expense) {
+  const installmentInfo = getInstallmentInfo(expense);
+  if (!installmentInfo) return true;
+  if (installmentInfo.current > installmentInfo.total) return false;
+  if (installmentInfo.finalDueDate && expense.dueDate && expense.dueDate > installmentInfo.finalDueDate) return false;
+  return true;
+}
+
+function areExpenseSharesSettled(expense) {
+  const shares = Object.values(expense.shares || {});
+  return shares.length > 0 && shares.every((share) => isSettledStatus(share.status));
+}
+
+function getInstallmentSeriesKey(expense, installmentInfo) {
+  return [
+    (expense.title || "").trim().toLowerCase(),
+    expense.payerId || "",
+    String(installmentInfo.total),
+    String(expense.totalValue || ""),
+    (expense.participants || []).slice().sort().join(","),
+  ].join("|");
+}
+
+function getFinishedPaidInstallmentExpenses(expenses) {
+  const groups = new Map();
+
+  expenses.forEach((expense) => {
+    const installmentInfo = getInstallmentInfo(expense);
+    if (!installmentInfo || !isValidInstallmentExpense(expense)) return;
+
+    const key = getInstallmentSeriesKey(expense, installmentInfo);
+    const group = groups.get(key) || {
+      first: installmentInfo.current,
+      total: installmentInfo.total,
+      installments: new Map(),
+    };
+
+    group.first = Math.min(group.first, installmentInfo.current);
+    group.installments.set(installmentInfo.current, expense);
+    groups.set(key, group);
+  });
+
+  return Array.from(groups.values())
+    .filter((group) => {
+      if (group.installments.size !== group.total - group.first + 1) return false;
+
+      for (let current = group.first; current <= group.total; current += 1) {
+        const expense = group.installments.get(current);
+        if (!expense || !areExpenseSharesSettled(expense)) return false;
+      }
+
+      return true;
+    })
+    .map((group) => group.installments.get(group.total))
+    .filter(Boolean)
+    .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+}
+
 function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("contas_mes_theme") || "dark";
@@ -177,6 +259,7 @@ function App() {
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
   const [expenses, setExpenses] = useState([]);
+  const [allExpenses, setAllExpenses] = useState([]);
   const [settlementPayments, setSettlementPayments] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -233,6 +316,7 @@ function App() {
       (snapshot) => {
         const nextExpenses = snapshot.docs
           .map((item) => ({ id: item.id, ...item.data() }))
+          .filter(isValidInstallmentExpense)
           .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
 
         setExpenses(nextExpenses);
@@ -244,6 +328,21 @@ function App() {
       },
     );
   }, [profile, selectedMonth]);
+
+  useEffect(() => {
+    if (!profile || !db) return undefined;
+
+    const expensesQuery = query(collection(db, "expenses"));
+
+    return onSnapshot(expensesQuery, (snapshot) => {
+      const nextExpenses = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .filter(isValidInstallmentExpense)
+        .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+
+      setAllExpenses(nextExpenses);
+    });
+  }, [profile]);
 
   useEffect(() => {
     if (!profile || !db) return undefined;
@@ -401,6 +500,7 @@ function App() {
     }
 
     const batch = writeBatch(db);
+    const finalInstallmentDueDate = type === "installment" ? addMonths(computedDueDate, runs - 1) : "";
 
     for (let index = 0; index < runs; index += 1) {
       const currentDueDate = addMonths(computedDueDate, index);
@@ -427,6 +527,14 @@ function App() {
       } else if (type === "recurring") {
         label = "Fixo";
       }
+      const installmentMeta =
+        type === "installment"
+          ? {
+              current: currentInstallment + index,
+              total: totalInstallments,
+              finalDueDate: finalInstallmentDueDate,
+            }
+          : null;
 
       const docRef = doc(collection(db, "expenses"));
       const expenseData = {
@@ -445,6 +553,7 @@ function App() {
         payerId: form.payerId,
         participants: form.participants,
         installment: label,
+        installmentMeta,
         shares,
         createdBy: profile.id,
         createdAt: serverTimestamp(),
@@ -755,11 +864,20 @@ function App() {
       payerId: updatedData.payerId,
       participants: updatedData.participants,
       shares,
+      installmentMeta: null,
       updatedAt: serverTimestamp(),
     };
 
     if (updatedData.installment !== undefined) {
       updateFields.installment = updatedData.installment;
+      const installmentInfo = getInstallmentInfo({ installment: updatedData.installment });
+      updateFields.installmentMeta = installmentInfo
+        ? {
+            current: installmentInfo.current,
+            total: installmentInfo.total,
+            finalDueDate: addMonths(updatedData.dueDate, installmentInfo.total - installmentInfo.current),
+          }
+        : null;
     }
 
     await updateDoc(doc(db, "expenses", expenseId), updateFields);
@@ -916,6 +1034,7 @@ function App() {
 
         {activeView === "manage" && (
           <ManagePanel
+            allExpenses={allExpenses}
             expenses={expenses}
             onEdit={setEditingExpense}
             onDelete={handleDeleteExpense}
@@ -2304,22 +2423,45 @@ function formatDate(date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
 }
 
-function ManagePanel({ expenses, onEdit, onDelete, dataLoading }) {
+function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading }) {
+  const [showFinishedInstallments, setShowFinishedInstallments] = useState(false);
+  const finishedInstallments = useMemo(
+    () => getFinishedPaidInstallmentExpenses(allExpenses),
+    [allExpenses],
+  );
+  const visibleExpenses = showFinishedInstallments ? finishedInstallments : expenses;
+
   if (dataLoading) {
     return <div className="empty-state">Carregando...</div>;
   }
 
-  if (!expenses.length) {
+  if (!expenses.length && !finishedInstallments.length) {
     return <div className="empty-state">Nenhuma conta cadastrada neste mês.</div>;
   }
 
   return (
     <section className="panel">
-      <div className="section-heading">
-        <h2>Contas do Mês</h2>
-        <span>{expenses.length} registro(s)</span>
+      <div className="section-heading manage-heading">
+        <h2>{showFinishedInstallments ? "Parceladas finalizadas e pagas" : "Contas do Mes"}</h2>
+        <span>{visibleExpenses.length} registro(s)</span>
+        <button
+          className={showFinishedInstallments ? "primary-button" : "secondary-button"}
+          onClick={() => setShowFinishedInstallments((current) => !current)}
+          type="button"
+        >
+          {showFinishedInstallments
+            ? "Ver contas do mes"
+            : `Ver parceladas finalizadas (${finishedInstallments.length})`}
+        </button>
       </div>
 
+      {!visibleExpenses.length ? (
+        <div className="empty-state">
+          {showFinishedInstallments
+            ? "Nenhuma conta parcelada finalizada e paga."
+            : "Nenhuma conta cadastrada neste mes."}
+        </div>
+      ) : (
       <div className="table-wrap">
         <table>
           <thead>
@@ -2334,7 +2476,7 @@ function ManagePanel({ expenses, onEdit, onDelete, dataLoading }) {
             </tr>
           </thead>
           <tbody>
-            {expenses.map((expense) => (
+            {visibleExpenses.map((expense) => (
               <tr key={expense.id}>
                 <td>
                   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -2379,6 +2521,7 @@ function ManagePanel({ expenses, onEdit, onDelete, dataLoading }) {
           </tbody>
         </table>
       </div>
+      )}
     </section>
   );
 }
