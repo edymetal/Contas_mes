@@ -262,9 +262,24 @@ function getNormalizedExpenses(expenses) {
   return [...regularExpenses, ...installmentsBySlot.values()];
 }
 
+function getExpenseDisplayMonthKey(expense) {
+  if (getInstallmentInfo(expense) || expense.installment === "Fixo") {
+    return monthFromDate(expense.dueDate || expense.monthKey || "");
+  }
+
+  return (
+    expense.monthKey ||
+    getExpenseMonthKey({
+      dueDate: expense.dueDate || "",
+      expenseDate: expense.expenseDate || "",
+      type: "normal",
+    })
+  );
+}
+
 function getExpensesForMonth(expenses, monthKey) {
   return getNormalizedExpenses(expenses)
-    .filter((expense) => expense.monthKey === monthKey)
+    .filter((expense) => getExpenseDisplayMonthKey(expense) === monthKey)
     .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
 }
 
