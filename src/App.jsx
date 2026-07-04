@@ -242,7 +242,7 @@ function getFinishedPaidInstallmentExpenses(expenses) {
 }
 
 function getNormalizedExpenses(expenses) {
-  const installmentsBySlot = new Map();
+  const installmentGroups = new Map();
   const regularExpenses = [];
 
   expenses.filter(isValidInstallmentExpense).forEach((expense) => {
@@ -252,17 +252,39 @@ function getNormalizedExpenses(expenses) {
       return;
     }
 
-    const key = `${getInstallmentSeriesKey(expense, installmentInfo)}|${installmentInfo.current}`;
-    const current = installmentsBySlot.get(key);
-    if (!current || (expense.dueDate || "") < (current.dueDate || "")) {
-      installmentsBySlot.set(key, expense);
+    const key = getInstallmentSeriesKey(expense, installmentInfo);
+    const group = installmentGroups.get(key) || {
+      first: installmentInfo.current,
+      installments: new Map(),
+    };
+    const currentExpense = group.installments.get(installmentInfo.current);
+
+    group.first = Math.min(group.first, installmentInfo.current);
+    if (!currentExpense || (expense.dueDate || "") < (currentExpense.dueDate || "")) {
+      group.installments.set(installmentInfo.current, expense);
     }
+    installmentGroups.set(key, group);
   });
 
-  return [...regularExpenses, ...installmentsBySlot.values()];
+  const normalizedInstallments = Array.from(installmentGroups.values()).flatMap((group) => {
+    const firstExpense = group.installments.get(group.first);
+    const firstDueDate = firstExpense?.dueDate || (firstExpense?.monthKey ? `${firstExpense.monthKey}-01` : "");
+
+    return Array.from(group.installments.entries()).map(([currentInstallment, expense]) => {
+      const expectedDueDate = firstDueDate ? addMonths(firstDueDate, currentInstallment - group.first) : "";
+      return {
+        ...expense,
+        displayMonthKey: expectedDueDate ? monthFromDate(expectedDueDate) : getExpenseDisplayMonthKey(expense),
+      };
+    });
+  });
+
+  return [...regularExpenses, ...normalizedInstallments];
 }
 
 function getExpenseDisplayMonthKey(expense) {
+  if (expense.displayMonthKey) return expense.displayMonthKey;
+
   if (getInstallmentInfo(expense) || expense.installment === "Fixo") {
     return monthFromDate(expense.dueDate || expense.monthKey || "");
   }
