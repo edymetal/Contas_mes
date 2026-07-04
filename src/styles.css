@@ -796,61 +796,92 @@ textarea:focus {
 
 .person-payment-summary {
   display: grid;
-  justify-items: center;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  margin: 20px 0;
+  grid-template-areas: "total people";
+  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1.2fr);
+  align-items: stretch;
+  gap: 0;
+  margin: 20px 0 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(148, 163, 184, 0.05));
+  box-shadow: var(--shadow);
 }
 
 .person-total-card,
 .person-debt-card {
-  width: min(100%, 420px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel-muted);
-  padding: 14px;
-  text-align: center;
+  min-width: 0;
 }
 
 .person-total-card {
+  grid-area: total;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 88px;
+  min-height: 156px;
+  padding: 24px;
+  border-right: 1px solid var(--line);
+  background: rgba(20, 184, 166, 0.08);
 }
 
 .person-debt-grid {
+  grid-area: people;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 300px));
-  justify-content: center;
+  align-content: stretch;
+  grid-template-columns: 1fr;
   width: 100%;
-  gap: 12px;
 }
 
 .person-total-card span,
 .person-debt-card span {
   display: block;
-  margin-bottom: 6px;
   color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .person-total-card strong,
 .person-debt-card strong {
   color: var(--text);
-  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .person-total-card strong {
   color: var(--primary);
-  font-size: 1.45rem;
+  margin-top: 10px;
+  font-size: clamp(2rem, 4vw, 2.65rem);
+}
+
+.person-total-card .person-debt-breakdown {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.person-debt-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.person-debt-card:last-child {
+  border-bottom: 0;
+}
+
+.person-debt-card strong {
+  color: var(--primary);
+  font-size: 1.5rem;
+  text-align: right;
 }
 
 .person-debt-breakdown {
   display: grid;
-  gap: 4px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .person-debt-breakdown small {
@@ -1488,8 +1519,16 @@ textarea:focus {
 
   .metrics-grid,
   .person-payment-summary {
+    grid-template-areas:
+      "total"
+      "people";
     grid-template-columns: 1fr;
-    gap: 16px;
+  }
+
+  .person-total-card {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .settlement-grid {
@@ -1508,6 +1547,20 @@ textarea:focus {
     min-height: 36px;
     padding: 8px 12px;
     font-size: 0.86rem;
+  }
+
+  .person-debt-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .person-debt-card strong {
+    text-align: left;
+  }
+
+  .person-total-card .person-debt-breakdown {
+    grid-template-columns: 1fr;
   }
 
   .topbar {
