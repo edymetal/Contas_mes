@@ -188,7 +188,6 @@ function isValidInstallmentExpense(expense) {
   const installmentInfo = getInstallmentInfo(expense);
   if (!installmentInfo) return true;
   if (installmentInfo.current > installmentInfo.total) return false;
-  if (installmentInfo.finalDueDate && expense.dueDate && expense.dueDate > installmentInfo.finalDueDate) return false;
   return true;
 }
 
