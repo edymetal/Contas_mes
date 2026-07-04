@@ -889,6 +889,7 @@ function App() {
             expenses={expenses}
             personId={activeView}
             settlementRows={settlementRows}
+            settlementPayments={selectedMonthSettlementPayments}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
           />
@@ -1292,14 +1293,14 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementRows }) {
+function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementPayments = [], settlementRows }) {
   const monthPickerRef = useRef(null);
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
     const totalsByPayer = PEOPLE
       .filter((person) => person.id !== personId)
-      .map((person) => ({ person, originalAmount: 0, paidAmount: 0, amount: 0 }));
+      .map((person) => ({ person, originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0 }));
 
     personExpenses.forEach((expense) => {
       if (expense.payerId === personId) return;
@@ -1322,21 +1323,33 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
       }
     });
 
+    settlementPayments.forEach((payment) => {
+      if (payment.fromId !== personId) return;
+
+      const payerRow = totalsByPayer.find((item) => item.person.id === payment.toId);
+      if (payerRow) {
+        payerRow.paidAmount = roundMoney(payerRow.paidAmount + Number(payment.amount || 0));
+      }
+    });
+
     totalsByPayer.forEach((row) => {
-      row.paidAmount = roundMoney(Math.max(row.originalAmount - row.amount, 0));
+      const paidAmount = Math.min(row.paidAmount, row.originalAmount);
+      row.paidAmount = roundMoney(paidAmount);
+      row.abatedAmount = roundMoney(Math.max(row.originalAmount - row.amount - paidAmount, 0));
     });
 
     const totals = totalsByPayer.reduce(
       (acc, row) => ({
         originalAmount: roundMoney(acc.originalAmount + row.originalAmount),
         paidAmount: roundMoney(acc.paidAmount + row.paidAmount),
+        abatedAmount: roundMoney(acc.abatedAmount + row.abatedAmount),
         amount: roundMoney(acc.amount + row.amount),
       }),
-      { originalAmount: 0, paidAmount: 0, amount: 0 },
+      { originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0 },
     );
 
     return { totalsByPayer, totals };
-  }, [personExpenses, settlementRows, personId]);
+  }, [personExpenses, settlementPayments, settlementRows, personId]);
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
@@ -1417,13 +1430,14 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
 
       <div className="person-payment-summary">
         <div className="person-debt-grid">
-          {paymentSummary.totalsByPayer.map(({ person, originalAmount, paidAmount, amount }) => (
+          {paymentSummary.totalsByPayer.map(({ person, originalAmount, paidAmount, abatedAmount, amount }) => (
             <div className="person-debt-card" key={person.id}>
               <span>Deve para {person.name}</span>
               <strong>{formatCurrency(amount)}</strong>
               <div className="person-debt-breakdown">
                 <small>Total da dívida: {formatCurrency(originalAmount)}</small>
-                <small>Abatido: {formatCurrency(paidAmount)}</small>
+                <small>Pago: {formatCurrency(paidAmount)}</small>
+                <small>Abatido: {formatCurrency(abatedAmount)}</small>
               </div>
             </div>
           ))}
@@ -1434,7 +1448,8 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
           <strong>{formatCurrency(paymentSummary.totals.amount)}</strong>
           <div className="person-debt-breakdown">
             <small>Total original: {formatCurrency(paymentSummary.totals.originalAmount)}</small>
-            <small>Total abatido: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
+            <small>Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
+            <small>Total abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
           </div>
         </div>
       </div>
