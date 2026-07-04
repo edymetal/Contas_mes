@@ -110,8 +110,12 @@ function monthFromDate(date) {
   return date.slice(0, 7);
 }
 
-function getPaymentMonthKey(payment) {
+function getSettlementPaymentMonthKey(payment) {
   return payment.monthKey || monthFromDate(payment.paidAt || "");
+}
+
+function getPaidAtMonthKey(payment) {
+  return monthFromDate(payment.paidAt || payment.monthKey || "");
 }
 
 function formatMonthLabel(monthKey) {
@@ -281,7 +285,7 @@ function App() {
   }, [expenses]);
 
   const selectedMonthSettlementPayments = useMemo(
-    () => settlementPayments.filter((payment) => getPaymentMonthKey(payment) === selectedMonth),
+    () => settlementPayments.filter((payment) => getSettlementPaymentMonthKey(payment) === selectedMonth),
     [selectedMonth, settlementPayments],
   );
 
@@ -1556,7 +1560,7 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
   });
   const paymentsByMonth = useMemo(() => {
     const grouped = settlementPayments.reduce((acc, payment) => {
-      const monthKey = getPaymentMonthKey(payment);
+      const monthKey = getPaidAtMonthKey(payment);
       const currentGroup = acc.get(monthKey) || {
         monthKey,
         total: 0,
