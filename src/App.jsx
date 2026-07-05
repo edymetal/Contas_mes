@@ -1691,14 +1691,21 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementPayments = [], settlementRows }) {
+function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementPayments = [], settlementRows = [] }) {
   const monthPickerRef = useRef(null);
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
     const totalsByPayer = PEOPLE
       .filter((person) => person.id !== personId)
-      .map((person) => ({ person, originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0 }));
+      .map((person) => ({
+        person,
+        originalAmount: 0,
+        paidAmount: 0,
+        abatedAmount: 0,
+        amount: 0,
+        receivableAmount: 0,
+      }));
 
     personExpenses.forEach((expense) => {
       if (expense.payerId === personId) return;
@@ -1713,11 +1720,18 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
     });
 
     settlementRows.forEach((row) => {
-      if (row.fromId !== personId) return;
+      if (row.fromId === personId) {
+        const payerRow = totalsByPayer.find((item) => item.person.id === row.toId);
+        if (payerRow) {
+          payerRow.amount = roundMoney(payerRow.amount + Number(row.amount || 0));
+        }
+      }
 
-      const payerRow = totalsByPayer.find((item) => item.person.id === row.toId);
-      if (payerRow) {
-        payerRow.amount = roundMoney(payerRow.amount + Number(row.amount || 0));
+      if (row.toId === personId) {
+        const payerRow = totalsByPayer.find((item) => item.person.id === row.fromId);
+        if (payerRow) {
+          payerRow.receivableAmount = roundMoney(payerRow.receivableAmount + Number(row.amount || 0));
+        }
       }
     });
 
@@ -1742,8 +1756,9 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
         paidAmount: roundMoney(acc.paidAmount + row.paidAmount),
         abatedAmount: roundMoney(acc.abatedAmount + row.abatedAmount),
         amount: roundMoney(acc.amount + row.amount),
+        receivableAmount: roundMoney(acc.receivableAmount + row.receivableAmount),
       }),
-      { originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0 },
+      { originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0, receivableAmount: 0 },
     );
 
     return { totalsByPayer, totals };
@@ -1822,7 +1837,14 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
 
       <div className="person-payment-summary">
         <div className="person-debt-grid">
-          {paymentSummary.totalsByPayer.map(({ person, originalAmount, paidAmount, abatedAmount, amount }) => (
+          {paymentSummary.totalsByPayer.map(({
+            person,
+            originalAmount,
+            paidAmount,
+            abatedAmount,
+            amount,
+            receivableAmount,
+          }) => (
             <div className="person-debt-card" key={person.id}>
               <span>Deve para {person.name}</span>
               <strong>{formatCurrency(amount)}</strong>
@@ -1830,6 +1852,7 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
                 <small className="debt-total">Total da dívida: {formatCurrency(originalAmount)}</small>
                 <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
                 <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
+                <small className="debt-receivable">A receber de {person.name}: {formatCurrency(receivableAmount)}</small>
               </div>
             </div>
           ))}
@@ -1838,6 +1861,8 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
         <div className="person-total-card">
           <span>Total a pagar no mês</span>
           <strong>{formatCurrency(paymentSummary.totals.amount)}</strong>
+          <span className="person-total-receivable-label">Total a receber no mês</span>
+          <strong className="person-total-receivable-value">{formatCurrency(paymentSummary.totals.receivableAmount)}</strong>
           <div className="person-debt-breakdown">
             <small className="debt-total">Total original: {formatCurrency(paymentSummary.totals.originalAmount)}</small>
             <small className="debt-paid">Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>

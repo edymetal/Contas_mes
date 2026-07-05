@@ -1366,6 +1366,15 @@ textarea:focus {
   font-size: clamp(2rem, 4vw, 2.65rem);
 }
 
+.person-total-receivable-label {
+  margin-top: 18px;
+}
+
+.person-total-card .person-total-receivable-value {
+  color: var(--success);
+  font-size: clamp(1.8rem, 3.4vw, 2.35rem);
+}
+
 .person-total-card .person-debt-breakdown {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 18px;
@@ -1425,6 +1434,12 @@ textarea:focus {
   border-color: color-mix(in srgb, #60a5fa 34%, transparent);
   background: color-mix(in srgb, #60a5fa 14%, transparent);
   color: #93c5fd;
+}
+
+.person-debt-breakdown .debt-receivable {
+  border-color: color-mix(in srgb, var(--success) 34%, transparent);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
 }
 
 :root:not([data-theme="dark"]) .person-debt-breakdown .debt-abated {
