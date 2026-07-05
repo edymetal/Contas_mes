@@ -98,6 +98,13 @@ function formatCurrency(value) {
   return currencyFormatter.format(Number(value || 0));
 }
 
+function formatSignedCurrency(value, sign) {
+  const amount = Math.abs(Number(value || 0));
+  if (!amount) return formatCurrency(0);
+
+  return `${sign === "negative" ? "-" : "+"}${formatCurrency(amount)}`;
+}
+
 function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
@@ -1847,12 +1854,12 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
           }) => (
             <div className="person-debt-card" key={person.id}>
               <span>Deve para {person.name}</span>
-              <strong>{formatCurrency(amount)}</strong>
+              <strong className="money-negative">{formatSignedCurrency(amount, "negative")}</strong>
               <div className="person-debt-breakdown">
-                <small className="debt-total">Total da dívida: {formatCurrency(originalAmount)}</small>
+                <small className="debt-total">Total da dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
                 <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
                 <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
-                <small className="debt-receivable">A receber de {person.name}: {formatCurrency(receivableAmount)}</small>
+                <small className="debt-receivable">A receber de {person.name}: {formatSignedCurrency(receivableAmount, "positive")}</small>
               </div>
             </div>
           ))}
@@ -1860,11 +1867,11 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
 
         <div className="person-total-card">
           <span>Total a pagar no mês</span>
-          <strong>{formatCurrency(paymentSummary.totals.amount)}</strong>
+          <strong className="money-negative">{formatSignedCurrency(paymentSummary.totals.amount, "negative")}</strong>
           <span className="person-total-receivable-label">Total a receber no mês</span>
-          <strong className="person-total-receivable-value">{formatCurrency(paymentSummary.totals.receivableAmount)}</strong>
+          <strong className="person-total-receivable-value">{formatSignedCurrency(paymentSummary.totals.receivableAmount, "positive")}</strong>
           <div className="person-debt-breakdown">
-            <small className="debt-total">Total original: {formatCurrency(paymentSummary.totals.originalAmount)}</small>
+            <small className="debt-total">Total original: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
             <small className="debt-paid">Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
             <small className="debt-abated">Total abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
           </div>
@@ -1896,7 +1903,9 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
                 </div>
 
                 <div className="expense-side">
-                  <strong>{formatCurrency(share?.amount)}</strong>
+                  <strong className={isPayer ? "money-positive" : "money-negative"}>
+                    {formatSignedCurrency(share?.amount, isPayer ? "positive" : "negative")}
+                  </strong>
                   <StatusBadge status={isPayer ? "self" : share?.status} />
                 </div>
               </article>
