@@ -1610,9 +1610,9 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
               <span>Deve para {person.name}</span>
               <strong>{formatCurrency(amount)}</strong>
               <div className="person-debt-breakdown">
-                <small>Total da dívida: {formatCurrency(originalAmount)}</small>
-                <small>Pago: {formatCurrency(paidAmount)}</small>
-                <small>Abatido: {formatCurrency(abatedAmount)}</small>
+                <small className="debt-total">Total da dívida: {formatCurrency(originalAmount)}</small>
+                <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
+                <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
               </div>
             </div>
           ))}
@@ -1622,9 +1622,9 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
           <span>Total a pagar no mês</span>
           <strong>{formatCurrency(paymentSummary.totals.amount)}</strong>
           <div className="person-debt-breakdown">
-            <small>Total original: {formatCurrency(paymentSummary.totals.originalAmount)}</small>
-            <small>Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
-            <small>Total abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
+            <small className="debt-total">Total original: {formatCurrency(paymentSummary.totals.originalAmount)}</small>
+            <small className="debt-paid">Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
+            <small className="debt-abated">Total abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
           </div>
         </div>
       </div>

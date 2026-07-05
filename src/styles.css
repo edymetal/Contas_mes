@@ -894,8 +894,36 @@ textarea:focus {
 }
 
 .person-debt-breakdown small {
-  color: var(--muted);
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.person-debt-breakdown .debt-total {
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+
+.person-debt-breakdown .debt-paid {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success);
+}
+
+.person-debt-breakdown .debt-abated {
+  border-color: color-mix(in srgb, #60a5fa 34%, transparent);
+  background: color-mix(in srgb, #60a5fa 14%, transparent);
+  color: #93c5fd;
+}
+
+:root:not([data-theme="dark"]) .person-debt-breakdown .debt-abated {
+  color: #2563eb;
 }
 
 .expense-card,
