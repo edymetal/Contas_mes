@@ -283,6 +283,30 @@ function getInstallmentSeriesSummaries(expenses) {
     .sort((a, b) => (a.finalDueDate || "").localeCompare(b.finalDueDate || ""));
 }
 
+function getFixedExpenseMonthGroups(expenses) {
+  const groups = new Map();
+
+  expenses
+    .filter((expense) => expense.installment === "Fixo")
+    .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
+    .forEach((expense) => {
+      const monthKey = getExpenseDisplayMonthKey(expense);
+      if (!monthKey) return;
+
+      const group = groups.get(monthKey) || {
+        monthKey,
+        total: 0,
+        expenses: [],
+      };
+
+      group.total = roundMoney(group.total + Number(expense.totalValue || 0));
+      group.expenses.push(expense);
+      groups.set(monthKey, group);
+    });
+
+  return Array.from(groups.values()).sort((a, b) => (b.monthKey || "").localeCompare(a.monthKey || ""));
+}
+
 function getNormalizedExpenses(expenses) {
   const installmentGroups = new Map();
   const regularExpenses = [];
@@ -2534,7 +2558,7 @@ function formatInstallmentPeriod(installment) {
 }
 
 function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading }) {
-  const [showInstallments, setShowInstallments] = useState(false);
+  const [manageView, setManageView] = useState("month");
   const monthlyInstallmentKeys = useMemo(() => {
     return new Set(
       expenses
@@ -2554,36 +2578,63 @@ function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading
   const finishedInstallments = installmentSummaries
     .filter((item) => item.completed)
     .sort((a, b) => (b.finalizedDate || b.finalDueDate || "").localeCompare(a.finalizedDate || a.finalDueDate || ""));
+  const fixedExpenseGroups = useMemo(
+    () => getFixedExpenseMonthGroups(allExpenses.length ? allExpenses : expenses),
+    [allExpenses, expenses],
+  );
+  const fixedExpensesCount = fixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
+
+  const viewTitle = {
+    month: "Contas do Mes",
+    installments: "Contas Parceladas",
+    fixed: "Contas Fixas",
+  }[manageView];
+  const viewCount = {
+    month: `${expenses.length} registro(s)`,
+    installments: `${installmentSummaries.length} parcelamento(s)`,
+    fixed: `${fixedExpensesCount} conta(s) fixa(s)`,
+  }[manageView];
 
   if (dataLoading) {
     return <div className="empty-state">Carregando...</div>;
   }
 
-  if (!expenses.length && !installmentSummaries.length) {
+  if (!expenses.length && !installmentSummaries.length && !fixedExpensesCount) {
     return <div className="empty-state">Nenhuma conta cadastrada neste mês.</div>;
   }
 
   return (
     <section className="panel">
       <div className="section-heading manage-heading">
-        <h2>{showInstallments ? "Contas Parceladas" : "Contas do Mes"}</h2>
-        <span>{showInstallments ? `${installmentSummaries.length} parcelamento(s)` : `${expenses.length} registro(s)`}</span>
-        <button
-          className={showInstallments ? "primary-button" : "secondary-button"}
-          onClick={() => setShowInstallments((current) => !current)}
-          type="button"
-        >
-          {showInstallments
-            ? "Ver contas do mes"
-            : `Contas Parceladas (${installmentSummaries.length})`}
-        </button>
+        <div>
+          <h2>{viewTitle}</h2>
+          <span>{viewCount}</span>
+        </div>
+        <div className="manage-actions">
+          <button
+            className={manageView === "installments" ? "primary-button" : "secondary-button"}
+            onClick={() => setManageView((current) => (current === "installments" ? "month" : "installments"))}
+            type="button"
+          >
+            {manageView === "installments" ? "Ver contas do mes" : `Contas Parceladas (${installmentSummaries.length})`}
+          </button>
+          <button
+            className={manageView === "fixed" ? "primary-button" : "secondary-button"}
+            onClick={() => setManageView((current) => (current === "fixed" ? "month" : "fixed"))}
+            type="button"
+          >
+            {manageView === "fixed" ? "Ver contas do mes" : `Contas Fixas (${fixedExpensesCount})`}
+          </button>
+        </div>
       </div>
 
-      {showInstallments ? (
+      {manageView === "installments" ? (
         <InstallmentSeriesView
           activeInstallments={activeInstallments}
           finishedInstallments={finishedInstallments}
         />
+      ) : manageView === "fixed" ? (
+        <FixedExpensesView groups={fixedExpenseGroups} />
       ) : !expenses.length ? (
         <div className="empty-state">Nenhuma conta cadastrada neste mes.</div>
       ) : (
@@ -2733,6 +2784,42 @@ function InstallmentSeriesGroup({ emptyText, installments, title }) {
         </div>
       )}
     </section>
+  );
+}
+
+function FixedExpensesView({ groups }) {
+  if (!groups.length) {
+    return <div className="empty-state">Nenhuma conta fixa cadastrada.</div>;
+  }
+
+  return (
+    <div className="fixed-expenses-view">
+      {groups.map((group) => (
+        <section className="fixed-expense-month" key={group.monthKey}>
+          <div className="fixed-expense-month-header">
+            <div>
+              <h3>{formatMonthLabel(group.monthKey)}</h3>
+              <span>{group.expenses.length} conta(s) fixa(s)</span>
+            </div>
+            <strong>{formatCurrency(group.total)}</strong>
+          </div>
+
+          <div className="fixed-expense-list">
+            {group.expenses.map((expense) => (
+              <article className="fixed-expense-row" key={expense.id}>
+                <div>
+                  <strong>{expense.title}</strong>
+                  <small>
+                    {expense.category} • {personName(expense.payerId)} • Vencimento {formatDate(expense.dueDate)}
+                  </small>
+                </div>
+                <span>{formatCurrency(expense.totalValue)}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 

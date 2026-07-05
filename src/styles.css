@@ -536,6 +536,13 @@ button {
   flex-shrink: 0;
 }
 
+.manage-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .installment-series-view {
   display: grid;
   gap: 24px;
@@ -707,6 +714,89 @@ button {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.fixed-expenses-view {
+  display: grid;
+  gap: 18px;
+}
+
+.fixed-expense-month {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.fixed-expense-month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--primary) 10%, var(--panel-muted));
+}
+
+.fixed-expense-month-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.fixed-expense-month-header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.fixed-expense-month-header strong {
+  color: var(--primary);
+  font-size: 1.35rem;
+  white-space: nowrap;
+}
+
+.fixed-expense-list {
+  display: grid;
+}
+
+.fixed-expense-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fixed-expense-row:last-child {
+  border-bottom: 0;
+}
+
+.fixed-expense-row div {
+  min-width: 0;
+}
+
+.fixed-expense-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.fixed-expense-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.fixed-expense-row span {
+  color: var(--success);
+  font-size: 1rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 /* Category Charts */
@@ -1799,6 +1889,12 @@ textarea:focus {
   .installment-series-card-header,
   .installment-series-heading {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fixed-expense-month-header,
+  .fixed-expense-row {
+    align-items: flex-start;
     flex-direction: column;
   }
 
