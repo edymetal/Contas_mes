@@ -2688,19 +2688,19 @@ function InstallmentSeriesGroup({ emptyText, installments, title }) {
               </div>
 
               <div className="installment-series-money">
-                <div>
+                <div className="installment-value installment-value-partial">
                   <span>Valor da parcela</span>
                   <strong>{formatCurrency(installment.installmentValue)}</strong>
                 </div>
-                <div>
+                <div className="installment-value installment-value-total">
                   <span>Total parcelado</span>
                   <strong>{formatCurrency(installment.totalValue)}</strong>
                 </div>
-                <div>
+                <div className="installment-value installment-value-paid">
                   <span>Já pago</span>
                   <strong>{formatCurrency(installment.paidValue)}</strong>
                 </div>
-                <div>
+                <div className="installment-value installment-value-remaining">
                   <span>Falta pagar</span>
                   <strong>{formatCurrency(installment.remainingValue)}</strong>
                 </div>

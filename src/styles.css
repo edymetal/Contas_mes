@@ -567,8 +567,8 @@ button {
 
 .installment-series-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .installment-series-card {
@@ -623,7 +623,7 @@ button {
   gap: 10px;
 }
 
-.installment-series-money div {
+.installment-value {
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--line);
@@ -631,18 +631,63 @@ button {
   background: var(--panel-muted);
 }
 
-.installment-series-money span {
+.installment-value span {
   display: block;
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 700;
 }
 
-.installment-series-money strong {
+.installment-value strong {
   display: block;
   margin-top: 5px;
   color: var(--text);
   font-size: 1rem;
+}
+
+.installment-value-partial {
+  border-color: color-mix(in srgb, #38bdf8 32%, transparent);
+  background: color-mix(in srgb, #38bdf8 12%, var(--panel-muted));
+}
+
+.installment-value-partial span,
+.installment-value-partial strong {
+  color: #7dd3fc;
+}
+
+.installment-value-total {
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, var(--panel-muted));
+}
+
+.installment-value-total span,
+.installment-value-total strong {
+  color: var(--warning);
+}
+
+.installment-value-paid {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, var(--panel-muted));
+}
+
+.installment-value-paid span,
+.installment-value-paid strong {
+  color: var(--success);
+}
+
+.installment-value-remaining {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel-muted));
+}
+
+.installment-value-remaining span,
+.installment-value-remaining strong {
+  color: var(--danger);
+}
+
+:root:not([data-theme="dark"]) .installment-value-partial span,
+:root:not([data-theme="dark"]) .installment-value-partial strong {
+  color: #0284c7;
 }
 
 .installment-series-details {
@@ -1720,6 +1765,10 @@ textarea:focus {
     gap: 16px;
     justify-content: center;
   }
+
+  .installment-series-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 680px) {
@@ -1743,7 +1792,6 @@ textarea:focus {
     text-align: left;
   }
 
-  .installment-series-grid,
   .installment-series-money {
     grid-template-columns: 1fr;
   }
