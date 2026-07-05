@@ -37,7 +37,7 @@ import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
 
-const currencyFormatter = new Intl.NumberFormat("pt-PT", {
+const currencyFormatter = new Intl.NumberFormat("de-DE", {
   style: "currency",
   currency: "EUR",
 });
@@ -2602,18 +2602,17 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
     .sort((a, b) => (b.finalizedDate || b.finalDueDate || "").localeCompare(a.finalizedDate || a.finalDueDate || ""));
   const installmentSummaryTotals = useMemo(() => {
     const nextMonth = shiftMonth(selectedMonth, 1);
-    const remainingExpenses = getNormalizedExpenses(expenseSource)
-      .filter((expense) => getInstallmentInfo(expense))
-      .filter((expense) => getExpenseDisplayMonthKey(expense) >= selectedMonth)
-      .filter((expense) => !areExpenseSharesSettled(expense));
 
     return {
       currentMonth: sumInstallmentExpenses(getExpensesForMonth(expenseSource, selectedMonth)),
       nextMonth: sumInstallmentExpenses(getExpensesForMonth(expenseSource, nextMonth)),
       nextMonthKey: nextMonth,
-      remaining: sumInstallmentExpenses(remainingExpenses),
+      remaining: installmentSummaries.reduce(
+        (sum, installment) => roundMoney(sum + Number(installment.remainingValue || 0)),
+        0,
+      ),
     };
-  }, [expenseSource, selectedMonth]);
+  }, [expenseSource, installmentSummaries, selectedMonth]);
   const fixedExpenseGroups = useMemo(
     () => getFixedExpenseMonthGroups(expenses),
     [expenses],
