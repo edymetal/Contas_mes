@@ -56,55 +56,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Ensure GitHub Pages is configured
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          api_url="https://api.github.com/repos/${GH_REPOSITORY}/pages"
-          auth_header="Authorization: Bearer ${GH_TOKEN}"
-          api_header="X-GitHub-Api-Version: 2022-11-28"
-          accept_header="Accept: application/vnd.github+json"
-
-          status=$(curl -sS -o /tmp/pages-response.json -w "%{http_code}" \
-            -H "${auth_header}" \
-            -H "${api_header}" \
-            -H "${accept_header}" \
-            "${api_url}")
-
-          if [ "${status}" = "404" ]; then
-            status=$(curl -sS -o /tmp/pages-create-response.json -w "%{http_code}" \
-              -X POST \
-              -H "${auth_header}" \
-              -H "${api_header}" \
-              -H "${accept_header}" \
-              "${api_url}" \
-              -d '{"build_type":"workflow"}')
-
-            if [ "${status}" != "201" ] && [ "${status}" != "409" ]; then
-              cat /tmp/pages-create-response.json
-              exit 1
-            fi
-          elif [ "${status}" = "200" ]; then
-            status=$(curl -sS -o /tmp/pages-update-response.json -w "%{http_code}" \
-              -X PATCH \
-              -H "${auth_header}" \
-              -H "${api_header}" \
-              -H "${accept_header}" \
-              "${api_url}" \
-              -d '{"build_type":"workflow"}')
-
-            if [ "${status}" != "200" ]; then
-              cat /tmp/pages-update-response.json
-              exit 1
-            fi
-          else
-            cat /tmp/pages-response.json
-            exit 1
-          fi
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
