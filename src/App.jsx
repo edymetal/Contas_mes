@@ -2647,6 +2647,7 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
         <InstallmentSeriesView
           activeInstallments={activeInstallments}
           finishedInstallments={finishedInstallments}
+          selectedMonth={selectedMonth}
         />
       ) : manageView === "fixed" ? (
         <FixedExpensesView groups={fixedExpenseGroups} selectedMonth={selectedMonth} />
@@ -2717,13 +2718,36 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
   );
 }
 
-function InstallmentSeriesView({ activeInstallments, finishedInstallments }) {
+function InstallmentSeriesView({ activeInstallments, finishedInstallments, selectedMonth }) {
+  const installments = [...activeInstallments, ...finishedInstallments];
+  const monthlyTotal = installments.reduce(
+    (sum, installment) => roundMoney(sum + Number(installment.installmentValue || 0)),
+    0,
+  );
+  const remainingTotal = installments.reduce(
+    (sum, installment) => roundMoney(sum + Number(installment.remainingValue || 0)),
+    0,
+  );
+
   if (!activeInstallments.length && !finishedInstallments.length) {
     return <div className="empty-state">Nenhuma conta parcelada cadastrada.</div>;
   }
 
   return (
     <div className="installment-series-view">
+      <div className="installment-summary-grid">
+        <article className="installment-summary-card monthly">
+          <span>Total parcelado no mês</span>
+          <strong>{formatCurrency(monthlyTotal)}</strong>
+          <small>{formatMonthLabel(selectedMonth)}</small>
+        </article>
+        <article className="installment-summary-card remaining">
+          <span>Total falta pagar</span>
+          <strong>{formatCurrency(remainingTotal)}</strong>
+          <small>{installments.length} parcelamento(s)</small>
+        </article>
+      </div>
+
       <InstallmentSeriesGroup
         installments={activeInstallments}
         title="Parceladas ativas"

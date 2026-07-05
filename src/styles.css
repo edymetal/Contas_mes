@@ -548,6 +548,53 @@ button {
   gap: 24px;
 }
 
+.installment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.installment-summary-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.installment-summary-card span,
+.installment-summary-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.installment-summary-card strong {
+  display: block;
+  margin: 8px 0 6px;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  line-height: 1;
+}
+
+.installment-summary-card.monthly {
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, var(--panel));
+}
+
+.installment-summary-card.monthly strong {
+  color: var(--warning);
+}
+
+.installment-summary-card.remaining {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, var(--panel));
+}
+
+.installment-summary-card.remaining strong {
+  color: var(--danger);
+}
+
 .installment-series-group {
   display: grid;
   gap: 14px;
@@ -1857,6 +1904,10 @@ textarea:focus {
   }
 
   .installment-series-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .installment-summary-grid {
     grid-template-columns: 1fr;
   }
 }
