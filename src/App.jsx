@@ -1173,6 +1173,7 @@ function App() {
           <ManagePanel
             allExpenses={allExpenses}
             expenses={expenses}
+            selectedMonth={selectedMonth}
             onEdit={setEditingExpense}
             onDelete={handleDeleteExpense}
             dataLoading={dataLoading}
@@ -2571,7 +2572,7 @@ function formatInstallmentPeriod(installment) {
   return start === end ? start : `${start} até ${end}`;
 }
 
-function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading }) {
+function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
   const monthlyInstallmentKeys = useMemo(() => {
     return new Set(
@@ -2593,8 +2594,8 @@ function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading
     .filter((item) => item.completed)
     .sort((a, b) => (b.finalizedDate || b.finalDueDate || "").localeCompare(a.finalizedDate || a.finalDueDate || ""));
   const fixedExpenseGroups = useMemo(
-    () => getFixedExpenseMonthGroups(allExpenses.length ? allExpenses : expenses),
-    [allExpenses, expenses],
+    () => getFixedExpenseMonthGroups(expenses),
+    [expenses],
   );
   const fixedExpensesCount = fixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
 
@@ -2648,7 +2649,7 @@ function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading
           finishedInstallments={finishedInstallments}
         />
       ) : manageView === "fixed" ? (
-        <FixedExpensesView groups={fixedExpenseGroups} />
+        <FixedExpensesView groups={fixedExpenseGroups} selectedMonth={selectedMonth} />
       ) : !expenses.length ? (
         <div className="empty-state">Nenhuma conta cadastrada neste mes.</div>
       ) : (
@@ -2801,9 +2802,9 @@ function InstallmentSeriesGroup({ emptyText, installments, title }) {
   );
 }
 
-function FixedExpensesView({ groups }) {
+function FixedExpensesView({ groups, selectedMonth }) {
   if (!groups.length) {
-    return <div className="empty-state">Nenhuma conta fixa cadastrada.</div>;
+    return <div className="empty-state">Nenhuma conta fixa em {formatMonthLabel(selectedMonth)}.</div>;
   }
 
   return (
