@@ -90,6 +90,10 @@ const navItems = [
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
+function isAdminProfile(profile) {
+  return profile?.role === "admin";
+}
+
 function formatCurrency(value) {
   return currencyFormatter.format(Number(value || 0));
 }
@@ -404,6 +408,7 @@ function App() {
   });
   const [actionMessage, setActionMessage] = useState("");
   const [editingExpense, setEditingExpense] = useState(null);
+  const canManageData = isAdminProfile(profile);
 
   useEffect(() => {
     if (!hasFirebaseConfig) {
@@ -413,7 +418,6 @@ function App() {
 
     return onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
-      setAuthError("");
 
       if (!user) {
         setProfile(null);
@@ -422,6 +426,7 @@ function App() {
         return;
       }
 
+      setAuthError("");
       const matchedProfile = getProfileByEmail(user.email);
       if (!matchedProfile) {
         setProfile(null);
@@ -535,6 +540,11 @@ function App() {
     [expenses, selectedMonthSettlementPayments],
   );
 
+  useEffect(() => {
+    if (!profile || canManageData) return;
+    if (activeView !== profile.id) setActiveView(profile.id);
+  }, [activeView, canManageData, profile]);
+
   async function handleLogin() {
     setAuthError("");
     try {
@@ -545,7 +555,14 @@ function App() {
   }
 
   async function handleLogout() {
+    setAuthError("");
     await signOut(auth);
+  }
+
+  function ensureCanManageData() {
+    if (canManageData) return true;
+    setActionMessage("Seu acesso e somente leitura. Esta conta nao pode alterar dados.");
+    return false;
   }
 
   function updateForm(field, value) {
@@ -567,6 +584,7 @@ function App() {
     event.preventDefault();
     setFormError("");
     setActionMessage("");
+    if (!ensureCanManageData()) return;
 
     const rawValue = Number(String(form.totalValue).replace(",", "."));
     if (isNaN(rawValue) || rawValue <= 0) {
@@ -725,6 +743,7 @@ function App() {
   }
 
   function openPayment(expense, personId) {
+    if (!ensureCanManageData()) return;
     setPaymentTarget({ expense, personId });
     setPaymentForm({ paidAt: todayInputValue(), type: "PIX", description: "" });
   }
@@ -732,6 +751,7 @@ function App() {
   async function confirmPayment(event) {
     event.preventDefault();
     if (!paymentTarget) return;
+    if (!ensureCanManageData()) return;
 
     const { expense, personId } = paymentTarget;
     if (personId !== profile.id) return;
@@ -794,6 +814,8 @@ function App() {
   }
 
   async function registerSettlementPayment(row, paymentData) {
+    if (!ensureCanManageData()) return false;
+
     const rawAmount = Number(String(paymentData.amount).replace(",", "."));
     if (isNaN(rawAmount) || rawAmount <= 0) {
       setActionMessage("Informe um valor de pagamento válido.");
@@ -874,6 +896,8 @@ function App() {
   }
 
   async function updateSettlementPayment(payment, paymentData) {
+    if (!ensureCanManageData()) return false;
+
     const rawAmount = Number(String(paymentData.amount).replace(",", "."));
     if (isNaN(rawAmount) || rawAmount <= 0) {
       setActionMessage("Informe um valor de pagamento valido.");
@@ -922,6 +946,7 @@ function App() {
   }
 
   async function deleteSettlementPayment(payment) {
+    if (!ensureCanManageData()) return;
     if (!window.confirm("Tem certeza que deseja apagar este pagamento do historico?")) return;
 
     const batch = writeBatch(db);
@@ -940,6 +965,7 @@ function App() {
   }
 
   async function handleDeleteExpense(expenseId) {
+    if (!ensureCanManageData()) return;
     if (!window.confirm("Tem certeza que deseja excluir esta conta?")) return;
     try {
       await deleteDoc(doc(db, "expenses", expenseId));
@@ -951,6 +977,10 @@ function App() {
   }
 
   async function handleUpdateExpense(expenseId, updatedData) {
+    if (!canManageData) {
+      throw new Error("Seu acesso e somente leitura. Esta conta nao pode alterar dados.");
+    }
+
     const rawValue = Number(String(updatedData.totalValue).replace(",", "."));
     if (isNaN(rawValue) || rawValue <= 0) {
       throw new Error("Informe um valor válido.");
@@ -1031,6 +1061,13 @@ function App() {
     return <LoginScreen error={authError} onLogin={handleLogin} missingConfig={!hasFirebaseConfig} />;
   }
 
+  const visibleNavItems = canManageData
+    ? navItems
+    : navItems.filter((item) => item.id === profile.id);
+  const visiblePeople = canManageData
+    ? PEOPLE
+    : PEOPLE.filter((person) => person.id === profile.id);
+
   return (
     <main className="app-shell">
       {isDrawerOpen && (
@@ -1051,7 +1088,7 @@ function App() {
         </div>
 
         <nav className="main-nav" aria-label="Navegação principal">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -1102,7 +1139,7 @@ function App() {
             <Menu size={22} />
           </button>
           <div className="mobile-user-tabs">
-            {PEOPLE.map((person) => (
+            {visiblePeople.map((person) => (
               <button
                 key={person.id}
                 className={`mobile-user-tab ${activeView === person.id ? "active" : ""}`}
@@ -1134,7 +1171,7 @@ function App() {
           />
         )}
 
-        {activeView === "new" && (
+        {canManageData && activeView === "new" && (
           <NewExpenseForm
             form={form}
             formError={formError}
@@ -1155,7 +1192,7 @@ function App() {
           />
         )}
 
-        {activeView === "settlement" && (
+        {canManageData && activeView === "settlement" && (
           <SettlementPanel
             rows={settlementRows}
             settlementPayments={settlementPayments}
@@ -1165,11 +1202,11 @@ function App() {
           />
         )}
 
-        {activeView === "settings" && (
+        {canManageData && activeView === "settings" && (
           <SettingsPanel theme={theme} setTheme={setTheme} />
         )}
 
-        {activeView === "manage" && (
+        {canManageData && activeView === "manage" && (
           <ManagePanel
             allExpenses={allExpenses}
             expenses={expenses}
@@ -1182,7 +1219,7 @@ function App() {
       </section>
     </div>
 
-      {paymentTarget && (
+      {canManageData && paymentTarget && (
         <PaymentModal
           form={paymentForm}
           onChange={setPaymentForm}
@@ -1192,7 +1229,7 @@ function App() {
         />
       )}
 
-      {editingExpense && (
+      {canManageData && editingExpense && (
         <EditExpenseModal
           expense={editingExpense}
           onClose={() => setEditingExpense(null)}

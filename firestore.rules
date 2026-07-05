@@ -11,19 +11,26 @@ service cloud.firestore {
         "edneypugleise@gmail.com",
         "edneypugliese.dev@gmail.com",
         "soniapugleise@gmail.com",
-        "RODNEYPUGLEISEMACHADO@gmail.com"
+        "RODNEYPUGLEISEMACHADO@gmail.com",
+        "rodneypugleisemachado@gmail.com"
+      ];
+    }
+
+    function adminEmail() {
+      return signedIn() && request.auth.token.email in [
+        "edneypugleise@gmail.com",
+        "edneypugliese.dev@gmail.com"
       ];
     }
 
     match /expenses/{expenseId} {
-      allow read, create: if allowedEmail();
-      allow update: if allowedEmail();
-      allow delete: if allowedEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
 
     match /settlements/{settlementId} {
-      allow read, create: if allowedEmail();
-      allow update, delete: if allowedEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
   }
 }

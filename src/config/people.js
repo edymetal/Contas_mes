@@ -4,16 +4,19 @@ export const PEOPLE = [
     name: "Edney",
     email: "edneypugleise@gmail.com",
     emails: ["edneypugleise@gmail.com", "edneypugliese.dev@gmail.com"],
+    role: "admin",
   },
   {
     id: "sonia",
     name: "Sônia",
     email: "soniapugleise@gmail.com",
+    role: "reader",
   },
   {
     id: "rodney",
     name: "Rodney",
     email: "RODNEYPUGLEISEMACHADO@gmail.com",
+    role: "reader",
   },
 ];
 
