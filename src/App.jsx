@@ -2720,14 +2720,20 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
 
 function InstallmentSeriesView({ activeInstallments, finishedInstallments, selectedMonth }) {
   const installments = [...activeInstallments, ...finishedInstallments];
-  const monthlyTotal = installments.reduce(
-    (sum, installment) => roundMoney(sum + Number(installment.installmentValue || 0)),
-    0,
+  const installmentExpenses = installments.flatMap((installment) =>
+    Array.from(installment.installments?.values() || []),
   );
-  const remainingTotal = installments.reduce(
-    (sum, installment) => roundMoney(sum + Number(installment.remainingValue || 0)),
-    0,
-  );
+  const nextMonth = shiftMonth(selectedMonth, 1);
+  const monthlyTotal = installmentExpenses
+    .filter((expense) => getExpenseDisplayMonthKey(expense) === selectedMonth)
+    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
+  const nextMonthTotal = installmentExpenses
+    .filter((expense) => getExpenseDisplayMonthKey(expense) === nextMonth)
+    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
+  const remainingTotal = installmentExpenses
+    .filter((expense) => getExpenseDisplayMonthKey(expense) >= selectedMonth)
+    .filter((expense) => !areExpenseSharesSettled(expense))
+    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
 
   if (!activeInstallments.length && !finishedInstallments.length) {
     return <div className="empty-state">Nenhuma conta parcelada cadastrada.</div>;
@@ -2741,10 +2747,15 @@ function InstallmentSeriesView({ activeInstallments, finishedInstallments, selec
           <strong>{formatCurrency(monthlyTotal)}</strong>
           <small>{formatMonthLabel(selectedMonth)}</small>
         </article>
+        <article className="installment-summary-card next-month">
+          <span>Total parcelado próximo mês</span>
+          <strong>{formatCurrency(nextMonthTotal)}</strong>
+          <small>{formatMonthLabel(nextMonth)}</small>
+        </article>
         <article className="installment-summary-card remaining">
           <span>Total falta pagar</span>
           <strong>{formatCurrency(remainingTotal)}</strong>
-          <small>{installments.length} parcelamento(s)</small>
+          <small>A partir de {formatMonthLabel(selectedMonth)}</small>
         </article>
       </div>
 
