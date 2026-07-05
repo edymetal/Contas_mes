@@ -717,7 +717,7 @@ function App() {
         acc[personId] = {
           amount: shareAmount,
           status: personId === form.payerId ? "self" : "pending",
-          payment: personId === form.payerId ? { type: "Pagamento original", paidAt: currentDueDate } : null,
+          payment: personId === form.payerId ? { type: "Pago", paidAt: currentDueDate } : null,
         };
         return acc;
       }, {});
@@ -1050,7 +1050,7 @@ function App() {
         acc[personId] = {
           amount: shareAmount,
           status: "self",
-          payment: { type: "Pagamento original", paidAt: updatedData.dueDate },
+          payment: { type: "Pago", paidAt: updatedData.dueDate },
         };
       } else {
         const currentStatus = (oldShare?.status === "self" || !oldShare?.status) ? "pending" : oldShare.status;
@@ -1233,7 +1233,6 @@ function App() {
             expenses={expenses}
             personId={activeView}
             settlementRows={settlementRows}
-            settlementPayments={selectedMonthSettlementPayments}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
           />
@@ -1698,11 +1697,12 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementPayments = [], settlementRows = [] }) {
+function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementRows = [] }) {
   const monthPickerRef = useRef(null);
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const paymentSummary = useMemo(() => {
+    let listPaidAmount = 0;
     const totalsByPayer = PEOPLE
       .filter((person) => person.id !== personId)
       .map((person) => ({
@@ -1715,14 +1715,21 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
       }));
 
     personExpenses.forEach((expense) => {
-      if (expense.payerId === personId) return;
-
       const share = getShare(expense, personId);
       if (!share) return;
+
+      if (isSettledStatus(share.status)) {
+        listPaidAmount = roundMoney(listPaidAmount + Number(share.amount || 0));
+      }
+
+      if (expense.payerId === personId) return;
 
       const payerRow = totalsByPayer.find((item) => item.person.id === expense.payerId);
       if (payerRow) {
         payerRow.originalAmount = roundMoney(payerRow.originalAmount + Number(share.amount || 0));
+        if (isSettledStatus(share.status)) {
+          payerRow.paidAmount = roundMoney(payerRow.paidAmount + Number(share.amount || 0));
+        }
       }
     });
 
@@ -1742,15 +1749,6 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
       }
     });
 
-    settlementPayments.forEach((payment) => {
-      if (payment.fromId !== personId) return;
-
-      const payerRow = totalsByPayer.find((item) => item.person.id === payment.toId);
-      if (payerRow) {
-        payerRow.paidAmount = roundMoney(payerRow.paidAmount + Number(payment.amount || 0));
-      }
-    });
-
     totalsByPayer.forEach((row) => {
       const paidAmount = Math.min(row.paidAmount, row.originalAmount);
       row.paidAmount = roundMoney(paidAmount);
@@ -1767,9 +1765,10 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
       }),
       { originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0, receivableAmount: 0 },
     );
+    totals.paidAmount = roundMoney(listPaidAmount);
 
     return { totalsByPayer, totals };
-  }, [personExpenses, settlementPayments, settlementRows, personId]);
+  }, [personExpenses, settlementRows, personId]);
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
@@ -1903,8 +1902,8 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
                 </div>
 
                 <div className="expense-side">
-                  <strong className={isPayer ? "money-positive" : "money-negative"}>
-                    {formatSignedCurrency(share?.amount, isPayer ? "positive" : "negative")}
+                  <strong className="money-negative">
+                    {formatSignedCurrency(share?.amount, "negative")}
                   </strong>
                   <StatusBadge status={isPayer ? "self" : share?.status} />
                 </div>
@@ -1922,7 +1921,7 @@ function StatusBadge({ status }) {
     pending: "Pendente",
     paid: "Pago",
     settled: "Liquidado",
-    self: "Pagamento original",
+    self: "Pago",
   };
 
   return <span className={`status-badge ${status}`}>{labels[status] || "Pendente"}</span>;
