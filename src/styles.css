@@ -434,12 +434,20 @@ button {
   .dashboard-main-content {
     grid-template-columns: 1fr;
   }
+
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
+}
+
+.dashboard-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .metric-card,
@@ -483,6 +491,13 @@ button {
   font-family: "Outfit", sans-serif;
   margin-top: 8px;
   color: var(--text);
+}
+
+.metric-card small {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .metric-icon {
@@ -895,6 +910,168 @@ button {
   min-width: 4px;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--primary), #10b981);
+}
+
+.type-chart {
+  display: grid;
+  gap: 20px;
+}
+
+.type-chart-total {
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary) 10%, var(--panel));
+}
+
+.type-chart-total span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.type-chart-total strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--primary);
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  line-height: 1;
+}
+
+.type-chart-bars {
+  display: grid;
+  gap: 14px;
+}
+
+.type-chart-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.85fr) minmax(120px, 1.4fr) minmax(96px, auto);
+  align-items: center;
+  gap: 14px;
+}
+
+.type-chart-row span {
+  display: block;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.type-chart-row small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.type-chart-row strong {
+  color: var(--text);
+  font-size: 0.92rem;
+  text-align: right;
+}
+
+.type-chart-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track-bg);
+}
+
+.type-chart-fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.type-chart-row.normal .type-chart-fill {
+  background: #38bdf8;
+}
+
+.type-chart-row.fixed .type-chart-fill {
+  background: var(--success);
+}
+
+.type-chart-row.installment .type-chart-fill {
+  background: var(--warning);
+}
+
+.dashboard-summary-panel {
+  grid-column: 1 / -1;
+}
+
+.dashboard-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-summary-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.dashboard-summary-card span,
+.dashboard-summary-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.dashboard-summary-card strong {
+  display: block;
+  margin: 8px 0 6px;
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.dashboard-summary-card.normal strong {
+  color: #7dd3fc;
+}
+
+.dashboard-summary-card.fixed strong {
+  color: var(--success);
+}
+
+.dashboard-summary-card.installment strong {
+  color: var(--warning);
+}
+
+:root:not([data-theme="dark"]) .dashboard-summary-card.normal strong {
+  color: #0284c7;
+}
+
+.dashboard-rateio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.dashboard-rateio-grid div {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+}
+
+.dashboard-rateio-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dashboard-rateio-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--primary);
+  font-size: 1.15rem;
 }
 
 /* Tables */
@@ -1904,6 +2081,11 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .dashboard-summary-grid,
+  .dashboard-rateio-grid {
+    grid-template-columns: 1fr;
+  }
+
   .person-total-card {
     min-height: 0;
     border-right: 0;
@@ -1943,6 +2125,15 @@ textarea:focus {
   }
 
   .person-debt-card strong {
+    text-align: left;
+  }
+
+  .type-chart-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .type-chart-row strong {
     text-align: left;
   }
 

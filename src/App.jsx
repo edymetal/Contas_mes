@@ -174,6 +174,12 @@ function isFixedExpense(expense) {
   );
 }
 
+function getExpenseKind(expense) {
+  if (isFixedExpense(expense)) return "fixed";
+  if (getInstallmentInfo(expense)) return "installment";
+  return "normal";
+}
+
 function isSettledStatus(status) {
   return status === "paid" || status === "settled" || status === "self";
 }
@@ -528,6 +534,39 @@ function App() {
 
     const max = Math.max(...totals.map((item) => item.total), 1);
     return totals.map((item) => ({ ...item, percent: (item.total / max) * 100 }));
+  }, [expenses]);
+
+  const dashboardBreakdown = useMemo(() => {
+    const labels = {
+      normal: "Normais",
+      fixed: "Fixas",
+      installment: "Parceladas",
+    };
+    const rows = [
+      { id: "normal", label: labels.normal, total: 0, count: 0 },
+      { id: "fixed", label: labels.fixed, total: 0, count: 0 },
+      { id: "installment", label: labels.installment, total: 0, count: 0 },
+    ];
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    expenses.forEach((expense) => {
+      const row = byId.get(getExpenseKind(expense));
+      if (!row) return;
+      row.count += 1;
+      row.total = roundMoney(row.total + Number(expense.totalValue || 0));
+    });
+
+    const total = rows.reduce((sum, row) => roundMoney(sum + row.total), 0);
+    const max = Math.max(...rows.map((row) => row.total), 1);
+
+    return {
+      total,
+      rows: rows.map((row) => ({
+        ...row,
+        percent: total ? (row.total / total) * 100 : 0,
+        barPercent: (row.total / max) * 100,
+      })),
+    };
   }, [expenses]);
 
   const selectedMonthSettlementPayments = useMemo(
@@ -1164,6 +1203,7 @@ function App() {
 
         {activeView === "dashboard" && (
           <Dashboard
+            breakdown={dashboardBreakdown}
             categoryTotals={categoryTotals}
             dataLoading={dataLoading}
             expenses={expenses}
@@ -1280,16 +1320,54 @@ function LoginScreen({ error, missingConfig, onLogin }) {
   );
 }
 
-function Dashboard({ categoryTotals, dataLoading, expenses, metrics }) {
+function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics }) {
+  const normal = breakdown.rows.find((item) => item.id === "normal") || { total: 0, count: 0 };
+  const fixed = breakdown.rows.find((item) => item.id === "fixed") || { total: 0, count: 0 };
+  const installment = breakdown.rows.find((item) => item.id === "installment") || { total: 0, count: 0 };
+
   return (
     <div className="view-grid">
-      <section className="metrics-grid">
-        <MetricCard icon={ReceiptText} label="Gastos do mês" value={formatCurrency(metrics.total)} />
-        <MetricCard icon={WalletCards} label="Total pendente" value={formatCurrency(metrics.pending)} tone="warning" />
-        <MetricCard icon={Check} label="Total pago" value={formatCurrency(metrics.paid)} tone="success" />
+      <section className="metrics-grid dashboard-metrics">
+        <MetricCard icon={ReceiptText} label="Gastos do mês" value={formatCurrency(breakdown.total)} />
+        <MetricCard icon={CircleDollarSign} label="Contas normais" value={formatCurrency(normal.total)} detail={`${normal.count} registro(s)`} />
+        <MetricCard icon={Home} label="Contas fixas" value={formatCurrency(fixed.total)} detail={`${fixed.count} registro(s)`} tone="success" />
+        <MetricCard icon={WalletCards} label="Contas parceladas" value={formatCurrency(installment.total)} detail={`${installment.count} registro(s)`} tone="warning" />
       </section>
 
       <div className="dashboard-main-content">
+        <section className="panel chart-panel">
+          <div className="section-heading">
+            <h2>Distribuição por tipo</h2>
+            <span>{expenses.length} registro(s)</span>
+          </div>
+
+          {dataLoading ? (
+            <div className="empty-state">Carregando...</div>
+          ) : (
+            <div className="type-chart">
+              <div className="type-chart-total">
+                <span>Total do mês</span>
+                <strong>{formatCurrency(breakdown.total)}</strong>
+              </div>
+
+              <div className="type-chart-bars">
+                {breakdown.rows.map((item) => (
+                  <div className={`type-chart-row ${item.id}`} key={item.id}>
+                    <div>
+                      <span>{item.label}</span>
+                      <small>{item.count} conta(s)</small>
+                    </div>
+                    <div className="type-chart-track">
+                      <div className="type-chart-fill" style={{ width: `${item.barPercent}%` }} />
+                    </div>
+                    <strong>{formatCurrency(item.total)}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
         <section className="panel chart-panel">
           <div className="section-heading">
             <h2>Gastos por categoria</h2>
@@ -1308,19 +1386,39 @@ function Dashboard({ categoryTotals, dataLoading, expenses, metrics }) {
           </div>
         </section>
 
-        <section className="panel table-panel">
+        <section className="panel dashboard-summary-panel">
           <div className="section-heading">
-            <h2>Contas cadastradas</h2>
-            <span>{expenses.length} registro(s)</span>
+            <h2>Resumo das contas</h2>
+            <span>{formatCurrency(breakdown.total)}</span>
           </div>
-          {dataLoading ? <div className="empty-state">Carregando...</div> : <ExpensesTable expenses={expenses} />}
+
+          <div className="dashboard-summary-grid">
+            {breakdown.rows.map((item) => (
+              <article className={`dashboard-summary-card ${item.id}`} key={item.id}>
+                <span>{item.label}</span>
+                <strong>{formatCurrency(item.total)}</strong>
+                <small>{item.count} conta(s) • {item.percent.toFixed(1).replace(".", ",")}% do mês</small>
+              </article>
+            ))}
+          </div>
+
+          <div className="dashboard-rateio-grid">
+            <div>
+              <span>Rateio pendente</span>
+              <strong>{formatCurrency(metrics.pending)}</strong>
+            </div>
+            <div>
+              <span>Rateio pago/liquidado</span>
+              <strong>{formatCurrency(metrics.paid)}</strong>
+            </div>
+          </div>
         </section>
       </div>
     </div>
   );
 }
 
-function MetricCard({ icon: Icon, label, tone = "default", value }) {
+function MetricCard({ detail, icon: Icon, label, tone = "default", value }) {
   return (
     <article className={`metric-card ${tone}`}>
       <div className="metric-icon">
@@ -1328,6 +1426,7 @@ function MetricCard({ icon: Icon, label, tone = "default", value }) {
       </div>
       <span>{label}</span>
       <strong>{value}</strong>
+      {detail && <small>{detail}</small>}
     </article>
   );
 }
