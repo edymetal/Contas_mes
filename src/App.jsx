@@ -2572,8 +2572,15 @@ function formatInstallmentPeriod(installment) {
   return start === end ? start : `${start} até ${end}`;
 }
 
+function sumInstallmentExpenses(expenses) {
+  return expenses
+    .filter((expense) => getInstallmentInfo(expense))
+    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
+}
+
 function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
+  const expenseSource = allExpenses.length ? allExpenses : expenses;
   const monthlyInstallmentKeys = useMemo(() => {
     return new Set(
       expenses
@@ -2585,14 +2592,28 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
     );
   }, [expenses]);
   const installmentSummaries = useMemo(
-    () => getInstallmentSeriesSummaries(allExpenses.length ? allExpenses : expenses)
+    () => getInstallmentSeriesSummaries(expenseSource)
       .filter((item) => monthlyInstallmentKeys.has(item.key)),
-    [allExpenses, expenses, monthlyInstallmentKeys],
+    [expenseSource, monthlyInstallmentKeys],
   );
   const activeInstallments = installmentSummaries.filter((item) => !item.completed);
   const finishedInstallments = installmentSummaries
     .filter((item) => item.completed)
     .sort((a, b) => (b.finalizedDate || b.finalDueDate || "").localeCompare(a.finalizedDate || a.finalDueDate || ""));
+  const installmentSummaryTotals = useMemo(() => {
+    const nextMonth = shiftMonth(selectedMonth, 1);
+    const remainingExpenses = getNormalizedExpenses(expenseSource)
+      .filter((expense) => getInstallmentInfo(expense))
+      .filter((expense) => getExpenseDisplayMonthKey(expense) >= selectedMonth)
+      .filter((expense) => !areExpenseSharesSettled(expense));
+
+    return {
+      currentMonth: sumInstallmentExpenses(getExpensesForMonth(expenseSource, selectedMonth)),
+      nextMonth: sumInstallmentExpenses(getExpensesForMonth(expenseSource, nextMonth)),
+      nextMonthKey: nextMonth,
+      remaining: sumInstallmentExpenses(remainingExpenses),
+    };
+  }, [expenseSource, selectedMonth]);
   const fixedExpenseGroups = useMemo(
     () => getFixedExpenseMonthGroups(expenses),
     [expenses],
@@ -2648,6 +2669,7 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
           activeInstallments={activeInstallments}
           finishedInstallments={finishedInstallments}
           selectedMonth={selectedMonth}
+          summaryTotals={installmentSummaryTotals}
         />
       ) : manageView === "fixed" ? (
         <FixedExpensesView groups={fixedExpenseGroups} selectedMonth={selectedMonth} />
@@ -2718,22 +2740,8 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
   );
 }
 
-function InstallmentSeriesView({ activeInstallments, finishedInstallments, selectedMonth }) {
+function InstallmentSeriesView({ activeInstallments, finishedInstallments, selectedMonth, summaryTotals }) {
   const installments = [...activeInstallments, ...finishedInstallments];
-  const installmentExpenses = installments.flatMap((installment) =>
-    Array.from(installment.installments?.values() || []),
-  );
-  const nextMonth = shiftMonth(selectedMonth, 1);
-  const monthlyTotal = installmentExpenses
-    .filter((expense) => getExpenseDisplayMonthKey(expense) === selectedMonth)
-    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
-  const nextMonthTotal = installmentExpenses
-    .filter((expense) => getExpenseDisplayMonthKey(expense) === nextMonth)
-    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
-  const remainingTotal = installmentExpenses
-    .filter((expense) => getExpenseDisplayMonthKey(expense) >= selectedMonth)
-    .filter((expense) => !areExpenseSharesSettled(expense))
-    .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
 
   if (!activeInstallments.length && !finishedInstallments.length) {
     return <div className="empty-state">Nenhuma conta parcelada cadastrada.</div>;
@@ -2744,17 +2752,17 @@ function InstallmentSeriesView({ activeInstallments, finishedInstallments, selec
       <div className="installment-summary-grid">
         <article className="installment-summary-card monthly">
           <span>Total parcelado no mês</span>
-          <strong>{formatCurrency(monthlyTotal)}</strong>
+          <strong>{formatCurrency(summaryTotals.currentMonth)}</strong>
           <small>{formatMonthLabel(selectedMonth)}</small>
         </article>
         <article className="installment-summary-card next-month">
           <span>Total parcelado próximo mês</span>
-          <strong>{formatCurrency(nextMonthTotal)}</strong>
-          <small>{formatMonthLabel(nextMonth)}</small>
+          <strong>{formatCurrency(summaryTotals.nextMonth)}</strong>
+          <small>{formatMonthLabel(summaryTotals.nextMonthKey)}</small>
         </article>
         <article className="installment-summary-card remaining">
           <span>Total falta pagar</span>
-          <strong>{formatCurrency(remainingTotal)}</strong>
+          <strong>{formatCurrency(summaryTotals.remaining)}</strong>
           <small>A partir de {formatMonthLabel(selectedMonth)}</small>
         </article>
       </div>
