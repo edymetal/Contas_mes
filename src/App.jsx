@@ -2535,9 +2535,20 @@ function formatInstallmentPeriod(installment) {
 
 function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading }) {
   const [showInstallments, setShowInstallments] = useState(false);
+  const monthlyInstallmentKeys = useMemo(() => {
+    return new Set(
+      expenses
+        .map((expense) => {
+          const installmentInfo = getInstallmentInfo(expense);
+          return installmentInfo ? getInstallmentSeriesKey(expense, installmentInfo) : "";
+        })
+        .filter(Boolean),
+    );
+  }, [expenses]);
   const installmentSummaries = useMemo(
-    () => getInstallmentSeriesSummaries(allExpenses),
-    [allExpenses],
+    () => getInstallmentSeriesSummaries(allExpenses.length ? allExpenses : expenses)
+      .filter((item) => monthlyInstallmentKeys.has(item.key)),
+    [allExpenses, expenses, monthlyInstallmentKeys],
   );
   const activeInstallments = installmentSummaries.filter((item) => !item.completed);
   const finishedInstallments = installmentSummaries
