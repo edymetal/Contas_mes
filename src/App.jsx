@@ -152,8 +152,22 @@ function personName(id) {
 
 function formatInstallmentLabel(label) {
   if (!label) return "";
-  if (label.startsWith("Fixo")) return "Fixo";
+  if (isFixedExpense({ installment: label })) return "Fixo";
   return label;
+}
+
+function isFixedExpense(expense) {
+  const installment = String(expense?.installment || "").trim().toLowerCase();
+  const type = String(expense?.type || "").trim().toLowerCase();
+
+  return (
+    installment.startsWith("fixo") ||
+    installment.startsWith("fixa") ||
+    type === "recurring" ||
+    type === "fixed" ||
+    expense?.recurring === true ||
+    expense?.isFixed === true
+  );
 }
 
 function isSettledStatus(status) {
@@ -287,7 +301,7 @@ function getFixedExpenseMonthGroups(expenses) {
   const groups = new Map();
 
   expenses
-    .filter((expense) => expense.installment === "Fixo")
+    .filter(isFixedExpense)
     .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
     .forEach((expense) => {
       const monthKey = getExpenseDisplayMonthKey(expense);
