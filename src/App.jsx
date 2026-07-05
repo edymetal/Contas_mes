@@ -206,39 +206,81 @@ function getInstallmentSeriesKey(expense, installmentInfo) {
   ].join("|");
 }
 
-function getFinishedPaidInstallmentExpenses(expenses) {
+function getExpenseSettlementDate(expense) {
+  return Object.values(expense.shares || {})
+    .map((share) => share?.payment?.paidAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || expense.dueDate || "";
+}
+
+function getInstallmentSeriesSummaries(expenses) {
   const groups = new Map();
 
-  expenses.forEach((expense) => {
+  expenses.filter(isValidInstallmentExpense).forEach((expense) => {
     const installmentInfo = getInstallmentInfo(expense);
-    if (!installmentInfo || !isValidInstallmentExpense(expense)) return;
+    if (!installmentInfo) return;
 
     const key = getInstallmentSeriesKey(expense, installmentInfo);
     const group = groups.get(key) || {
+      key,
+      title: expense.title || "Conta parcelada",
+      category: expense.category || "",
+      payerId: expense.payerId || "",
+      participants: expense.participants || [],
       first: installmentInfo.current,
       total: installmentInfo.total,
+      installmentValue: Number(expense.totalValue || 0),
+      finalDueDate: installmentInfo.finalDueDate || "",
       installments: new Map(),
     };
 
+    const currentExpense = group.installments.get(installmentInfo.current);
     group.first = Math.min(group.first, installmentInfo.current);
-    group.installments.set(installmentInfo.current, expense);
+    group.total = Math.max(group.total, installmentInfo.total);
+    group.finalDueDate = group.finalDueDate || installmentInfo.finalDueDate || "";
+    if (!currentExpense || (expense.dueDate || "") < (currentExpense.dueDate || "")) {
+      group.installments.set(installmentInfo.current, expense);
+    }
     groups.set(key, group);
   });
 
   return Array.from(groups.values())
-    .filter((group) => {
-      if (group.installments.size !== group.total - group.first + 1) return false;
+    .map((group) => {
+      const installments = Array.from(group.installments.entries())
+        .sort(([first], [second]) => first - second)
+        .map(([, expense]) => expense);
+      const firstExpense = installments[0];
+      const lastExpense = installments.at(-1);
+      const firstDueDate = firstExpense?.dueDate || (firstExpense?.monthKey ? `${firstExpense.monthKey}-01` : "");
+      const finalDueDate =
+        group.finalDueDate ||
+        group.installments.get(group.total)?.dueDate ||
+        (firstDueDate ? addMonths(firstDueDate, group.total - group.first) : lastExpense?.dueDate || "");
+      const paidTrackedCount = installments.filter(areExpenseSharesSettled).length;
+      const paidInstallments = Math.min(group.total, Math.max(0, group.first - 1) + paidTrackedCount);
+      const totalValue = roundMoney(group.installmentValue * group.total);
+      const paidValue = roundMoney(group.installmentValue * paidInstallments);
+      const remainingValue = roundMoney(Math.max(totalValue - paidValue, 0));
+      const completed = remainingValue <= 0 && paidInstallments >= group.total;
+      const finalizedDate = completed
+        ? installments.map(getExpenseSettlementDate).filter(Boolean).sort().at(-1) || finalDueDate
+        : "";
 
-      for (let current = group.first; current <= group.total; current += 1) {
-        const expense = group.installments.get(current);
-        if (!expense || !areExpenseSharesSettled(expense)) return false;
-      }
-
-      return true;
+      return {
+        ...group,
+        firstDueDate,
+        finalDueDate,
+        finalizedDate,
+        paidInstallments,
+        remainingInstallments: Math.max(group.total - paidInstallments, 0),
+        totalValue,
+        paidValue,
+        remainingValue,
+        completed,
+      };
     })
-    .map((group) => group.installments.get(group.total))
-    .filter(Boolean)
-    .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+    .sort((a, b) => (a.finalDueDate || "").localeCompare(b.finalDueDate || ""));
 }
 
 function getNormalizedExpenses(expenses) {
@@ -2480,44 +2522,59 @@ function formatDate(date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
 }
 
+function formatDateMonth(date) {
+  if (!date) return "-";
+  return formatMonthLabel(monthFromDate(date));
+}
+
+function formatInstallmentPeriod(installment) {
+  const start = formatDateMonth(installment.firstDueDate);
+  const end = formatDateMonth(installment.finalDueDate);
+  return start === end ? start : `${start} até ${end}`;
+}
+
 function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading }) {
-  const [showFinishedInstallments, setShowFinishedInstallments] = useState(false);
-  const finishedInstallments = useMemo(
-    () => getFinishedPaidInstallmentExpenses(allExpenses),
+  const [showInstallments, setShowInstallments] = useState(false);
+  const installmentSummaries = useMemo(
+    () => getInstallmentSeriesSummaries(allExpenses),
     [allExpenses],
   );
-  const visibleExpenses = showFinishedInstallments ? finishedInstallments : expenses;
+  const activeInstallments = installmentSummaries.filter((item) => !item.completed);
+  const finishedInstallments = installmentSummaries
+    .filter((item) => item.completed)
+    .sort((a, b) => (b.finalizedDate || b.finalDueDate || "").localeCompare(a.finalizedDate || a.finalDueDate || ""));
 
   if (dataLoading) {
     return <div className="empty-state">Carregando...</div>;
   }
 
-  if (!expenses.length && !finishedInstallments.length) {
+  if (!expenses.length && !installmentSummaries.length) {
     return <div className="empty-state">Nenhuma conta cadastrada neste mês.</div>;
   }
 
   return (
     <section className="panel">
       <div className="section-heading manage-heading">
-        <h2>{showFinishedInstallments ? "Parceladas finalizadas e pagas" : "Contas do Mes"}</h2>
-        <span>{visibleExpenses.length} registro(s)</span>
+        <h2>{showInstallments ? "Contas Parceladas" : "Contas do Mes"}</h2>
+        <span>{showInstallments ? `${installmentSummaries.length} parcelamento(s)` : `${expenses.length} registro(s)`}</span>
         <button
-          className={showFinishedInstallments ? "primary-button" : "secondary-button"}
-          onClick={() => setShowFinishedInstallments((current) => !current)}
+          className={showInstallments ? "primary-button" : "secondary-button"}
+          onClick={() => setShowInstallments((current) => !current)}
           type="button"
         >
-          {showFinishedInstallments
+          {showInstallments
             ? "Ver contas do mes"
-            : `Ver parceladas finalizadas (${finishedInstallments.length})`}
+            : `Contas Parceladas (${installmentSummaries.length})`}
         </button>
       </div>
 
-      {!visibleExpenses.length ? (
-        <div className="empty-state">
-          {showFinishedInstallments
-            ? "Nenhuma conta parcelada finalizada e paga."
-            : "Nenhuma conta cadastrada neste mes."}
-        </div>
+      {showInstallments ? (
+        <InstallmentSeriesView
+          activeInstallments={activeInstallments}
+          finishedInstallments={finishedInstallments}
+        />
+      ) : !expenses.length ? (
+        <div className="empty-state">Nenhuma conta cadastrada neste mes.</div>
       ) : (
       <div className="table-wrap">
         <table>
@@ -2533,7 +2590,7 @@ function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading
             </tr>
           </thead>
           <tbody>
-            {visibleExpenses.map((expense) => (
+            {expenses.map((expense) => (
               <tr key={expense.id}>
                 <td>
                   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -2578,6 +2635,91 @@ function ManagePanel({ allExpenses = [], expenses, onEdit, onDelete, dataLoading
           </tbody>
         </table>
       </div>
+      )}
+    </section>
+  );
+}
+
+function InstallmentSeriesView({ activeInstallments, finishedInstallments }) {
+  if (!activeInstallments.length && !finishedInstallments.length) {
+    return <div className="empty-state">Nenhuma conta parcelada cadastrada.</div>;
+  }
+
+  return (
+    <div className="installment-series-view">
+      <InstallmentSeriesGroup
+        installments={activeInstallments}
+        title="Parceladas ativas"
+        emptyText="Nenhuma conta parcelada ativa."
+      />
+      <InstallmentSeriesGroup
+        installments={finishedInstallments}
+        title="Parceladas finalizadas"
+        emptyText="Nenhuma conta parcelada finalizada."
+      />
+    </div>
+  );
+}
+
+function InstallmentSeriesGroup({ emptyText, installments, title }) {
+  return (
+    <section className="installment-series-group">
+      <div className="installment-series-heading">
+        <h3>{title}</h3>
+        <span>{installments.length} parcelamento(s)</span>
+      </div>
+
+      {!installments.length ? (
+        <div className="empty-state compact">{emptyText}</div>
+      ) : (
+        <div className="installment-series-grid">
+          {installments.map((installment) => (
+            <article className="installment-series-card" key={installment.key}>
+              <div className="installment-series-card-header">
+                <div>
+                  <strong>{installment.title}</strong>
+                  <small>
+                    {installment.category} • {personName(installment.payerId)}
+                  </small>
+                </div>
+                <span className={installment.completed ? "tag success-tag" : "tag warning-tag"}>
+                  {installment.completed ? "Finalizada" : "Ativa"}
+                </span>
+              </div>
+
+              <div className="installment-series-money">
+                <div>
+                  <span>Valor da parcela</span>
+                  <strong>{formatCurrency(installment.installmentValue)}</strong>
+                </div>
+                <div>
+                  <span>Total parcelado</span>
+                  <strong>{formatCurrency(installment.totalValue)}</strong>
+                </div>
+                <div>
+                  <span>Já pago</span>
+                  <strong>{formatCurrency(installment.paidValue)}</strong>
+                </div>
+                <div>
+                  <span>Falta pagar</span>
+                  <strong>{formatCurrency(installment.remainingValue)}</strong>
+                </div>
+              </div>
+
+              <div className="installment-series-details">
+                <span>
+                  Parcelas: {installment.paidInstallments}/{installment.total}
+                </span>
+                <span>Faltam: {installment.remainingInstallments} parcela(s)</span>
+                <span>Período: {formatInstallmentPeriod(installment)}</span>
+                <span>Última parcela: {formatDateMonth(installment.finalDueDate)}</span>
+                {installment.completed && (
+                  <span>Finalizada em: {formatDateMonth(installment.finalizedDate)}</span>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </section>
   );
