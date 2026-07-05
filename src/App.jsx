@@ -285,18 +285,7 @@ function getNormalizedExpenses(expenses) {
 function getExpenseDisplayMonthKey(expense) {
   if (expense.displayMonthKey) return expense.displayMonthKey;
 
-  if (getInstallmentInfo(expense) || expense.installment === "Fixo") {
-    return monthFromDate(expense.dueDate || expense.monthKey || "");
-  }
-
-  return (
-    expense.monthKey ||
-    getExpenseMonthKey({
-      dueDate: expense.dueDate || "",
-      expenseDate: expense.expenseDate || "",
-      type: "normal",
-    })
-  );
+  return monthFromDate(expense.dueDate || expense.monthKey || "");
 }
 
 function getExpensesForMonth(expenses, monthKey) {
