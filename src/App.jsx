@@ -1902,7 +1902,6 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           <div className="person-summary-person">
             <PersonAvatar person={selectedPerson} photoUrl={selectedPersonPhotoUrl} size="large" />
             <div>
-              <span>Resumo de</span>
               <strong>{selectedPerson.name}</strong>
               <small>{selectedPerson.email}</small>
             </div>

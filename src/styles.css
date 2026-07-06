@@ -1330,6 +1330,7 @@ textarea:focus {
 .person-total-card {
   grid-area: total;
   display: flex;
+  align-items: center;
   flex-direction: column;
   justify-content: center;
   gap: 10px;
@@ -1337,6 +1338,7 @@ textarea:focus {
   padding: 24px;
   border-right: 1px solid var(--line);
   background: rgba(20, 184, 166, 0.08);
+  text-align: center;
 }
 
 .person-debt-grid {
@@ -1369,6 +1371,7 @@ textarea:focus {
 
 .person-total-card .person-debt-breakdown {
   grid-template-columns: repeat(auto-fit, minmax(150px, max-content));
+  justify-content: center;
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
@@ -1402,9 +1405,11 @@ textarea:focus {
 }
 
 .person-summary-person {
+  justify-content: center;
   margin-bottom: 8px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
+  width: 100%;
 }
 
 .person-avatar {
@@ -1454,6 +1459,7 @@ textarea:focus {
 
 .person-summary-person strong {
   font-size: 1.35rem;
+  text-align: center;
 }
 
 .person-summary-person small,
@@ -1466,6 +1472,10 @@ textarea:focus {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.person-summary-person small {
+  text-align: center;
 }
 
 .person-debt-amount {
