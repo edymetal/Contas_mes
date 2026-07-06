@@ -161,6 +161,27 @@ function personName(id) {
   return getPersonById(id)?.name || id;
 }
 
+function getPersonInitials(person) {
+  const name = person?.name || "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+
+  return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
+}
+
+function getPersonPhotoUrl(person, firebaseUser) {
+  const personEmails = [person?.email, ...(person?.emails || [])]
+    .filter(Boolean)
+    .map((email) => email.toLowerCase());
+  const userEmail = firebaseUser?.email?.toLowerCase();
+
+  if (firebaseUser?.photoURL && userEmail && personEmails.includes(userEmail)) {
+    return firebaseUser.photoURL;
+  }
+
+  return person?.photoUrl || "";
+}
+
 function formatInstallmentLabel(label) {
   if (!label) return "";
   if (isFixedExpense({ installment: label })) return "Fixo";
@@ -1231,6 +1252,7 @@ function App() {
         {PEOPLE.some((person) => person.id === activeView) && (
           <PersonExpenses
             expenses={expenses}
+            firebaseUser={firebaseUser}
             personId={activeView}
             settlementRows={settlementRows}
             selectedMonth={selectedMonth}
@@ -1697,10 +1719,11 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, settlementRows = [] }) {
+function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMonthChange, settlementRows = [] }) {
   const monthPickerRef = useRef(null);
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
+  const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser);
   const paymentSummary = useMemo(() => {
     let listPaidAmount = 0;
     const totalsByPayer = PEOPLE
@@ -1850,25 +1873,42 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
             abatedAmount,
             amount,
             receivableAmount,
-          }) => (
-            <div className="person-debt-card" key={person.id}>
-              <span>Deve para {person.name}</span>
-              <strong className="money-negative">{formatSignedCurrency(amount, "negative")}</strong>
-              <div className="person-debt-breakdown">
-                <small className="debt-total">Total da dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
-                <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
-                <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
-                <small className="debt-receivable">A receber de {person.name}: {formatSignedCurrency(receivableAmount, "positive")}</small>
+          }) => {
+            const photoUrl = getPersonPhotoUrl(person, firebaseUser);
+
+            return (
+              <div className="person-debt-card" key={person.id}>
+                <div className="person-debt-person">
+                  <PersonAvatar person={person} photoUrl={photoUrl} />
+                  <div>
+                    <span>Deve para</span>
+                    <strong>{person.name}</strong>
+                    <small>{person.email}</small>
+                  </div>
+                </div>
+                <strong className="person-debt-amount money-negative">{formatSignedCurrency(amount, "negative")}</strong>
+                <div className="person-debt-breakdown">
+                  <small className="debt-total">Total da dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
+                  <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
+                  <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
+                  <small className="debt-receivable">A receber de {person.name}: {formatSignedCurrency(receivableAmount, "positive")}</small>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="person-total-card">
+          <div className="person-summary-person">
+            <PersonAvatar person={selectedPerson} photoUrl={selectedPersonPhotoUrl} size="large" />
+            <div>
+              <span>Resumo de</span>
+              <strong>{selectedPerson.name}</strong>
+              <small>{selectedPerson.email}</small>
+            </div>
+          </div>
           <span>Total a pagar no mês</span>
           <strong className="money-negative">{formatSignedCurrency(paymentSummary.totals.amount, "negative")}</strong>
-          <span className="person-total-receivable-label">Total a receber no mês</span>
-          <strong className="person-total-receivable-value">{formatSignedCurrency(paymentSummary.totals.receivableAmount, "positive")}</strong>
           <div className="person-debt-breakdown">
             <small className="debt-total">Total original: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
             <small className="debt-paid">Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
@@ -1914,6 +1954,23 @@ function PersonExpenses({ expenses, personId, selectedMonth, onMonthChange, sett
       )}
     </section>
   );
+}
+
+function PersonAvatar({ person, photoUrl, size = "default" }) {
+  const className = `person-avatar ${size === "large" ? "large" : ""}`.trim();
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={person.name}
+        className={className}
+        referrerPolicy="no-referrer"
+      />
+    );
+  }
+
+  return <div className={`${className} placeholder`}>{getPersonInitials(person)}</div>;
 }
 
 function StatusBadge({ status }) {
