@@ -1923,6 +1923,12 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           {personExpenses.map((expense) => {
             const share = getShare(expense, personId);
             const isPayer = expense.payerId === personId;
+            const displayStatus = isPayer ? "self" : share?.status;
+            const isPaidOrSettled = isSettledStatus(displayStatus);
+            const amountClassName = isPaidOrSettled ? "money-positive" : "money-negative";
+            const amountLabel = isPaidOrSettled
+              ? formatCurrency(share?.amount)
+              : formatSignedCurrency(share?.amount, "negative");
 
             return (
               <article className="expense-card" key={expense.id}>
@@ -1941,10 +1947,8 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
                 </div>
 
                 <div className="expense-side">
-                  <strong className="money-negative">
-                    {formatSignedCurrency(share?.amount, "negative")}
-                  </strong>
-                  <StatusBadge status={isPayer ? "self" : share?.status} />
+                  <strong className={amountClassName}>{amountLabel}</strong>
+                  <StatusBadge status={displayStatus} />
                 </div>
               </article>
             );
