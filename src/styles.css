@@ -2469,6 +2469,20 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .dashboard-hero,
+  .dashboard-layout,
+  .dashboard-layout-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-top: 20px;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
   .dashboard-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2506,6 +2520,7 @@ textarea:focus {
   .dashboard-hero {
     gap: 22px;
     padding: 24px 20px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .dashboard-hero-copy {
@@ -2525,6 +2540,10 @@ textarea:focus {
   .dashboard-hero-stack {
     width: 100%;
     gap: 14px;
+    padding-top: 18px;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
     text-align: center;
   }
 
