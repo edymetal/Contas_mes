@@ -2270,7 +2270,7 @@ textarea:focus {
 
   .person-debt-card {
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 24px;
     padding: 22px 20px;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
@@ -2291,12 +2291,12 @@ textarea:focus {
 
   .person-debt-card .person-debt-amount {
     display: block;
-    margin: 8px 0 4px;
+    margin: 14px 0 12px;
     text-align: center;
   }
 
   .person-debt-card .person-debt-breakdown {
-    gap: 8px;
+    gap: 10px;
     margin-top: 0;
   }
 
