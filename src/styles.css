@@ -1329,16 +1329,16 @@ textarea:focus {
 
 .person-total-card {
   grid-area: total;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
+  gap: 18px 24px;
+  justify-content: stretch;
   min-height: 156px;
   padding: 24px;
   border-right: 1px solid var(--line);
   background: rgba(20, 184, 166, 0.08);
-  text-align: center;
+  text-align: left;
 }
 
 .person-debt-grid {
@@ -1349,7 +1349,7 @@ textarea:focus {
   width: 100%;
 }
 
-.person-total-card span,
+.person-total-main span,
 .person-debt-card span {
   display: block;
   color: var(--muted);
@@ -1357,22 +1357,28 @@ textarea:focus {
   font-weight: 700;
 }
 
-.person-total-card strong,
+.person-total-main strong,
 .person-debt-card strong {
   color: var(--text);
   line-height: 1;
 }
 
-.person-total-card strong {
+.person-total-main {
+  min-width: max-content;
+  text-align: right;
+}
+
+.person-total-main strong {
+  display: block;
   color: var(--primary);
-  margin-top: 10px;
+  margin-top: 8px;
   font-size: clamp(2rem, 4vw, 2.65rem);
 }
 
 .person-total-card .person-debt-breakdown {
-  grid-template-columns: repeat(auto-fit, minmax(150px, max-content));
-  justify-content: center;
-  margin-top: 18px;
+  grid-template-columns: repeat(3, max-content);
+  justify-content: start;
+  margin-top: 0;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
@@ -1405,10 +1411,10 @@ textarea:focus {
 }
 
 .person-summary-person {
-  justify-content: center;
-  margin-bottom: 8px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
+  justify-content: flex-start;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
   width: 100%;
 }
 
@@ -1459,7 +1465,7 @@ textarea:focus {
 
 .person-summary-person strong {
   font-size: 1.35rem;
-  text-align: center;
+  text-align: left;
 }
 
 .person-summary-person small,
@@ -1475,7 +1481,7 @@ textarea:focus {
 }
 
 .person-summary-person small {
-  text-align: center;
+  text-align: left;
 }
 
 .person-debt-amount {
@@ -2366,5 +2372,16 @@ textarea:focus {
 
   .modal-actions button {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .person-total-card {
+    grid-template-columns: 1fr;
+  }
+
+  .person-total-main {
+    min-width: 0;
+    text-align: left;
   }
 }
