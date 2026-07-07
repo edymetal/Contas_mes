@@ -2249,10 +2249,19 @@ textarea:focus {
   }
 
   .person-total-card {
+    gap: 24px;
     border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--line));
     border-radius: var(--radius-lg);
     background: rgba(20, 184, 166, 0.12);
     box-shadow: 0 14px 30px -24px var(--primary);
+  }
+
+  .person-total-main {
+    text-align: center;
+  }
+
+  .person-total-main strong {
+    margin-top: 14px;
   }
 
   .person-debt-grid {
@@ -2281,6 +2290,8 @@ textarea:focus {
   }
 
   .person-debt-card .person-debt-amount {
+    display: block;
+    margin: 8px 0 4px;
     text-align: center;
   }
 
@@ -2316,6 +2327,7 @@ textarea:focus {
 
   .person-total-card .person-debt-breakdown {
     grid-template-columns: 1fr;
+    padding-top: 22px;
   }
 
   .topbar {
@@ -2351,6 +2363,33 @@ textarea:focus {
     align-items: stretch;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .expense-card {
+    align-items: center;
+    gap: 22px;
+    padding: 24px 22px;
+    text-align: center;
+  }
+
+  .expense-main {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .expense-main h3 {
+    margin: 0;
+    text-align: center;
+  }
+
+  .expense-main > div {
+    justify-content: center;
+  }
+
+  .expense-main p {
+    line-height: 1.35;
   }
 
   .settlement-card-heading,
@@ -2399,8 +2438,14 @@ textarea:focus {
   }
 
   .expense-side {
-    align-items: flex-start;
+    align-items: center;
+    gap: 14px;
     min-width: 0;
+    width: 100%;
+  }
+
+  .expense-side strong {
+    text-align: center;
   }
 
   .expense-side .secondary-button,
@@ -2429,6 +2474,6 @@ textarea:focus {
 
   .person-total-main {
     min-width: 0;
-    text-align: left;
+    text-align: center;
   }
 }
