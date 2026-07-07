@@ -1875,18 +1875,23 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             receivableAmount,
           }) => {
             const photoUrl = getPersonPhotoUrl(person, firebaseUser);
+            const hasReceivableAmount = receivableAmount > 0;
+            const mainAmount = hasReceivableAmount ? receivableAmount : amount;
+            const mainAmountClassName = hasReceivableAmount ? "money-positive" : "money-negative";
+            const mainAmountSign = hasReceivableAmount ? "positive" : "negative";
 
             return (
               <div className="person-debt-card" key={person.id}>
                 <div className="person-debt-person">
                   <PersonAvatar person={person} photoUrl={photoUrl} />
                   <div>
-                    <span>Deve para</span>
                     <strong>{person.name}</strong>
                     <small>{person.email}</small>
                   </div>
                 </div>
-                <strong className="person-debt-amount money-negative">{formatSignedCurrency(amount, "negative")}</strong>
+                <strong className={`person-debt-amount ${mainAmountClassName}`}>
+                  {formatSignedCurrency(mainAmount, mainAmountSign)}
+                </strong>
                 <div className="person-debt-breakdown">
                   <small className="debt-total">Dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
                   <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
