@@ -655,7 +655,8 @@ function App() {
 
   useEffect(() => {
     if (!profile || canManageData) return;
-    if (activeView !== profile.id) setActiveView(profile.id);
+    const canViewActivePage = activeView === "dashboard" || PEOPLE.some((person) => person.id === activeView);
+    if (!canViewActivePage) setActiveView(profile.id);
   }, [activeView, canManageData, profile]);
 
   async function handleLogin() {
@@ -1176,10 +1177,8 @@ function App() {
 
   const visibleNavItems = canManageData
     ? navItems
-    : navItems.filter((item) => item.id === profile.id);
-  const visiblePeople = canManageData
-    ? PEOPLE
-    : PEOPLE.filter((person) => person.id === profile.id);
+    : navItems.filter((item) => item.id === "dashboard" || PEOPLE.some((person) => person.id === item.id));
+  const visiblePeople = PEOPLE;
 
   return (
     <main className="app-shell">
