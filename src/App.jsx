@@ -28,6 +28,7 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -174,7 +175,10 @@ function getPersonInitials(person) {
   return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
 }
 
-function getPersonPhotoUrl(person, firebaseUser) {
+function getPersonPhotoUrl(person, firebaseUser, userProfiles = {}) {
+  const savedPhotoUrl = userProfiles[person?.id]?.photoURL;
+  if (savedPhotoUrl) return savedPhotoUrl;
+
   const personEmails = [person?.email, ...(person?.emails || [])]
     .filter(Boolean)
     .map((email) => email.toLowerCase());
@@ -436,6 +440,7 @@ function App() {
   const [monthlyExpenses, setMonthlyExpenses] = useState([]);
   const [allExpenses, setAllExpenses] = useState([]);
   const [settlementPayments, setSettlementPayments] = useState([]);
+  const [userProfiles, setUserProfiles] = useState({});
   const [dataLoading, setDataLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState("");
@@ -475,11 +480,47 @@ function App() {
         return;
       }
 
+      if (db) {
+        try {
+          await setDoc(
+            doc(db, "userProfiles", matchedProfile.id),
+            {
+              personId: matchedProfile.id,
+              name: matchedProfile.name,
+              email: user.email,
+              photoURL: user.photoURL || "",
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+        } catch {
+          setActionMessage("Não foi possível atualizar a foto do usuário.");
+        }
+      }
+
       setProfile(matchedProfile);
       setActiveView(matchedProfile.id);
       setAuthLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!profile || !db) return undefined;
+
+    return onSnapshot(
+      collection(db, "userProfiles"),
+      (snapshot) => {
+        const nextProfiles = {};
+        snapshot.forEach((item) => {
+          nextProfiles[item.id] = item.data();
+        });
+        setUserProfiles(nextProfiles);
+      },
+      () => {
+        setActionMessage("Não foi possível carregar as fotos dos usuários.");
+      },
+    );
+  }, [profile]);
 
   useEffect(() => {
     if (!profile || !db) return undefined;
@@ -1261,6 +1302,7 @@ function App() {
             personId={activeView}
             settlementRows={settlementRows}
             selectedMonth={selectedMonth}
+            userProfiles={userProfiles}
             onMonthChange={setSelectedMonth}
           />
         )}
@@ -1724,11 +1766,11 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
   );
 }
 
-function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMonthChange, settlementRows = [] }) {
+function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMonthChange, settlementRows = [], userProfiles = {} }) {
   const monthPickerRef = useRef(null);
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
-  const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser);
+  const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser, userProfiles);
   const paymentSummary = useMemo(() => {
     let listPaidAmount = 0;
     const totalsByPayer = PEOPLE
@@ -1879,7 +1921,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             amount,
             receivableAmount,
           }) => {
-            const photoUrl = getPersonPhotoUrl(person, firebaseUser);
+            const photoUrl = getPersonPhotoUrl(person, firebaseUser, userProfiles);
             const hasReceivableAmount = receivableAmount > 0;
             const mainAmount = hasReceivableAmount ? receivableAmount : amount;
             const mainAmountClassName = hasReceivableAmount ? "money-positive" : "money-negative";
