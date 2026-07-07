@@ -2292,6 +2292,7 @@ textarea:focus {
   .person-debt-card .person-debt-amount {
     display: block;
     margin: 14px 0 12px;
+    font-size: clamp(1.9rem, 9vw, 2.35rem);
     text-align: center;
   }
 
