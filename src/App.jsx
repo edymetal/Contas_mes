@@ -114,7 +114,12 @@ function todayInputValue() {
 }
 
 function currentMonthValue() {
-  return new Date().toISOString().slice(0, 7);
+  const today = new Date();
+  const referenceDate = today.getDate() > 5 ? new Date(today.getFullYear(), today.getMonth() + 1, 1) : today;
+  const year = referenceDate.getFullYear();
+  const month = String(referenceDate.getMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
 }
 
 function monthFromDate(date) {
