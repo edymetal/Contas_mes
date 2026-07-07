@@ -2227,16 +2227,49 @@ textarea:focus {
     padding: 10px 12px;
   }
 
+  .section-heading .person-month-switcher {
+    width: min(100%, 350px);
+    margin-inline: auto;
+    justify-content: space-between;
+  }
+
   .mobile-user-tab {
     min-height: 36px;
     padding: 8px 12px;
     font-size: 0.86rem;
   }
 
+  .person-payment-summary {
+    gap: 14px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .person-total-card {
+    border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--line));
+    border-radius: var(--radius-lg);
+    background: rgba(20, 184, 166, 0.12);
+    box-shadow: 0 14px 30px -24px var(--primary);
+  }
+
+  .person-debt-grid {
+    gap: 10px;
+  }
+
   .person-debt-card {
     grid-template-columns: 1fr;
     gap: 10px;
     padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--panel-muted) 82%, transparent);
+  }
+
+  .person-debt-card:last-child {
+    border-bottom: 1px solid var(--line);
   }
 
   .person-debt-card strong {
