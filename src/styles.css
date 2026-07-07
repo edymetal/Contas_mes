@@ -2256,13 +2256,13 @@ textarea:focus {
   }
 
   .person-debt-grid {
-    gap: 10px;
+    gap: 14px;
   }
 
   .person-debt-card {
     grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 16px;
+    gap: 18px;
+    padding: 22px 20px;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: color-mix(in srgb, var(--panel-muted) 82%, transparent);
@@ -2274,6 +2274,19 @@ textarea:focus {
 
   .person-debt-card strong {
     text-align: left;
+  }
+
+  .person-debt-card .person-debt-person {
+    gap: 16px;
+  }
+
+  .person-debt-card .person-debt-amount {
+    text-align: center;
+  }
+
+  .person-debt-card .person-debt-breakdown {
+    gap: 8px;
+    margin-top: 0;
   }
 
   .type-chart-row {

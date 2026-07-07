@@ -1917,7 +1917,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             </div>
           </div>
           <div className="person-total-main">
-            <span>Total a pagar no mês</span>
+            <span>Total Mês</span>
             <strong className="money-negative">{formatSignedCurrency(paymentSummary.totals.amount, "negative")}</strong>
           </div>
           <div className="person-debt-breakdown">
