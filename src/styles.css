@@ -1365,7 +1365,7 @@ textarea:focus {
 
 .person-total-main {
   min-width: 0;
-  text-align: left;
+  text-align: center;
 }
 
 .person-total-main strong {

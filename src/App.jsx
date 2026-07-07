@@ -167,6 +167,10 @@ function personName(id) {
   return getPersonById(id)?.name || id;
 }
 
+function formatEmail(email) {
+  return email ? email.toLowerCase() : "";
+}
+
 function getPersonInitials(person) {
   const name = person?.name || "";
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -487,7 +491,7 @@ function App() {
             {
               personId: matchedProfile.id,
               name: matchedProfile.name,
-              email: user.email,
+              email: formatEmail(user.email),
               photoURL: user.photoURL || "",
               updatedAt: serverTimestamp(),
             },
@@ -1236,7 +1240,7 @@ function App() {
             <div>
               <span>Logado como</span>
               <strong>{profile.name}</strong>
-              <small>{firebaseUser?.email}</small>
+              <small>{formatEmail(firebaseUser?.email)}</small>
             </div>
           </div>
           <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
@@ -1932,7 +1936,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
                   <PersonAvatar person={person} photoUrl={photoUrl} />
                   <div>
                     <strong>{person.name}</strong>
-                    <small>{person.email}</small>
+                    <small>{formatEmail(person.email)}</small>
                   </div>
                 </div>
                 <strong className={`person-debt-amount ${mainAmountClassName}`}>
@@ -1954,7 +1958,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             <PersonAvatar person={selectedPerson} photoUrl={selectedPersonPhotoUrl} size="large" />
             <div>
               <strong>{selectedPerson.name}</strong>
-              <small>{selectedPerson.email}</small>
+              <small>{formatEmail(selectedPerson.email)}</small>
             </div>
           </div>
           <div className="person-total-main">
