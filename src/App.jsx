@@ -1909,7 +1909,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           <span>Total a pagar no mês</span>
           <strong className="money-negative">{formatSignedCurrency(paymentSummary.totals.amount, "negative")}</strong>
           <div className="person-debt-breakdown">
-            <small className="debt-total">Total original: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
+            <small className="debt-total">Total Dívida: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
             <small className="debt-paid">Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
             <small className="debt-abated">Total abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
           </div>
