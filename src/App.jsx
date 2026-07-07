@@ -1888,10 +1888,10 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
                 </div>
                 <strong className="person-debt-amount money-negative">{formatSignedCurrency(amount, "negative")}</strong>
                 <div className="person-debt-breakdown">
-                  <small className="debt-total">Total da dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
+                  <small className="debt-total">Dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
                   <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
                   <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
-                  <small className="debt-receivable">A receber de {person.name}: {formatSignedCurrency(receivableAmount, "positive")}</small>
+                  <small className="debt-receivable">Receber {person.name}: {formatSignedCurrency(receivableAmount, "positive")}</small>
                 </div>
               </div>
             );
@@ -1909,9 +1909,9 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           <span>Total a pagar no mês</span>
           <strong className="money-negative">{formatSignedCurrency(paymentSummary.totals.amount, "negative")}</strong>
           <div className="person-debt-breakdown">
-            <small className="debt-total">Total Dívida: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
-            <small className="debt-paid">Total pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
-            <small className="debt-abated">Total abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
+            <small className="debt-total">Dívida: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
+            <small className="debt-paid">Pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
+            <small className="debt-abated">Abatido: {formatCurrency(paymentSummary.totals.abatedAmount)}</small>
           </div>
         </div>
       </div>
