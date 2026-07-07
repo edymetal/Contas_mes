@@ -1330,8 +1330,8 @@ textarea:focus {
 .person-total-card {
   grid-area: total;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   gap: 18px 24px;
   justify-content: stretch;
   min-height: 156px;
@@ -1364,8 +1364,8 @@ textarea:focus {
 }
 
 .person-total-main {
-  min-width: max-content;
-  text-align: right;
+  min-width: 0;
+  text-align: left;
 }
 
 .person-total-main strong {
