@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   BarChart3,
+  Calendar,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -1855,7 +1856,62 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
 }
 
 function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMonthChange, settlementRows = [], userProfiles = {} }) {
-  const monthPickerRef = useRef(null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(2026);
+  const containerRef = useRef(null);
+
+  const MONTHS_PT = useMemo(() => [
+    { value: "01", short: "Jan" },
+    { value: "02", short: "Fev" },
+    { value: "03", short: "Mar" },
+    { value: "04", short: "Abr" },
+    { value: "05", short: "Mai" },
+    { value: "06", short: "Jun" },
+    { value: "07", short: "Jul" },
+    { value: "08", short: "Ago" },
+    { value: "09", short: "Set" },
+    { value: "10", short: "Out" },
+    { value: "11", short: "Nov" },
+    { value: "12", short: "Dez" },
+  ], []);
+
+  useEffect(() => {
+    if (selectedMonth) {
+      const year = Number(selectedMonth.split("-")[0]);
+      if (!isNaN(year)) {
+        setPickerYear(year);
+      }
+    }
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsPickerOpen(false);
+      }
+    }
+    if (isPickerOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isPickerOpen]);
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsPickerOpen(false);
+      }
+    }
+    if (isPickerOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPickerOpen]);
+
   const personExpenses = expenses.filter((expense) => expense.participants?.includes(personId));
   const selectedPerson = getPersonById(personId);
   const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser, userProfiles);
@@ -1941,24 +1997,6 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
     onMonthChange(shiftMonth(selectedMonth, 1));
   }
 
-  function handleOpenMonthPicker(event) {
-    event?.preventDefault();
-    const picker = monthPickerRef.current;
-    if (!picker) return;
-
-    if (typeof picker.showPicker === "function") {
-      try {
-        picker.showPicker();
-        return;
-      } catch {
-        picker.focus();
-        return;
-      }
-    }
-
-    picker.focus();
-  }
-
   return (
     <section className="panel">
       <div className="section-heading" style={{ flexWrap: "wrap", gap: "12px" }}>
@@ -1967,7 +2005,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           <span>{personExpenses.length} registro(s)</span>
         </div>
 
-        <div className="person-month-switcher">
+        <div className="person-month-switcher" ref={containerRef}>
           <button
             type="button"
             className="icon-button"
@@ -1977,16 +2015,15 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             <ChevronLeft size={18} />
           </button>
           
-          <label className="person-month-picker" onClick={handleOpenMonthPicker} title="Escolher mes e ano">
+          <button
+            type="button"
+            className={`person-month-picker-btn ${isPickerOpen ? "active" : ""}`}
+            onClick={() => setIsPickerOpen(!isPickerOpen)}
+            title="Escolher mês e ano"
+          >
+            <Calendar size={16} className="picker-icon" />
             <span>{formattedMonthName}</span>
-            <input
-              ref={monthPickerRef}
-              aria-label="Escolher mes e ano"
-              type="month"
-              value={selectedMonth}
-              onChange={(event) => onMonthChange(event.target.value)}
-            />
-          </label>
+          </button>
 
           <button
             type="button"
@@ -1996,6 +2033,51 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           >
             <ChevronRight size={18} />
           </button>
+
+          {isPickerOpen && (
+            <div className="custom-month-dropdown">
+              <div className="picker-year-header">
+                <button
+                  type="button"
+                  className="year-nav-btn"
+                  onClick={() => setPickerYear((prev) => prev - 1)}
+                  title="Ano Anterior"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="picker-year-display">{pickerYear}</span>
+                <button
+                  type="button"
+                  className="year-nav-btn"
+                  onClick={() => setPickerYear((prev) => prev + 1)}
+                  title="Próximo Ano"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              <div className="picker-months-grid">
+                {MONTHS_PT.map((m) => {
+                  const monthValue = `${pickerYear}-${m.value}`;
+                  const isSelected = selectedMonth === monthValue;
+                  
+                  return (
+                    <button
+                      key={m.value}
+                      type="button"
+                      className={`picker-month-btn ${isSelected ? "selected" : ""}`}
+                      onClick={() => {
+                        onMonthChange(monthValue);
+                        setIsPickerOpen(false);
+                      }}
+                    >
+                      {m.short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
