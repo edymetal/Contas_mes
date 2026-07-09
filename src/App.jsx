@@ -1917,6 +1917,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
   const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser, userProfiles);
   const paymentSummary = useMemo(() => {
     let listPaidAmount = 0;
+    let listDebtAmount = 0;
     const totalsByPayer = PEOPLE
       .filter((person) => person.id !== personId)
       .map((person) => ({
@@ -1931,6 +1932,8 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
     personExpenses.forEach((expense) => {
       const share = getShare(expense, personId);
       if (!share) return;
+
+      listDebtAmount = roundMoney(listDebtAmount + Number(share.amount || 0));
 
       const displayStatus = expense.payerId === personId ? "self" : share.status;
 
@@ -1981,6 +1984,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
       }),
       { originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0, receivableAmount: 0 },
     );
+    totals.originalAmount = roundMoney(listDebtAmount);
     totals.paidAmount = roundMoney(listPaidAmount);
 
     return { totalsByPayer, totals };
