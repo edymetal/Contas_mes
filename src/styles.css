@@ -1521,104 +1521,6 @@ textarea:focus {
   font-family: "Outfit", sans-serif;
 }
 
-.install-app-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 24px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel-muted);
-}
-
-.install-app-copy {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-}
-
-.install-app-icon {
-  display: grid;
-  flex: 0 0 46px;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius-md);
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.install-app-card h3 {
-  margin: 0 0 5px;
-  color: var(--text);
-  font-size: 1rem;
-}
-
-.install-app-card p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.install-checklist {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-
-.install-check-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-}
-
-.install-check-status {
-  display: grid;
-  place-items: center;
-  min-width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.install-check-status.ok {
-  background: var(--success-soft);
-  color: var(--success);
-}
-
-.install-check-status.warning {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.install-check-item strong {
-  display: block;
-  color: var(--text);
-  font-size: 0.88rem;
-}
-
-.install-check-item small {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
 /* Buttons */
 .primary-button,
 .secondary-button,
@@ -2858,19 +2760,6 @@ textarea:focus {
   }
 
   .settlement-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .install-app-card {
-    align-items: stretch;
-    grid-template-columns: 1fr;
-  }
-
-  .install-app-card .primary-button {
-    width: 100%;
-  }
-
-  .install-checklist {
     grid-template-columns: 1fr;
   }
 

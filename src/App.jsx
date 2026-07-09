@@ -14,7 +14,6 @@ import {
   ReceiptText,
   Settings,
   SlidersHorizontal,
-  Smartphone,
   Trash2,
   UserRound,
   X,
@@ -1277,8 +1276,6 @@ function App() {
           </header>
 
         {actionMessage && <div className="notice">{actionMessage}</div>}
-
-        <InstallAppPanel />
 
         {activeView === "dashboard" && (
           <Dashboard
@@ -2629,171 +2626,6 @@ function calculateSettlementRows(expenses, settlementPayments = []) {
   }
 
   return rows;
-}
-
-function InstallAppPanel() {
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [isAppInstalled, setIsAppInstalled] = useState(() => {
-    return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
-  });
-  const [pwaChecks, setPwaChecks] = useState([]);
-
-  useEffect(() => {
-    function handleBeforeInstallPrompt(event) {
-      event.preventDefault();
-      setInstallPrompt(event);
-    }
-
-    function handleAppInstalled() {
-      setInstallPrompt(null);
-      setIsAppInstalled(true);
-    }
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function checkPwaReadiness() {
-      const isSecure =
-        window.location.protocol === "https:" ||
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
-      const manifestUrl = document.querySelector('link[rel="manifest"]')?.href;
-      let manifestOk = false;
-      let iconsOk = false;
-
-      if (manifestUrl) {
-        try {
-          const response = await fetch(manifestUrl, { cache: "no-store" });
-          const manifest = response.ok ? await response.json() : null;
-          manifestOk = Boolean(manifest?.name && manifest?.start_url && (manifest?.display || manifest?.display_override));
-          iconsOk = Boolean(
-            manifest?.icons?.some((icon) => icon.sizes?.includes("192x192")) &&
-              manifest?.icons?.some((icon) => icon.sizes?.includes("512x512")),
-          );
-        } catch {
-          manifestOk = false;
-          iconsOk = false;
-        }
-      }
-
-      let serviceWorkerOk = false;
-      let serviceWorkerControlled = false;
-      if ("serviceWorker" in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.getRegistration();
-          serviceWorkerOk = Boolean(registration);
-          serviceWorkerControlled = Boolean(navigator.serviceWorker.controller);
-        } catch {
-          serviceWorkerOk = false;
-        }
-      }
-
-      if (!isMounted) return;
-
-      setPwaChecks([
-        {
-          label: "Conexao segura",
-          ok: isSecure,
-          detail: isSecure ? "HTTPS ativo." : "Abra o site em HTTPS; HTTP comum bloqueia instalacao.",
-        },
-        {
-          label: "Manifesto do app",
-          ok: manifestOk,
-          detail: manifestOk ? "Manifesto carregado." : "O Chrome ainda nao conseguiu ler o manifesto.",
-        },
-        {
-          label: "Icones instalaveis",
-          ok: iconsOk,
-          detail: iconsOk ? "Icones 192 e 512 encontrados." : "Faltam icones PNG 192x192 e 512x512.",
-        },
-        {
-          label: "Service worker",
-          ok: serviceWorkerOk,
-          detail: serviceWorkerControlled
-            ? "Ativo nesta aba."
-            : serviceWorkerOk
-              ? "Registrado; recarregue a pagina para ativar nesta aba."
-              : "Ainda nao registrado pelo navegador.",
-        },
-        {
-          label: "Prompt do Chrome",
-          ok: Boolean(installPrompt || isAppInstalled),
-          detail: isAppInstalled
-            ? "Aplicativo ja instalado."
-            : installPrompt
-              ? "Instalacao nativa disponivel."
-              : "Com tudo OK, abra o menu do Chrome ou aguarde o navegador liberar o prompt.",
-        },
-      ]);
-    }
-
-    checkPwaReadiness();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [installPrompt, isAppInstalled]);
-
-  async function handleInstallApp() {
-    if (!installPrompt) return;
-
-    installPrompt.prompt();
-    const choiceResult = await installPrompt.userChoice;
-
-    if (choiceResult.outcome === "accepted") {
-      setIsAppInstalled(true);
-    }
-
-    setInstallPrompt(null);
-  }
-
-  if (isAppInstalled) return null;
-
-  return (
-    <div className="install-app-card">
-      <div className="install-app-copy">
-        <span className="install-app-icon">
-          <Smartphone size={22} />
-        </span>
-        <div>
-          <h3>Instalar no celular</h3>
-          <p>
-            No Chrome Android, toque em Instalar app quando o botao aparecer. Se o Chrome nao liberar,
-            confira abaixo qual requisito ainda nao foi reconhecido.
-          </p>
-        </div>
-      </div>
-
-      <button type="button" className="primary-button" onClick={handleInstallApp} disabled={!installPrompt}>
-        {installPrompt ? "Instalar app" : "Aguardando Chrome"}
-      </button>
-
-      {pwaChecks.length > 0 && (
-        <div className="install-checklist">
-          {pwaChecks.map((item) => (
-            <div className="install-check-item" key={item.label}>
-              <span className={item.ok ? "install-check-status ok" : "install-check-status warning"}>
-                {item.ok ? "OK" : "!"}
-              </span>
-              <div>
-                <strong>{item.label}</strong>
-                <small>{item.detail}</small>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function SettingsPanel({ theme, setTheme }) {
