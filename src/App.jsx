@@ -1278,6 +1278,8 @@ function App() {
 
         {actionMessage && <div className="notice">{actionMessage}</div>}
 
+        <InstallAppPanel />
+
         {activeView === "dashboard" && (
           <Dashboard
             breakdown={dashboardBreakdown}
@@ -2629,10 +2631,7 @@ function calculateSettlementRows(expenses, settlementPayments = []) {
   return rows;
 }
 
-function SettingsPanel({ theme, setTheme }) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [backupMessage, setBackupMessage] = useState(null);
+function InstallAppPanel() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(() => {
     return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
@@ -2675,7 +2674,7 @@ function SettingsPanel({ theme, setTheme }) {
         try {
           const response = await fetch(manifestUrl, { cache: "no-store" });
           const manifest = response.ok ? await response.json() : null;
-          manifestOk = Boolean(manifest?.name && manifest?.start_url && manifest?.display);
+          manifestOk = Boolean(manifest?.name && manifest?.start_url && (manifest?.display || manifest?.display_override));
           iconsOk = Boolean(
             manifest?.icons?.some((icon) => icon.sizes?.includes("192x192")) &&
               manifest?.icons?.some((icon) => icon.sizes?.includes("512x512")),
@@ -2732,7 +2731,7 @@ function SettingsPanel({ theme, setTheme }) {
             ? "Aplicativo ja instalado."
             : installPrompt
               ? "Instalacao nativa disponivel."
-              : "Se os itens acima estiverem OK, use o menu do Chrome ou aguarde o Chrome liberar o prompt.",
+              : "Com tudo OK, abra o menu do Chrome ou aguarde o navegador liberar o prompt.",
         },
       ]);
     }
@@ -2756,6 +2755,51 @@ function SettingsPanel({ theme, setTheme }) {
 
     setInstallPrompt(null);
   }
+
+  if (isAppInstalled) return null;
+
+  return (
+    <div className="install-app-card">
+      <div className="install-app-copy">
+        <span className="install-app-icon">
+          <Smartphone size={22} />
+        </span>
+        <div>
+          <h3>Instalar no celular</h3>
+          <p>
+            No Chrome Android, toque em Instalar app quando o botao aparecer. Se o Chrome nao liberar,
+            confira abaixo qual requisito ainda nao foi reconhecido.
+          </p>
+        </div>
+      </div>
+
+      <button type="button" className="primary-button" onClick={handleInstallApp} disabled={!installPrompt}>
+        {installPrompt ? "Instalar app" : "Aguardando Chrome"}
+      </button>
+
+      {pwaChecks.length > 0 && (
+        <div className="install-checklist">
+          {pwaChecks.map((item) => (
+            <div className="install-check-item" key={item.label}>
+              <span className={item.ok ? "install-check-status ok" : "install-check-status warning"}>
+                {item.ok ? "OK" : "!"}
+              </span>
+              <div>
+                <strong>{item.label}</strong>
+                <small>{item.detail}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SettingsPanel({ theme, setTheme }) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [backupMessage, setBackupMessage] = useState(null);
 
   async function handleExport() {
     setIsExporting(true);
@@ -2927,48 +2971,6 @@ function SettingsPanel({ theme, setTheme }) {
       </div>
 
       <div style={{ display: "grid", gap: "24px", marginTop: "16px" }}>
-        <div className="install-app-card">
-          <div className="install-app-copy">
-            <span className="install-app-icon">
-              <Smartphone size={22} />
-            </span>
-            <div>
-              <h3>Instalar no celular</h3>
-              <p>
-                Abra pelo Chrome no Android em uma conexao HTTPS. Se o botao nativo nao aparecer,
-                toque no menu do Chrome e escolha Instalar app ou Adicionar a tela inicial.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleInstallApp}
-            disabled={!installPrompt || isAppInstalled}
-          >
-            {isAppInstalled ? "Aplicativo instalado" : installPrompt ? "Instalar app" : "Menu do Chrome"}
-          </button>
-
-          {pwaChecks.length > 0 && (
-            <div className="install-checklist">
-              {pwaChecks.map((item) => (
-                <div className="install-check-item" key={item.label}>
-                  <span className={item.ok ? "install-check-status ok" : "install-check-status warning"}>
-                    {item.ok ? "OK" : "!"}
-                  </span>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <small>{item.detail}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <hr style={{ border: "0", borderTop: "1px solid var(--line)", margin: "8px 0" }} />
-
         <div>
           <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Tema do Sistema</h3>
           <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: "0.9rem" }}>

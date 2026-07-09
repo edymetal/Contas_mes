@@ -1,4 +1,4 @@
-const CACHE_NAME = "contas-mes-v3";
+const CACHE_NAME = "contas-mes-v4";
 const APP_SCOPE = self.registration.scope;
 const APP_SHELL = ["", "index.html", "manifest.webmanifest", "favicon.svg", "icon-192.png", "icon-512.png"].map((path) =>
   new URL(path, APP_SCOPE).toString(),
