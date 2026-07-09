@@ -2849,7 +2849,8 @@ function SettingsPanel({ theme, setTheme }) {
             <div>
               <h3>Instalar no celular</h3>
               <p>
-                Abra pelo Chrome no Android e instale o sistema como aplicativo na tela inicial.
+                Abra pelo Chrome no Android em uma conexao HTTPS. Se o botao nativo nao aparecer,
+                toque no menu do Chrome e escolha Instalar app ou Adicionar a tela inicial.
               </p>
             </div>
           </div>
@@ -2860,7 +2861,7 @@ function SettingsPanel({ theme, setTheme }) {
             onClick={handleInstallApp}
             disabled={!installPrompt || isAppInstalled}
           >
-            {isAppInstalled ? "Aplicativo instalado" : installPrompt ? "Instalar app" : "Use o menu do Chrome"}
+            {isAppInstalled ? "Aplicativo instalado" : installPrompt ? "Instalar app" : "Menu do Chrome"}
           </button>
         </div>
 
