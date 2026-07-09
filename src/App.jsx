@@ -2139,11 +2139,14 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
           <div className="person-debt-breakdown">
             <small className="debt-total">Dívida: {formatSignedCurrency(paymentSummary.totals.originalAmount, "negative")}</small>
             <small className="debt-paid">Pago: {formatCurrency(paymentSummary.totals.paidAmount)}</small>
-            {paymentSummary.totalsByPayer.map(({ person, abatedAmount }) => (
-              <small className="debt-abated" key={`abated-${person.id}`}>
-                Abatido {person.name}: {formatCurrency(abatedAmount)}
-              </small>
-            ))}
+            <small className="debt-abated">
+              <span>Abatido</span>
+              {paymentSummary.totalsByPayer.map(({ person, abatedAmount }) => (
+                <span key={`abated-${person.id}`}>
+                  {person.name}: {formatCurrency(abatedAmount)}
+                </span>
+              ))}
+            </small>
           </div>
         </div>
       </div>

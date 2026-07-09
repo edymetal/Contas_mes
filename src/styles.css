@@ -1927,9 +1927,12 @@ textarea:focus {
 }
 
 .person-debt-breakdown .debt-abated {
+  align-items: flex-start;
   border-color: color-mix(in srgb, #60a5fa 34%, transparent);
   background: color-mix(in srgb, #60a5fa 14%, transparent);
   color: #93c5fd;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .person-debt-breakdown .debt-receivable {
