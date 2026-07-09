@@ -1,5 +1,5 @@
-const CACHE_NAME = "contas-mes-v1";
-const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE_NAME = "contas-mes-v2";
+const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
