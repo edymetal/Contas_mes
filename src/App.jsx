@@ -2637,6 +2637,7 @@ function SettingsPanel({ theme, setTheme }) {
   const [isAppInstalled, setIsAppInstalled] = useState(() => {
     return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
   });
+  const [pwaChecks, setPwaChecks] = useState([]);
 
   useEffect(() => {
     function handleBeforeInstallPrompt(event) {
@@ -2657,6 +2658,91 @@ function SettingsPanel({ theme, setTheme }) {
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkPwaReadiness() {
+      const isSecure =
+        window.location.protocol === "https:" ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+      const manifestUrl = document.querySelector('link[rel="manifest"]')?.href;
+      let manifestOk = false;
+      let iconsOk = false;
+
+      if (manifestUrl) {
+        try {
+          const response = await fetch(manifestUrl, { cache: "no-store" });
+          const manifest = response.ok ? await response.json() : null;
+          manifestOk = Boolean(manifest?.name && manifest?.start_url && manifest?.display);
+          iconsOk = Boolean(
+            manifest?.icons?.some((icon) => icon.sizes?.includes("192x192")) &&
+              manifest?.icons?.some((icon) => icon.sizes?.includes("512x512")),
+          );
+        } catch {
+          manifestOk = false;
+          iconsOk = false;
+        }
+      }
+
+      let serviceWorkerOk = false;
+      let serviceWorkerControlled = false;
+      if ("serviceWorker" in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          serviceWorkerOk = Boolean(registration);
+          serviceWorkerControlled = Boolean(navigator.serviceWorker.controller);
+        } catch {
+          serviceWorkerOk = false;
+        }
+      }
+
+      if (!isMounted) return;
+
+      setPwaChecks([
+        {
+          label: "Conexao segura",
+          ok: isSecure,
+          detail: isSecure ? "HTTPS ativo." : "Abra o site em HTTPS; HTTP comum bloqueia instalacao.",
+        },
+        {
+          label: "Manifesto do app",
+          ok: manifestOk,
+          detail: manifestOk ? "Manifesto carregado." : "O Chrome ainda nao conseguiu ler o manifesto.",
+        },
+        {
+          label: "Icones instalaveis",
+          ok: iconsOk,
+          detail: iconsOk ? "Icones 192 e 512 encontrados." : "Faltam icones PNG 192x192 e 512x512.",
+        },
+        {
+          label: "Service worker",
+          ok: serviceWorkerOk,
+          detail: serviceWorkerControlled
+            ? "Ativo nesta aba."
+            : serviceWorkerOk
+              ? "Registrado; recarregue a pagina para ativar nesta aba."
+              : "Ainda nao registrado pelo navegador.",
+        },
+        {
+          label: "Prompt do Chrome",
+          ok: Boolean(installPrompt || isAppInstalled),
+          detail: isAppInstalled
+            ? "Aplicativo ja instalado."
+            : installPrompt
+              ? "Instalacao nativa disponivel."
+              : "Se os itens acima estiverem OK, use o menu do Chrome ou aguarde o Chrome liberar o prompt.",
+        },
+      ]);
+    }
+
+    checkPwaReadiness();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [installPrompt, isAppInstalled]);
 
   async function handleInstallApp() {
     if (!installPrompt) return;
@@ -2863,6 +2949,22 @@ function SettingsPanel({ theme, setTheme }) {
           >
             {isAppInstalled ? "Aplicativo instalado" : installPrompt ? "Instalar app" : "Menu do Chrome"}
           </button>
+
+          {pwaChecks.length > 0 && (
+            <div className="install-checklist">
+              {pwaChecks.map((item) => (
+                <div className="install-check-item" key={item.label}>
+                  <span className={item.ok ? "install-check-status ok" : "install-check-status warning"}>
+                    {item.ok ? "OK" : "!"}
+                  </span>
+                  <div>
+                    <strong>{item.label}</strong>
+                    <small>{item.detail}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <hr style={{ border: "0", borderTop: "1px solid var(--line)", margin: "8px 0" }} />

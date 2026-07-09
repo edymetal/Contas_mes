@@ -11,7 +11,7 @@ createRoot(document.getElementById("root")).render(
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+    navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch(() => {
       // The app still works normally if registration is blocked by the browser.
     });
   });

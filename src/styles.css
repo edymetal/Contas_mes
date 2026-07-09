@@ -1522,9 +1522,9 @@ textarea:focus {
 }
 
 .install-app-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 18px;
   padding: 18px;
   border: 1px solid var(--line);
@@ -1561,6 +1561,61 @@ textarea:focus {
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.45;
+}
+
+.install-checklist {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.install-check-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+
+.install-check-status {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.install-check-status.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.install-check-status.warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.install-check-item strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.install-check-item small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 /* Buttons */
@@ -2807,11 +2862,15 @@ textarea:focus {
 
   .install-app-card {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .install-app-card .primary-button {
     width: 100%;
+  }
+
+  .install-checklist {
+    grid-template-columns: 1fr;
   }
 
   .settlement-people {
