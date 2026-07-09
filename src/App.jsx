@@ -1934,7 +1934,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
 
       const displayStatus = expense.payerId === personId ? "self" : share.status;
 
-      if (isSettledStatus(displayStatus)) {
+      if (displayStatus === "paid" || displayStatus === "self") {
         listPaidAmount = roundMoney(listPaidAmount + Number(share.amount || 0));
       }
 
