@@ -1773,8 +1773,6 @@ textarea:focus {
 }
 
 .person-total-card .person-debt-breakdown {
-  grid-template-columns: repeat(3, max-content);
-  justify-content: start;
   margin-top: 0;
   padding-top: 16px;
   border-top: 1px solid var(--line);
@@ -1897,21 +1895,23 @@ textarea:focus {
 }
 
 .person-debt-breakdown {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   grid-column: 1 / -1;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .person-debt-breakdown small {
-  width: fit-content;
-  max-width: 100%;
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.25;
+  transition: all 0.2s ease;
 }
 
 .person-debt-breakdown .debt-total {
