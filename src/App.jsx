@@ -1932,7 +1932,9 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
       const share = getShare(expense, personId);
       if (!share) return;
 
-      if (isSettledStatus(share.status)) {
+      const displayStatus = expense.payerId === personId ? "self" : share.status;
+
+      if (isSettledStatus(displayStatus)) {
         listPaidAmount = roundMoney(listPaidAmount + Number(share.amount || 0));
       }
 
