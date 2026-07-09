@@ -1521,6 +1521,48 @@ textarea:focus {
   font-family: "Outfit", sans-serif;
 }
 
+.install-app-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+}
+
+.install-app-copy {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.install-app-icon {
+  display: grid;
+  flex: 0 0 46px;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.install-app-card h3 {
+  margin: 0 0 5px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.install-app-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 /* Buttons */
 .primary-button,
 .secondary-button,
@@ -2761,6 +2803,15 @@ textarea:focus {
 
   .settlement-grid {
     grid-template-columns: 1fr;
+  }
+
+  .install-app-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .install-app-card .primary-button {
+    width: 100%;
   }
 
   .settlement-people {

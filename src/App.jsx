@@ -14,6 +14,7 @@ import {
   ReceiptText,
   Settings,
   SlidersHorizontal,
+  Smartphone,
   Trash2,
   UserRound,
   X,
@@ -2632,6 +2633,43 @@ function SettingsPanel({ theme, setTheme }) {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [backupMessage, setBackupMessage] = useState(null);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(() => {
+    return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  });
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event) {
+      event.preventDefault();
+      setInstallPrompt(event);
+    }
+
+    function handleAppInstalled() {
+      setInstallPrompt(null);
+      setIsAppInstalled(true);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  async function handleInstallApp() {
+    if (!installPrompt) return;
+
+    installPrompt.prompt();
+    const choiceResult = await installPrompt.userChoice;
+
+    if (choiceResult.outcome === "accepted") {
+      setIsAppInstalled(true);
+    }
+
+    setInstallPrompt(null);
+  }
 
   async function handleExport() {
     setIsExporting(true);
@@ -2803,6 +2841,31 @@ function SettingsPanel({ theme, setTheme }) {
       </div>
 
       <div style={{ display: "grid", gap: "24px", marginTop: "16px" }}>
+        <div className="install-app-card">
+          <div className="install-app-copy">
+            <span className="install-app-icon">
+              <Smartphone size={22} />
+            </span>
+            <div>
+              <h3>Instalar no celular</h3>
+              <p>
+                Abra pelo Chrome no Android e instale o sistema como aplicativo na tela inicial.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="primary-button"
+            onClick={handleInstallApp}
+            disabled={!installPrompt || isAppInstalled}
+          >
+            {isAppInstalled ? "Aplicativo instalado" : installPrompt ? "Instalar app" : "Use o menu do Chrome"}
+          </button>
+        </div>
+
+        <hr style={{ border: "0", borderTop: "1px solid var(--line)", margin: "8px 0" }} />
+
         <div>
           <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Tema do Sistema</h3>
           <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: "0.9rem" }}>
