@@ -37,6 +37,8 @@ import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
 
+const appVersion = import.meta.env.VITE_APP_VERSION || "0.0.0";
+
 const currencyFormatter = new Intl.NumberFormat("de-DE", {
   style: "currency",
   currency: "EUR",
@@ -1245,6 +1247,9 @@ function App() {
           <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
             <LogOut size={18} />
           </button>
+        </div>
+        <div className="app-version" aria-label={`Versao do sistema ${appVersion}`}>
+          Versao {appVersion}
         </div>
       </aside>
 

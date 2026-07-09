@@ -258,6 +258,13 @@ button {
   font-size: 0.8rem;
 }
 
+.app-version {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .user-avatar {
   width: 40px;
   height: 40px;
