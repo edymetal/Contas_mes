@@ -2,35 +2,31 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function allowedEmail() {
-      return signedIn() && request.auth.token.email in [
-        "edneypugleise@gmail.com",
-        "edneypugliese.dev@gmail.com",
-        "soniapugleise@gmail.com",
-        "RODNEYPUGLEISEMACHADO@gmail.com",
-        "rodneypugleisemachado@gmail.com"
-      ];
-    }
-
-    function adminEmail() {
-      return signedIn() && request.auth.token.email in [
+    function edneyEmail() {
+      return request.auth != null && request.auth.token.email in [
         "edneypugleise@gmail.com",
         "edneypugliese.dev@gmail.com"
       ];
     }
 
     match /expenses/{expenseId} {
-      allow read: if allowedEmail();
-      allow create, update, delete: if adminEmail();
+      allow read, create, update, delete: if edneyEmail();
     }
 
     match /settlements/{settlementId} {
-      allow read: if allowedEmail();
-      allow create, update, delete: if adminEmail();
+      allow read, create, update, delete: if edneyEmail();
+    }
+
+    match /marketItems/{itemId} {
+      allow read, create, update, delete: if edneyEmail();
+    }
+
+    match /otherPayments/{paymentId} {
+      allow read, create, update, delete: if edneyEmail();
+    }
+
+    match /userProfiles/{profileId} {
+      allow read, create, update: if edneyEmail();
     }
   }
 }

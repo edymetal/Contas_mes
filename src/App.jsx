@@ -14,9 +14,11 @@ import {
   Plus,
   ReceiptText,
   Settings,
+  ShoppingCart,
   SlidersHorizontal,
   Trash2,
   UserRound,
+  WalletCards,
   X,
 } from "lucide-react";
 import {
@@ -62,6 +64,24 @@ const emptyForm = {
   recurringMonths: 12,
 };
 
+const emptyMarketForm = {
+  market: "",
+  product: "",
+  description: "",
+  quantity: "1",
+  unitValue: "",
+  purchasedAt: todayInputValue(),
+};
+
+const emptyOtherPaymentForm = {
+  place: "",
+  paidAt: todayInputValue(),
+  product: "",
+  paymentMethod: "Cartão",
+  quantity: "1",
+  unitValue: "",
+};
+
 function addMonths(dateStr, months) {
   if (!dateStr) return "";
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -88,6 +108,8 @@ const navItems = [
   { id: "dashboard", label: "Painel", icon: BarChart3 },
   { id: "new", label: "Nova conta", icon: Plus },
   ...PEOPLE.map((person) => ({ id: person.id, label: person.name, icon: UserRound })),
+  { id: "market", label: "Mercado", icon: ShoppingCart },
+  { id: "other-payments", label: "Outros pagamentos", icon: WalletCards },
   { id: "settlement", label: "Acerto", icon: ArrowRightLeft },
   { id: "manage", label: "Gerenciar contas", icon: SlidersHorizontal },
   { id: "settings", label: "Configurações", icon: Settings },
@@ -126,7 +148,7 @@ function currentMonthValue() {
 }
 
 function monthFromDate(date) {
-  return date.slice(0, 7);
+  return date ? date.slice(0, 7) : "";
 }
 
 function getSettlementPaymentMonthKey(payment) {
@@ -446,6 +468,8 @@ function App() {
   const [monthlyExpenses, setMonthlyExpenses] = useState([]);
   const [allExpenses, setAllExpenses] = useState([]);
   const [settlementPayments, setSettlementPayments] = useState([]);
+  const [marketItems, setMarketItems] = useState([]);
+  const [otherPayments, setOtherPayments] = useState([]);
   const [userProfiles, setUserProfiles] = useState({});
   const [dataLoading, setDataLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -458,6 +482,10 @@ function App() {
   });
   const [actionMessage, setActionMessage] = useState("");
   const [editingExpense, setEditingExpense] = useState(null);
+  const [marketForm, setMarketForm] = useState(emptyMarketForm);
+  const [otherPaymentForm, setOtherPaymentForm] = useState(emptyOtherPaymentForm);
+  const [marketFormError, setMarketFormError] = useState("");
+  const [otherPaymentFormError, setOtherPaymentFormError] = useState("");
   const canManageData = isAdminProfile(profile);
 
   useEffect(() => {
@@ -525,6 +553,38 @@ function App() {
       () => {
         setActionMessage("Não foi possível carregar as fotos dos usuários.");
       },
+    );
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profile || !db) return undefined;
+
+    return onSnapshot(
+      collection(db, "marketItems"),
+      (snapshot) => {
+        setMarketItems(
+          snapshot.docs
+            .map((item) => ({ id: item.id, ...item.data() }))
+            .sort((a, b) => (b.purchasedAt || "").localeCompare(a.purchasedAt || "")),
+        );
+      },
+      () => setActionMessage("Não foi possível carregar os itens de mercado."),
+    );
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profile || !db) return undefined;
+
+    return onSnapshot(
+      collection(db, "otherPayments"),
+      (snapshot) => {
+        setOtherPayments(
+          snapshot.docs
+            .map((item) => ({ id: item.id, ...item.data() }))
+            .sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || "")),
+        );
+      },
+      () => setActionMessage("Não foi possível carregar os outros pagamentos."),
     );
   }, [profile]);
 
@@ -687,6 +747,81 @@ function App() {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleCreateMarketItem(event) {
+    event.preventDefault();
+    setMarketFormError("");
+    setActionMessage("");
+    if (!ensureCanManageData()) return;
+
+    const quantity = Number(String(marketForm.quantity).replace(",", "."));
+    const unitValue = Number(String(marketForm.unitValue).replace(",", "."));
+    if (!marketForm.market.trim() || !marketForm.product.trim() || !marketForm.purchasedAt) {
+      setMarketFormError("Preencha mercado, produto e data da compra.");
+      return;
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue <= 0) {
+      setMarketFormError("Informe quantidade e valor válidos.");
+      return;
+    }
+
+    await addDoc(collection(db, "marketItems"), {
+      market: marketForm.market.trim(),
+      product: marketForm.product.trim(),
+      description: marketForm.description.trim(),
+      quantity,
+      unitValue: roundMoney(unitValue),
+      totalValue: roundMoney(quantity * unitValue),
+      purchasedAt: marketForm.purchasedAt,
+      monthKey: monthFromDate(marketForm.purchasedAt),
+      createdBy: profile.id,
+      createdAt: serverTimestamp(),
+    });
+    setSelectedMonth(monthFromDate(marketForm.purchasedAt));
+    setMarketForm({ ...emptyMarketForm, purchasedAt: marketForm.purchasedAt });
+    setActionMessage("Item de mercado adicionado com sucesso.");
+  }
+
+  async function handleCreateOtherPayment(event) {
+    event.preventDefault();
+    setOtherPaymentFormError("");
+    setActionMessage("");
+    if (!ensureCanManageData()) return;
+
+    const quantity = Number(String(otherPaymentForm.quantity).replace(",", "."));
+    const unitValue = Number(String(otherPaymentForm.unitValue).replace(",", "."));
+    if (!otherPaymentForm.place.trim() || !otherPaymentForm.product.trim() || !otherPaymentForm.paidAt) {
+      setOtherPaymentFormError("Preencha local, produto e data do pagamento.");
+      return;
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue <= 0) {
+      setOtherPaymentFormError("Informe quantidade e valor válidos.");
+      return;
+    }
+
+    await addDoc(collection(db, "otherPayments"), {
+      place: otherPaymentForm.place.trim(),
+      product: otherPaymentForm.product.trim(),
+      paymentMethod: otherPaymentForm.paymentMethod,
+      quantity,
+      unitValue: roundMoney(unitValue),
+      totalValue: roundMoney(quantity * unitValue),
+      paidAt: otherPaymentForm.paidAt,
+      monthKey: monthFromDate(otherPaymentForm.paidAt),
+      createdBy: profile.id,
+      createdAt: serverTimestamp(),
+    });
+    setSelectedMonth(monthFromDate(otherPaymentForm.paidAt));
+    setOtherPaymentForm({ ...emptyOtherPaymentForm, paidAt: otherPaymentForm.paidAt });
+    setActionMessage("Pagamento adicionado com sucesso.");
+  }
+
+  async function handleDeleteResourceItem(collectionName, itemId, label) {
+    if (!ensureCanManageData()) return;
+    if (!window.confirm(`Tem certeza que deseja excluir ${label}?`)) return;
+    await deleteDoc(doc(db, collectionName, itemId));
+    setActionMessage(`${label.charAt(0).toUpperCase()}${label.slice(1)} excluído com sucesso.`);
   }
 
   function toggleParticipant(personId) {
@@ -1300,6 +1435,34 @@ function App() {
             onChange={updateForm}
             onSubmit={handleCreateExpense}
             onToggleParticipant={toggleParticipant}
+          />
+        )}
+
+        {canManageData && activeView === "market" && (
+          <ResourceListView
+            form={marketForm}
+            formError={marketFormError}
+            items={marketItems}
+            kind="market"
+            selectedMonth={selectedMonth}
+            onChange={(field, value) => setMarketForm((current) => ({ ...current, [field]: value }))}
+            onDelete={(itemId) => handleDeleteResourceItem("marketItems", itemId, "este item")}
+            onMonthChange={setSelectedMonth}
+            onSubmit={handleCreateMarketItem}
+          />
+        )}
+
+        {canManageData && activeView === "other-payments" && (
+          <ResourceListView
+            form={otherPaymentForm}
+            formError={otherPaymentFormError}
+            items={otherPayments}
+            kind="other-payments"
+            selectedMonth={selectedMonth}
+            onChange={(field, value) => setOtherPaymentForm((current) => ({ ...current, [field]: value }))}
+            onDelete={(itemId) => handleDeleteResourceItem("otherPayments", itemId, "este pagamento")}
+            onMonthChange={setSelectedMonth}
+            onSubmit={handleCreateOtherPayment}
           />
         )}
 
@@ -3014,6 +3177,8 @@ function SettingsPanel({ theme, setTheme }) {
 function getViewTitle(activeView) {
   if (activeView === "dashboard") return "Dashboard geral";
   if (activeView === "new") return "Nova conta";
+  if (activeView === "market") return "Mercado";
+  if (activeView === "other-payments") return "Outros pagamentos";
   if (activeView === "settlement") return "Acerto de contas";
   if (activeView === "manage") return "Gerenciar contas";
   if (activeView === "settings") return "Configurações";
@@ -3034,6 +3199,145 @@ function formatInstallmentPeriod(installment) {
   const start = formatDateMonth(installment.firstDueDate);
   const end = formatDateMonth(installment.finalDueDate);
   return start === end ? start : `${start} até ${end}`;
+}
+
+function ResourceListView({
+  form,
+  formError,
+  items,
+  kind,
+  selectedMonth,
+  onChange,
+  onDelete,
+  onMonthChange,
+  onSubmit,
+}) {
+  const isMarket = kind === "market";
+  const monthlyItems = useMemo(
+    () => items.filter((item) => item.monthKey === selectedMonth),
+    [items, selectedMonth],
+  );
+  const monthlyTotal = useMemo(
+    () => monthlyItems.reduce((total, item) => roundMoney(total + Number(item.totalValue || 0)), 0),
+    [monthlyItems],
+  );
+  const totalPreview = roundMoney(
+    Number(String(form.quantity || 0).replace(",", ".")) * Number(String(form.unitValue || 0).replace(",", ".")),
+  );
+  const dateField = isMarket ? "purchasedAt" : "paidAt";
+
+  return (
+    <div className="resource-page">
+      <section className="panel resource-form-panel">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Novo lançamento</span>
+            <h2>{isMarket ? "Adicionar item de mercado" : "Adicionar outro pagamento"}</h2>
+          </div>
+          <strong className="resource-preview-total">{formatCurrency(totalPreview)}</strong>
+        </div>
+
+        <form className="form-grid resource-form" onSubmit={onSubmit}>
+          <label>
+            {isMarket ? "Mercado" : "Local"}
+            <input
+              value={isMarket ? form.market : form.place}
+              onChange={(event) => onChange(isMarket ? "market" : "place", event.target.value)}
+              placeholder={isMarket ? "Ex.: ARD" : "Ex.: Amazon"}
+            />
+          </label>
+          <label>
+            Data
+            <input type="date" value={form[dateField]} onChange={(event) => onChange(dateField, event.target.value)} />
+          </label>
+          <label>
+            Produto
+            <input value={form.product} onChange={(event) => onChange("product", event.target.value)} placeholder="Nome do produto" />
+          </label>
+          {isMarket ? (
+            <label>
+              Descrição
+              <input value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Ex.: Alimentos" />
+            </label>
+          ) : (
+            <label>
+              Pagamento
+              <select value={form.paymentMethod} onChange={(event) => onChange("paymentMethod", event.target.value)}>
+                {PAYMENT_TYPES.map((type) => <option key={type}>{type}</option>)}
+              </select>
+            </label>
+          )}
+          <label>
+            Qtd
+            <input type="number" min="0.01" step="0.01" value={form.quantity} onChange={(event) => onChange("quantity", event.target.value)} />
+          </label>
+          <label>
+            Valor unitário (€)
+            <input type="number" min="0.01" step="0.01" value={form.unitValue} onChange={(event) => onChange("unitValue", event.target.value)} />
+          </label>
+          {formError && <p className="form-error resource-form-error">{formError}</p>}
+          <div className="resource-form-action">
+            <button className="primary-button" type="submit"><Plus size={18} /> Adicionar à lista</button>
+          </div>
+        </form>
+      </section>
+
+      <section className="panel resource-list-panel">
+        <div className="section-heading resource-list-heading">
+          <div>
+            <span className="eyebrow">Controle mensal</span>
+            <h2>{formatMonthLabel(selectedMonth)}</h2>
+          </div>
+          <label className="month-filter">
+            <Calendar size={18} />
+            <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
+          </label>
+        </div>
+
+        <div className="resource-total-card">
+          <span>Total do mês</span>
+          <strong>{formatCurrency(monthlyTotal)}</strong>
+          <small>{monthlyItems.length} {monthlyItems.length === 1 ? "lançamento" : "lançamentos"}</small>
+        </div>
+
+        <div className="resource-table-wrap">
+          <table className="resource-table">
+            <thead>
+              <tr>
+                <th>{isMarket ? "Mercado" : "Local"}</th>
+                <th>Data</th>
+                <th>Produto</th>
+                <th>{isMarket ? "Descrição" : "Pagamento"}</th>
+                <th>Qtd</th>
+                <th>Valor</th>
+                <th>Total</th>
+                <th aria-label="Ações" />
+              </tr>
+            </thead>
+            <tbody>
+              {monthlyItems.map((item) => (
+                <tr key={item.id}>
+                  <td>{isMarket ? item.market : item.place}</td>
+                  <td>{formatDate(isMarket ? item.purchasedAt : item.paidAt)}</td>
+                  <td>{item.product}</td>
+                  <td>{isMarket ? item.description || "-" : item.paymentMethod}</td>
+                  <td>{item.quantity}</td>
+                  <td>{formatCurrency(item.unitValue)}</td>
+                  <td><strong>{formatCurrency(item.totalValue)}</strong></td>
+                  <td>
+                    <button className="icon-button danger-button" title="Excluir lançamento" type="button" onClick={() => onDelete(item.id)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!monthlyItems.length && <div className="empty-state">Nenhum lançamento neste mês.</div>}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function sumInstallmentExpenses(expenses) {

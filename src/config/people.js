@@ -6,18 +6,6 @@ export const PEOPLE = [
     emails: ["edneypugleise@gmail.com", "edneypugliese.dev@gmail.com"],
     role: "admin",
   },
-  {
-    id: "sonia",
-    name: "Sônia",
-    email: "soniapugleise@gmail.com",
-    role: "reader",
-  },
-  {
-    id: "rodney",
-    name: "Rodney",
-    email: "RODNEYPUGLEISEMACHADO@gmail.com",
-    role: "reader",
-  },
 ];
 
 export const CATEGORIES = ["Casa", "Carro", "Viagem", "Outros"];

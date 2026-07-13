@@ -1698,6 +1698,127 @@ textarea:focus {
   transform: translateY(0);
 }
 
+/* Mercado e outros pagamentos */
+.resource-page {
+  display: grid;
+  gap: 24px;
+}
+
+.resource-form-panel,
+.resource-list-panel {
+  min-width: 0;
+}
+
+.resource-form-panel .section-heading,
+.resource-list-heading {
+  margin-bottom: 22px;
+}
+
+.resource-form-panel h2,
+.resource-list-panel h2 {
+  margin: 5px 0 0;
+  font-size: 1.35rem;
+}
+
+.resource-preview-total {
+  color: var(--primary);
+  font-family: "Outfit", sans-serif;
+  font-size: 1.55rem;
+}
+
+.resource-form {
+  align-items: end;
+}
+
+.resource-form-error,
+.resource-form-action {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.resource-form-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.resource-total-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 18px;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line));
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+}
+
+.resource-total-card span,
+.resource-total-card small {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.resource-total-card strong {
+  grid-row: span 2;
+  color: var(--primary);
+  font-family: "Outfit", sans-serif;
+  font-size: 1.7rem;
+}
+
+.resource-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.resource-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+}
+
+.resource-table th,
+.resource-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.resource-table th {
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.resource-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--panel-muted) 52%, transparent);
+}
+
+.resource-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.resource-table td:nth-last-child(2),
+.resource-table th:nth-last-child(2),
+.resource-table td:nth-last-child(3),
+.resource-table th:nth-last-child(3) {
+  text-align: right;
+}
+
+.resource-table td:last-child {
+  width: 56px;
+}
+
+.danger-button:hover {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 /* Expense & Settlement Lists */
 .expense-list {
   display: grid;
