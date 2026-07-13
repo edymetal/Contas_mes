@@ -61,3 +61,19 @@ O projeto esta preparado para build estatico com Vite. No GitHub:
 O workflow `.github/workflows/deploy.yml` gera a pasta `dist` e publica no GitHub Pages.
 
 O deploy do GitHub Pages publica apenas o frontend. Quando houver alteracoes em `functions/` ou `firestore.rules`, publique-as com o comando Firebase acima.
+
+### Deploy automatico pelo GitHub Actions
+
+O workflow tambem pode atualizar o secret no Firebase e publicar a funcao e as regras. Para habilitar esse job, configure estes Actions secrets:
+
+- `GEMINI_API_KEY`: chave exclusiva da Gemini API.
+- `FIREBASE_TOKEN`: credencial do Firebase CLI usada apenas pelo runner.
+
+Gere e cadastre o token sem coloca-lo em arquivos do projeto:
+
+```bash
+npx firebase-tools login:ci
+gh secret set FIREBASE_TOKEN --repo edymetal/Contas_mes
+```
+
+O primeiro comando mostra o token e o segundo solicita que ele seja colado de forma protegida. Sem os dois secrets, o job do backend e ignorado e a publicacao do frontend continua normalmente. O `FIREBASE_TOKEN` e suportado pelo Firebase CLI, mas e uma opcao legada; para ambientes maiores, substitua-o por Application Default Credentials com Workload Identity Federation.
