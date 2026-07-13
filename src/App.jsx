@@ -108,8 +108,7 @@ const navItems = [
   { id: "dashboard", label: "Painel", icon: BarChart3 },
   { id: "new", label: "Nova conta", icon: Plus },
   ...PEOPLE.map((person) => ({ id: person.id, label: person.name, icon: UserRound })),
-  { id: "market", label: "Mercado", icon: ShoppingCart },
-  { id: "other-payments", label: "Outros pagamentos", icon: WalletCards },
+  { id: "other-accounts", label: "Outras Contas", icon: WalletCards },
   { id: "settlement", label: "Acerto", icon: ArrowRightLeft },
   { id: "manage", label: "Gerenciar contas", icon: SlidersHorizontal },
   { id: "settings", label: "Configurações", icon: Settings },
@@ -1438,31 +1437,22 @@ function App() {
           />
         )}
 
-        {canManageData && activeView === "market" && (
-          <ResourceListView
-            form={marketForm}
-            formError={marketFormError}
-            items={marketItems}
-            kind="market"
+        {canManageData && activeView === "other-accounts" && (
+          <OtherAccountsView
+            marketForm={marketForm}
+            marketFormError={marketFormError}
+            marketItems={marketItems}
+            otherPaymentForm={otherPaymentForm}
+            otherPaymentFormError={otherPaymentFormError}
+            otherPayments={otherPayments}
             selectedMonth={selectedMonth}
-            onChange={(field, value) => setMarketForm((current) => ({ ...current, [field]: value }))}
-            onDelete={(itemId) => handleDeleteResourceItem("marketItems", itemId, "este item")}
+            onMarketChange={(field, value) => setMarketForm((current) => ({ ...current, [field]: value }))}
+            onOtherPaymentChange={(field, value) => setOtherPaymentForm((current) => ({ ...current, [field]: value }))}
+            onDeleteMarketItem={(itemId) => handleDeleteResourceItem("marketItems", itemId, "este item")}
+            onDeleteOtherPayment={(itemId) => handleDeleteResourceItem("otherPayments", itemId, "este pagamento")}
             onMonthChange={setSelectedMonth}
-            onSubmit={handleCreateMarketItem}
-          />
-        )}
-
-        {canManageData && activeView === "other-payments" && (
-          <ResourceListView
-            form={otherPaymentForm}
-            formError={otherPaymentFormError}
-            items={otherPayments}
-            kind="other-payments"
-            selectedMonth={selectedMonth}
-            onChange={(field, value) => setOtherPaymentForm((current) => ({ ...current, [field]: value }))}
-            onDelete={(itemId) => handleDeleteResourceItem("otherPayments", itemId, "este pagamento")}
-            onMonthChange={setSelectedMonth}
-            onSubmit={handleCreateOtherPayment}
+            onMarketSubmit={handleCreateMarketItem}
+            onOtherPaymentSubmit={handleCreateOtherPayment}
           />
         )}
 
@@ -3177,8 +3167,7 @@ function SettingsPanel({ theme, setTheme }) {
 function getViewTitle(activeView) {
   if (activeView === "dashboard") return "Dashboard geral";
   if (activeView === "new") return "Nova conta";
-  if (activeView === "market") return "Mercado";
-  if (activeView === "other-payments") return "Outros pagamentos";
+  if (activeView === "other-accounts") return "Outras Contas";
   if (activeView === "settlement") return "Acerto de contas";
   if (activeView === "manage") return "Gerenciar contas";
   if (activeView === "settings") return "Configurações";
@@ -3199,6 +3188,63 @@ function formatInstallmentPeriod(installment) {
   const start = formatDateMonth(installment.firstDueDate);
   const end = formatDateMonth(installment.finalDueDate);
   return start === end ? start : `${start} até ${end}`;
+}
+
+function OtherAccountsView({
+  marketForm,
+  marketFormError,
+  marketItems,
+  otherPaymentForm,
+  otherPaymentFormError,
+  otherPayments,
+  selectedMonth,
+  onMarketChange,
+  onOtherPaymentChange,
+  onDeleteMarketItem,
+  onDeleteOtherPayment,
+  onMonthChange,
+  onMarketSubmit,
+  onOtherPaymentSubmit,
+}) {
+  const [activeTab, setActiveTab] = useState("market");
+  const isMarket = activeTab === "market";
+
+  return (
+    <div className="other-accounts-page">
+      <div className="resource-tabs" role="tablist" aria-label="Tipo de lançamento">
+        <button
+          className={isMarket ? "resource-tab active" : "resource-tab"}
+          onClick={() => setActiveTab("market")}
+          role="tab"
+          type="button"
+          aria-selected={isMarket}
+        >
+          <ShoppingCart size={18} /> Mercado
+        </button>
+        <button
+          className={!isMarket ? "resource-tab active" : "resource-tab"}
+          onClick={() => setActiveTab("other-payments")}
+          role="tab"
+          type="button"
+          aria-selected={!isMarket}
+        >
+          <WalletCards size={18} /> Outros pagamentos
+        </button>
+      </div>
+
+      <ResourceListView
+        form={isMarket ? marketForm : otherPaymentForm}
+        formError={isMarket ? marketFormError : otherPaymentFormError}
+        items={isMarket ? marketItems : otherPayments}
+        kind={activeTab}
+        selectedMonth={selectedMonth}
+        onChange={isMarket ? onMarketChange : onOtherPaymentChange}
+        onDelete={isMarket ? onDeleteMarketItem : onDeleteOtherPayment}
+        onMonthChange={onMonthChange}
+        onSubmit={isMarket ? onMarketSubmit : onOtherPaymentSubmit}
+      />
+    </div>
+  );
 }
 
 function ResourceListView({
@@ -3288,10 +3334,18 @@ function ResourceListView({
             <span className="eyebrow">Controle mensal</span>
             <h2>{formatMonthLabel(selectedMonth)}</h2>
           </div>
-          <label className="month-filter">
-            <Calendar size={18} />
-            <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
-          </label>
+          <div className="resource-month-controls">
+            <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, -1))} title="Mês anterior" type="button">
+              <ChevronLeft size={18} />
+            </button>
+            <label className="month-filter">
+              <Calendar size={18} />
+              <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
+            </label>
+            <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, 1))} title="Próximo mês" type="button">
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="resource-total-card">

@@ -1704,6 +1704,43 @@ textarea:focus {
   gap: 24px;
 }
 
+.other-accounts-page {
+  display: grid;
+  gap: 20px;
+}
+
+.resource-tabs {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.resource-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.resource-tab:hover,
+.resource-tab.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
 .resource-form-panel,
 .resource-list-panel {
   min-width: 0;
@@ -1712,6 +1749,12 @@ textarea:focus {
 .resource-form-panel .section-heading,
 .resource-list-heading {
   margin-bottom: 22px;
+}
+
+.resource-month-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .resource-form-panel h2,
