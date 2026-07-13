@@ -39,8 +39,9 @@ import {
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
+import packageInfo from "../package.json";
 
-const appVersion = import.meta.env.VITE_APP_VERSION || "0.0.0";
+const appVersion = import.meta.env.VITE_APP_VERSION || packageInfo.version;
 
 const currencyFormatter = new Intl.NumberFormat("de-DE", {
   style: "currency",
