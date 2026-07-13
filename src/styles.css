@@ -1853,7 +1853,13 @@ textarea:focus {
 }
 
 .resource-table td:last-child {
-  width: 56px;
+  width: 104px;
+}
+
+.resource-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .danger-button:hover {

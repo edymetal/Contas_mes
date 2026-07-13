@@ -134,6 +134,13 @@ function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function getFirebaseActionError(error, action) {
+  if (error?.code === "permission-denied") {
+    return `Sem permissão para ${action}. Publique as regras do Firestore atualizadas para liberar Mercado e Outros pagamentos.`;
+  }
+  return `Não foi possível ${action}: ${error?.message || error}`;
+}
+
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -482,6 +489,7 @@ function App() {
   });
   const [actionMessage, setActionMessage] = useState("");
   const [editingExpense, setEditingExpense] = useState(null);
+  const [editingResourceItem, setEditingResourceItem] = useState(null);
   const [marketForm, setMarketForm] = useState(emptyMarketForm);
   const [otherPaymentForm, setOtherPaymentForm] = useState(emptyOtherPaymentForm);
   const [marketFormError, setMarketFormError] = useState("");
@@ -568,7 +576,7 @@ function App() {
             .sort((a, b) => (b.purchasedAt || "").localeCompare(a.purchasedAt || "")),
         );
       },
-      () => setActionMessage("Não foi possível carregar os itens de mercado."),
+      (error) => setActionMessage(getFirebaseActionError(error, "carregar os itens de mercado")),
     );
   }, [profile]);
 
@@ -584,7 +592,7 @@ function App() {
             .sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || "")),
         );
       },
-      () => setActionMessage("Não foi possível carregar os outros pagamentos."),
+      (error) => setActionMessage(getFirebaseActionError(error, "carregar os outros pagamentos")),
     );
   }, [profile]);
 
@@ -766,21 +774,25 @@ function App() {
       return;
     }
 
-    await addDoc(collection(db, "marketItems"), {
-      market: marketForm.market.trim(),
-      product: marketForm.product.trim(),
-      description: marketForm.description.trim(),
-      quantity,
-      unitValue: roundMoney(unitValue),
-      totalValue: roundMoney(quantity * unitValue),
-      purchasedAt: marketForm.purchasedAt,
-      monthKey: monthFromDate(marketForm.purchasedAt),
-      createdBy: profile.id,
-      createdAt: serverTimestamp(),
-    });
-    setSelectedMonth(monthFromDate(marketForm.purchasedAt));
-    setMarketForm({ ...emptyMarketForm, purchasedAt: marketForm.purchasedAt });
-    setActionMessage("Item de mercado adicionado com sucesso.");
+    try {
+      await addDoc(collection(db, "marketItems"), {
+        market: marketForm.market.trim(),
+        product: marketForm.product.trim(),
+        description: marketForm.description.trim(),
+        quantity,
+        unitValue: roundMoney(unitValue),
+        totalValue: roundMoney(quantity * unitValue),
+        purchasedAt: marketForm.purchasedAt,
+        monthKey: monthFromDate(marketForm.purchasedAt),
+        createdBy: profile.id,
+        createdAt: serverTimestamp(),
+      });
+      setSelectedMonth(monthFromDate(marketForm.purchasedAt));
+      setMarketForm({ ...emptyMarketForm, purchasedAt: marketForm.purchasedAt });
+      setActionMessage("Item de mercado adicionado com sucesso.");
+    } catch (error) {
+      setMarketFormError(getFirebaseActionError(error, "salvar o item"));
+    }
   }
 
   async function handleCreateOtherPayment(event) {
@@ -800,28 +812,78 @@ function App() {
       return;
     }
 
-    await addDoc(collection(db, "otherPayments"), {
-      place: otherPaymentForm.place.trim(),
-      product: otherPaymentForm.product.trim(),
-      paymentMethod: otherPaymentForm.paymentMethod,
-      quantity,
-      unitValue: roundMoney(unitValue),
-      totalValue: roundMoney(quantity * unitValue),
-      paidAt: otherPaymentForm.paidAt,
-      monthKey: monthFromDate(otherPaymentForm.paidAt),
-      createdBy: profile.id,
-      createdAt: serverTimestamp(),
-    });
-    setSelectedMonth(monthFromDate(otherPaymentForm.paidAt));
-    setOtherPaymentForm({ ...emptyOtherPaymentForm, paidAt: otherPaymentForm.paidAt });
-    setActionMessage("Pagamento adicionado com sucesso.");
+    try {
+      await addDoc(collection(db, "otherPayments"), {
+        place: otherPaymentForm.place.trim(),
+        product: otherPaymentForm.product.trim(),
+        paymentMethod: otherPaymentForm.paymentMethod,
+        quantity,
+        unitValue: roundMoney(unitValue),
+        totalValue: roundMoney(quantity * unitValue),
+        paidAt: otherPaymentForm.paidAt,
+        monthKey: monthFromDate(otherPaymentForm.paidAt),
+        createdBy: profile.id,
+        createdAt: serverTimestamp(),
+      });
+      setSelectedMonth(monthFromDate(otherPaymentForm.paidAt));
+      setOtherPaymentForm({ ...emptyOtherPaymentForm, paidAt: otherPaymentForm.paidAt });
+      setActionMessage("Pagamento adicionado com sucesso.");
+    } catch (error) {
+      setOtherPaymentFormError(getFirebaseActionError(error, "salvar o pagamento"));
+    }
   }
 
   async function handleDeleteResourceItem(collectionName, itemId, label) {
     if (!ensureCanManageData()) return;
     if (!window.confirm(`Tem certeza que deseja excluir ${label}?`)) return;
-    await deleteDoc(doc(db, collectionName, itemId));
-    setActionMessage(`${label.charAt(0).toUpperCase()}${label.slice(1)} excluído com sucesso.`);
+    try {
+      await deleteDoc(doc(db, collectionName, itemId));
+      setActionMessage(`${label.charAt(0).toUpperCase()}${label.slice(1)} excluído com sucesso.`);
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "excluir o lançamento"));
+    }
+  }
+
+  async function handleUpdateResourceItem(item, updatedData) {
+    if (!ensureCanManageData()) return;
+
+    const quantity = Number(String(updatedData.quantity).replace(",", "."));
+    const unitValue = Number(String(updatedData.unitValue).replace(",", "."));
+    const isMarket = item.kind === "market";
+    const date = isMarket ? updatedData.purchasedAt : updatedData.paidAt;
+    const location = isMarket ? updatedData.market : updatedData.place;
+
+    if (!location.trim() || !updatedData.product.trim() || !date) {
+      throw new Error("Preencha local, produto e data.");
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue <= 0) {
+      throw new Error("Informe quantidade e valor válidos.");
+    }
+
+    const collectionName = isMarket ? "marketItems" : "otherPayments";
+    const fields = {
+      product: updatedData.product.trim(),
+      quantity,
+      unitValue: roundMoney(unitValue),
+      totalValue: roundMoney(quantity * unitValue),
+      monthKey: monthFromDate(date),
+      updatedBy: profile.id,
+      updatedAt: serverTimestamp(),
+    };
+    if (isMarket) {
+      fields.market = updatedData.market.trim();
+      fields.description = updatedData.description.trim();
+      fields.purchasedAt = date;
+    } else {
+      fields.place = updatedData.place.trim();
+      fields.paymentMethod = updatedData.paymentMethod;
+      fields.paidAt = date;
+    }
+
+    await updateDoc(doc(db, collectionName, item.id), fields);
+    setSelectedMonth(monthFromDate(date));
+    setEditingResourceItem(null);
+    setActionMessage("Lançamento atualizado com sucesso.");
   }
 
   function toggleParticipant(personId) {
@@ -1449,6 +1511,8 @@ function App() {
             selectedMonth={selectedMonth}
             onMarketChange={(field, value) => setMarketForm((current) => ({ ...current, [field]: value }))}
             onOtherPaymentChange={(field, value) => setOtherPaymentForm((current) => ({ ...current, [field]: value }))}
+            onEditMarketItem={(item) => setEditingResourceItem({ ...item, kind: "market" })}
+            onEditOtherPayment={(item) => setEditingResourceItem({ ...item, kind: "other-payments" })}
             onDeleteMarketItem={(itemId) => handleDeleteResourceItem("marketItems", itemId, "este item")}
             onDeleteOtherPayment={(itemId) => handleDeleteResourceItem("otherPayments", itemId, "este pagamento")}
             onMonthChange={setSelectedMonth}
@@ -1511,6 +1575,14 @@ function App() {
           expense={editingExpense}
           onClose={() => setEditingExpense(null)}
           onSave={handleUpdateExpense}
+        />
+      )}
+
+      {canManageData && editingResourceItem && (
+        <EditResourceItemModal
+          item={editingResourceItem}
+          onClose={() => setEditingResourceItem(null)}
+          onSave={handleUpdateResourceItem}
         />
       )}
     </main>
@@ -3201,6 +3273,8 @@ function OtherAccountsView({
   selectedMonth,
   onMarketChange,
   onOtherPaymentChange,
+  onEditMarketItem,
+  onEditOtherPayment,
   onDeleteMarketItem,
   onDeleteOtherPayment,
   onMonthChange,
@@ -3240,6 +3314,7 @@ function OtherAccountsView({
         kind={activeTab}
         selectedMonth={selectedMonth}
         onChange={isMarket ? onMarketChange : onOtherPaymentChange}
+        onEdit={isMarket ? onEditMarketItem : onEditOtherPayment}
         onDelete={isMarket ? onDeleteMarketItem : onDeleteOtherPayment}
         onMonthChange={onMonthChange}
         onSubmit={isMarket ? onMarketSubmit : onOtherPaymentSubmit}
@@ -3255,14 +3330,18 @@ function ResourceListView({
   kind,
   selectedMonth,
   onChange,
+  onEdit,
   onDelete,
   onMonthChange,
   onSubmit,
 }) {
   const isMarket = kind === "market";
   const monthlyItems = useMemo(
-    () => items.filter((item) => item.monthKey === selectedMonth),
-    [items, selectedMonth],
+    () => items.filter((item) => {
+      const itemDate = isMarket ? item.purchasedAt : item.paidAt;
+      return (item.monthKey || monthFromDate(itemDate)) === selectedMonth;
+    }),
+    [isMarket, items, selectedMonth],
   );
   const monthlyTotal = useMemo(
     () => monthlyItems.reduce((total, item) => roundMoney(total + Number(item.totalValue || 0)), 0),
@@ -3380,9 +3459,14 @@ function ResourceListView({
                   <td>{formatCurrency(item.unitValue)}</td>
                   <td><strong>{formatCurrency(item.totalValue)}</strong></td>
                   <td>
-                    <button className="icon-button danger-button" title="Excluir lançamento" type="button" onClick={() => onDelete(item.id)}>
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="resource-row-actions">
+                      <button className="icon-button" title="Editar lançamento" type="button" onClick={() => onEdit(item)}>
+                        <Pencil size={16} />
+                      </button>
+                      <button className="icon-button danger-button" title="Excluir lançamento" type="button" onClick={() => onDelete(item.id)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -3699,6 +3783,104 @@ function FixedExpensesView({ groups, selectedMonth }) {
           </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+function EditResourceItemModal({ item, onClose, onSave }) {
+  const isMarket = item.kind === "market";
+  const [form, setForm] = useState({
+    market: item.market || "",
+    place: item.place || "",
+    product: item.product || "",
+    description: item.description || "",
+    paymentMethod: item.paymentMethod || "Cartão",
+    quantity: item.quantity || "1",
+    unitValue: item.unitValue || "",
+    purchasedAt: item.purchasedAt || "",
+    paidAt: item.paidAt || "",
+  });
+  const [error, setError] = useState("");
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    try {
+      await onSave(item, form);
+    } catch (saveError) {
+      setError(saveError.message || "Não foi possível atualizar o lançamento.");
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="resource-edit-title">
+        <div className="section-heading">
+          <div>
+            <h2 id="resource-edit-title">Editar {isMarket ? "item de mercado" : "pagamento"}</h2>
+            <span>Altere os dados do lançamento</span>
+          </div>
+          <button className="icon-button" onClick={onClose} type="button" title="Fechar">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <label>
+              <span>{isMarket ? "Mercado" : "Local"}</span>
+              <input
+                value={isMarket ? form.market : form.place}
+                onChange={(event) => updateField(isMarket ? "market" : "place", event.target.value)}
+                required
+              />
+            </label>
+            <label>
+              <span>Data</span>
+              <input
+                type="date"
+                value={isMarket ? form.purchasedAt : form.paidAt}
+                onChange={(event) => updateField(isMarket ? "purchasedAt" : "paidAt", event.target.value)}
+                required
+              />
+            </label>
+            <label>
+              <span>Produto</span>
+              <input value={form.product} onChange={(event) => updateField("product", event.target.value)} required />
+            </label>
+            {isMarket ? (
+              <label>
+                <span>Descrição</span>
+                <input value={form.description} onChange={(event) => updateField("description", event.target.value)} />
+              </label>
+            ) : (
+              <label>
+                <span>Pagamento</span>
+                <select value={form.paymentMethod} onChange={(event) => updateField("paymentMethod", event.target.value)}>
+                  {PAYMENT_TYPES.map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </label>
+            )}
+            <label>
+              <span>Quantidade</span>
+              <input type="number" min="0.01" step="0.01" value={form.quantity} onChange={(event) => updateField("quantity", event.target.value)} required />
+            </label>
+            <label>
+              <span>Valor unitário (€)</span>
+              <input type="number" min="0.01" step="0.01" value={form.unitValue} onChange={(event) => updateField("unitValue", event.target.value)} required />
+            </label>
+          </div>
+          {error && <p className="form-error">{error}</p>}
+          <div className="modal-actions">
+            <button className="secondary-button" type="button" onClick={onClose}>Cancelar</button>
+            <button className="primary-button" type="submit"><Check size={18} /> Salvar alterações</button>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }
