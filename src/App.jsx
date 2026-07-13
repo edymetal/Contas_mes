@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   BarChart3,
+  AlertTriangle,
   Calendar,
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -10,13 +12,16 @@ import {
   Home,
   LogOut,
   Menu,
+  LoaderCircle,
   Pencil,
   Plus,
   ReceiptText,
   Settings,
   ShoppingCart,
+  Sparkles,
   SlidersHorizontal,
   Trash2,
+  Upload,
   UserRound,
   WalletCards,
   X,
@@ -38,6 +43,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
+import { analyzeMarketReceipt } from "./services/receiptAnalysis";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
 import packageInfo from "../package.json";
 
@@ -795,6 +801,94 @@ function App() {
     }
   }
 
+  async function handleCreateMarketReceipt(receipt) {
+    setMarketFormError("");
+    setActionMessage("");
+    if (!ensureCanManageData()) throw new Error("Sua conta não pode adicionar lançamentos.");
+
+    const market = String(receipt.market || "").trim();
+    const purchasedAt = String(receipt.purchasedAt || "");
+    const items = Array.isArray(receipt.items) ? receipt.items : [];
+    if (!market || !purchasedAt || !items.length) {
+      throw new Error("Confira o mercado, a data e pelo menos um produto.");
+    }
+    if (items.length > 400) {
+      throw new Error("A nota possui itens demais para uma única inclusão.");
+    }
+
+    const normalizedItems = items.map((item, index) => {
+      const product = String(item.product || "").trim();
+      const quantity = Number(String(item.quantity).replace(",", "."));
+      const totalValue = Number(String(item.totalValue).replace(",", "."));
+      let unitValue = Number(String(item.unitValue).replace(",", "."));
+      if (!Number.isFinite(unitValue) || unitValue <= 0) unitValue = totalValue / quantity;
+      if (!product || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(totalValue) || totalValue < 0) {
+        throw new Error(`Confira nome, quantidade e total do item ${index + 1}.`);
+      }
+      return {
+        product,
+        description: String(item.description || "").trim(),
+        quantity,
+        unit: String(item.unit || "un").trim() || "un",
+        unitValue: roundMoney(unitValue),
+        totalValue: roundMoney(totalValue),
+        discount: Math.max(0, roundMoney(item.discount)),
+        vatRate: Math.max(0, Number(item.vatRate) || 0),
+        confidence: Math.min(1, Math.max(0, Number(item.confidence) || 0)),
+      };
+    });
+
+    const batch = writeBatch(db);
+    const receiptRef = doc(collection(db, "marketReceipts"));
+    const receiptTotal = roundMoney(receipt.total || normalizedItems.reduce((sum, item) => sum + item.totalValue, 0));
+    const receiptMetadata = {
+      market,
+      address: String(receipt.address || "").trim(),
+      vatNumber: String(receipt.vatNumber || "").trim(),
+      receiptNumber: String(receipt.receiptNumber || "").trim(),
+      purchasedAt,
+      purchasedTime: String(receipt.purchasedTime || "").trim(),
+      paymentMethod: String(receipt.paymentMethod || "").trim(),
+      currency: String(receipt.currency || "EUR").trim().toUpperCase() || "EUR",
+      subtotal: Math.max(0, roundMoney(receipt.subtotal)),
+      discountTotal: Math.max(0, roundMoney(receipt.discountTotal)),
+      taxTotal: Math.max(0, roundMoney(receipt.taxTotal)),
+      total: receiptTotal,
+      confidence: Math.min(1, Math.max(0, Number(receipt.confidence) || 0)),
+      notes: String(receipt.notes || "").trim(),
+      itemCount: normalizedItems.length,
+      monthKey: monthFromDate(purchasedAt),
+      source: "gemini-receipt-import",
+      model: String(receipt.model || "gemini-3.5-flash"),
+      createdBy: profile.id,
+      createdAt: serverTimestamp(),
+    };
+    batch.set(receiptRef, receiptMetadata);
+
+    normalizedItems.forEach((item, itemIndex) => {
+      const itemRef = doc(collection(db, "marketItems"));
+      batch.set(itemRef, {
+        ...item,
+        market,
+        purchasedAt,
+        monthKey: monthFromDate(purchasedAt),
+        receiptId: receiptRef.id,
+        receiptItemIndex: itemIndex,
+        receiptNumber: receiptMetadata.receiptNumber,
+        createdBy: profile.id,
+        createdAt: serverTimestamp(),
+      });
+    });
+
+    try {
+      await batch.commit();
+      setSelectedMonth(monthFromDate(purchasedAt));
+      setActionMessage(`Nota conferida e ${normalizedItems.length} ${normalizedItems.length === 1 ? "item adicionado" : "itens adicionados"} com sucesso.`);
+    } catch (error) {
+      throw new Error(getFirebaseActionError(error, "salvar os itens da nota"));
+    }
+  }
+
   async function handleCreateOtherPayment(event) {
     event.preventDefault();
     setOtherPaymentFormError("");
@@ -1517,6 +1611,7 @@ function App() {
             onDeleteOtherPayment={(itemId) => handleDeleteResourceItem("otherPayments", itemId, "este pagamento")}
             onMonthChange={setSelectedMonth}
             onMarketSubmit={handleCreateMarketItem}
+            onMarketReceiptSubmit={handleCreateMarketReceipt}
             onOtherPaymentSubmit={handleCreateOtherPayment}
           />
         )}
@@ -3279,6 +3374,7 @@ function OtherAccountsView({
   onDeleteOtherPayment,
   onMonthChange,
   onMarketSubmit,
+  onMarketReceiptSubmit,
   onOtherPaymentSubmit,
 }) {
   const [activeTab, setActiveTab] = useState("market");
@@ -3318,7 +3414,237 @@ function OtherAccountsView({
         onDelete={isMarket ? onDeleteMarketItem : onDeleteOtherPayment}
         onMonthChange={onMonthChange}
         onSubmit={isMarket ? onMarketSubmit : onOtherPaymentSubmit}
+        onMarketReceiptSubmit={onMarketReceiptSubmit}
       />
+    </div>
+  );
+}
+
+function MarketReceiptImporter({ onConfirm }) {
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState("");
+  const [draft, setDraft] = useState(null);
+  const [preview, setPreview] = useState({ name: "", type: "", url: "" });
+
+  useEffect(() => () => {
+    if (preview.url) URL.revokeObjectURL(preview.url);
+  }, [preview.url]);
+
+  function clearImport() {
+    setDraft(null);
+    setError("");
+    setPreview({ name: "", type: "", url: "" });
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleSelectedFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setDraft(null);
+    setPreview({ name: file.name, type: file.type, url: URL.createObjectURL(file) });
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeMarketReceipt(file);
+      setDraft({
+        ...result,
+        purchasedAt: result.purchasedAt || todayInputValue(),
+        currency: result.currency || "EUR",
+      });
+    } catch (analysisError) {
+      setError(analysisError?.message || "Não foi possível analisar a nota fiscal.");
+    } finally {
+      setIsAnalyzing(false);
+      event.target.value = "";
+    }
+  }
+
+  return (
+    <>
+      <section className="panel receipt-import-panel">
+        <div className="receipt-import-copy">
+          <span className="receipt-import-icon"><Sparkles size={22} /></span>
+          <div>
+            <span className="eyebrow">Preenchimento automático</span>
+            <h2>Importar nota fiscal italiana</h2>
+            <p>Fotografe ou envie a nota. O Gemini identifica mercado, data, totais e todos os produtos para você conferir antes de adicionar.</p>
+          </div>
+        </div>
+        <div className="receipt-import-actions">
+          <input
+            ref={cameraInputRef}
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleSelectedFile}
+          />
+          <input
+            ref={fileInputRef}
+            className="visually-hidden"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={handleSelectedFile}
+          />
+          <button className="primary-button" type="button" disabled={isAnalyzing} onClick={() => cameraInputRef.current?.click()}>
+            <Camera size={18} /> Tirar foto
+          </button>
+          <button className="secondary-button" type="button" disabled={isAnalyzing} onClick={() => fileInputRef.current?.click()}>
+            <Upload size={18} /> Enviar arquivo
+          </button>
+        </div>
+        {isAnalyzing && (
+          <div className="receipt-analysis-status" role="status">
+            <LoaderCircle className="spin-icon" size={20} />
+            <div><strong>Lendo a nota em italiano…</strong><span>Identificando dados fiscais, valores e produtos.</span></div>
+          </div>
+        )}
+        {error && <p className="form-error receipt-import-error">{error}</p>}
+      </section>
+
+      {draft && (
+        <ReceiptReviewModal
+          draft={draft}
+          preview={preview}
+          onChange={setDraft}
+          onClose={clearImport}
+          onConfirm={async (receipt) => {
+            await onConfirm(receipt);
+            clearImport();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const itemsTotal = useMemo(
+    () => roundMoney(draft.items.reduce((sum, item) => sum + Number(String(item.totalValue || 0).replace(",", ".")), 0)),
+    [draft.items],
+  );
+  const receiptTotal = Number(String(draft.total || 0).replace(",", "."));
+  const difference = roundMoney(itemsTotal - receiptTotal);
+
+  function updateField(field, value) {
+    onChange((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateItem(index, field, value) {
+    onChange((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
+    }));
+  }
+
+  function removeItem(index) {
+    onChange((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      await onConfirm(draft);
+    } catch (error) {
+      setSaveError(error?.message || "Não foi possível adicionar os itens.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop receipt-review-backdrop" role="presentation">
+      <section className="modal receipt-review-modal" role="dialog" aria-modal="true" aria-labelledby="receipt-review-title">
+        <div className="section-heading receipt-review-heading">
+          <div>
+            <span className="eyebrow">Conferência obrigatória</span>
+            <h2 id="receipt-review-title">Confira os dados da nota</h2>
+            <span>Edite qualquer informação que não corresponda ao documento.</span>
+          </div>
+          <button className="icon-button" onClick={onClose} type="button" title="Fechar"><X size={20} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="receipt-review-layout">
+            <aside className="receipt-preview-pane">
+              {preview.type === "application/pdf" ? (
+                <object data={preview.url} type="application/pdf" aria-label="Prévia da nota fiscal">
+                  <p>Prévia do PDF indisponível.</p>
+                </object>
+              ) : (
+                <img src={preview.url} alt="Nota fiscal selecionada para conferência" />
+              )}
+              <small title={preview.name}>{preview.name}</small>
+            </aside>
+
+            <div className="receipt-data-pane">
+              <div className="form-grid receipt-metadata-grid">
+                <label>Mercado<input value={draft.market} onChange={(event) => updateField("market", event.target.value)} required /></label>
+                <label>Data<input type="date" value={draft.purchasedAt} onChange={(event) => updateField("purchasedAt", event.target.value)} required /></label>
+                <label>Horário<input type="time" value={draft.purchasedTime} onChange={(event) => updateField("purchasedTime", event.target.value)} /></label>
+                <label>Nº da nota<input value={draft.receiptNumber} onChange={(event) => updateField("receiptNumber", event.target.value)} /></label>
+                <label className="receipt-wide-field">Endereço<input value={draft.address} onChange={(event) => updateField("address", event.target.value)} /></label>
+                <label>Partita IVA<input value={draft.vatNumber} onChange={(event) => updateField("vatNumber", event.target.value)} /></label>
+                <label>Pagamento<input value={draft.paymentMethod} onChange={(event) => updateField("paymentMethod", event.target.value)} /></label>
+              </div>
+
+              <div className="receipt-totals-grid">
+                <label>Subtotal (€)<input type="number" min="0" step="0.01" value={draft.subtotal} onChange={(event) => updateField("subtotal", event.target.value)} /></label>
+                <label>Descontos (€)<input type="number" min="0" step="0.01" value={draft.discountTotal} onChange={(event) => updateField("discountTotal", event.target.value)} /></label>
+                <label>IVA (€)<input type="number" min="0" step="0.01" value={draft.taxTotal} onChange={(event) => updateField("taxTotal", event.target.value)} /></label>
+                <label className="receipt-grand-total">Total da nota (€)<input type="number" min="0" step="0.01" value={draft.total} onChange={(event) => updateField("total", event.target.value)} required /></label>
+              </div>
+            </div>
+          </div>
+
+          <div className="receipt-items-heading">
+            <div><h3>Produtos identificados</h3><span>{draft.items.length} {draft.items.length === 1 ? "item" : "itens"}</span></div>
+            <strong>{formatCurrency(itemsTotal)}</strong>
+          </div>
+
+          {Math.abs(difference) > 0.02 && (
+            <div className="receipt-warning"><AlertTriangle size={18} /><span>A soma dos itens difere do total da nota em {formatCurrency(Math.abs(difference))}. Confira descontos e valores.</span></div>
+          )}
+          {draft.notes && <div className="receipt-ai-note"><strong>Observação da leitura:</strong> {draft.notes}</div>}
+
+          <div className="receipt-review-table-wrap">
+            <table className="receipt-review-table">
+              <thead><tr><th>Produto (italiano)</th><th>Descrição</th><th>Qtd.</th><th>Un.</th><th>Unitário</th><th>Desconto</th><th>Total</th><th /></tr></thead>
+              <tbody>
+                {draft.items.map((item, index) => (
+                  <tr key={index}>
+                    <td><input aria-label={`Produto ${index + 1}`} value={item.product} onChange={(event) => updateItem(index, "product", event.target.value)} required /></td>
+                    <td><input aria-label={`Descrição ${index + 1}`} value={item.description} onChange={(event) => updateItem(index, "description", event.target.value)} /></td>
+                    <td><input aria-label={`Quantidade ${index + 1}`} type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => updateItem(index, "quantity", event.target.value)} required /></td>
+                    <td><input aria-label={`Unidade ${index + 1}`} value={item.unit} onChange={(event) => updateItem(index, "unit", event.target.value)} /></td>
+                    <td><input aria-label={`Valor unitário ${index + 1}`} type="number" min="0" step="0.01" value={item.unitValue} onChange={(event) => updateItem(index, "unitValue", event.target.value)} required /></td>
+                    <td><input aria-label={`Desconto ${index + 1}`} type="number" min="0" step="0.01" value={item.discount} onChange={(event) => updateItem(index, "discount", event.target.value)} /></td>
+                    <td><input aria-label={`Total ${index + 1}`} type="number" min="0" step="0.01" value={item.totalValue} onChange={(event) => updateItem(index, "totalValue", event.target.value)} required /></td>
+                    <td><button className="icon-button danger-button" type="button" title="Remover item" onClick={() => removeItem(index)}><Trash2 size={16} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!draft.items.length && <div className="empty-state">Todos os itens foram removidos. Analise a nota novamente.</div>}
+          </div>
+
+          {saveError && <p className="form-error">{saveError}</p>}
+          <div className="modal-actions receipt-review-actions">
+            <button className="secondary-button" type="button" onClick={onClose} disabled={isSaving}>Cancelar</button>
+            <button className="primary-button" type="submit" disabled={isSaving || !draft.items.length}>
+              {isSaving ? <LoaderCircle className="spin-icon" size={18} /> : <Check size={18} />}
+              {isSaving ? "Adicionando…" : `Conferi e adicionar ${draft.items.length} itens`}
+            </button>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }
@@ -3333,6 +3659,7 @@ function ResourceListView({
   onEdit,
   onDelete,
   onMonthChange,
+  onMarketReceiptSubmit,
   onSubmit,
 }) {
   const isMarket = kind === "market";
@@ -3354,6 +3681,8 @@ function ResourceListView({
 
   return (
     <div className="resource-page">
+      {isMarket && <MarketReceiptImporter onConfirm={onMarketReceiptSubmit} />}
+
       <section className="panel resource-form-panel">
         <div className="section-heading">
           <div>

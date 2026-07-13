@@ -21,6 +21,10 @@ service cloud.firestore {
       allow read, create, update, delete: if edneyEmail();
     }
 
+    match /marketReceipts/{receiptId} {
+      allow read, create, update, delete: if edneyEmail();
+    }
+
     match /otherPayments/{paymentId} {
       allow read, create, update, delete: if edneyEmail();
     }

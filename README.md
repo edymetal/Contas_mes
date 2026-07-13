@@ -28,6 +28,27 @@ npm install
 npm run dev
 ```
 
+## Leitura de notas fiscais com Gemini
+
+O fluxo **Outras Contas > Mercado** aceita fotos JPG/PNG/WebP e notas em PDF. A leitura usa o modelo `gemini-3.5-flash` em uma Cloud Function autenticada; a chave nunca deve ser adicionada a uma variavel `VITE_*` ou ao codigo do navegador.
+
+Configure e publique o backend uma vez:
+
+```bash
+npx firebase-tools login
+npx firebase-tools use SEU_PROJECT_ID
+npx firebase-tools functions:secrets:set GEMINI_API_KEY
+npx firebase-tools deploy --only functions:analyzeMarketReceipt,firestore:rules
+```
+
+O comando de secret solicita a chave de forma interativa. Use uma chave exclusiva, restrita a Gemini API, e nao grave a chave em `.env`, GitHub Secrets usados pelo frontend ou arquivos versionados.
+
+Para testar a funcao localmente, instale tambem as dependencias do backend:
+
+```bash
+npm install --prefix functions
+```
+
 ## Publicar no GitHub Pages
 
 O projeto esta preparado para build estatico com Vite. No GitHub:
@@ -38,3 +59,5 @@ O projeto esta preparado para build estatico com Vite. No GitHub:
 4. Faca push para a branch `main`.
 
 O workflow `.github/workflows/deploy.yml` gera a pasta `dist` e publica no GitHub Pages.
+
+O deploy do GitHub Pages publica apenas o frontend. Quando houver alteracoes em `functions/` ou `firestore.rules`, publique-as com o comando Firebase acima.
