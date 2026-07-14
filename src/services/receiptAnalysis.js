@@ -145,12 +145,20 @@ function normalizeReceipt(receipt) {
   };
 }
 
-function getApiErrorMessage(status, details = "") {
-  if (status === 400) return "O Gemini não conseguiu processar este arquivo. Tente uma foto mais nítida e completa.";
-  if (status === 401 || status === 403) return "A chave Gemini é inválida ou não tem acesso ao modelo. Confira a chave e as restrições da API.";
+function getApiErrorMessage(status, error = {}) {
+  const details = String(error?.message || "").trim();
+  const reason = error?.details?.find((item) => item?.reason)?.reason || "";
+  if (reason === "API_KEY_INVALID" || /api key not valid|invalid api key/i.test(details)) {
+    return "A chave Gemini é inválida. Crie uma nova chave no Google AI Studio e configure-a novamente.";
+  }
+  if (status === 401 || status === 403) return "A chave Gemini não tem acesso ao modelo. Confira a chave e as restrições da API.";
   if (status === 404) return `O modelo ${MODEL} não está disponível para esta chave.`;
   if (status === 429) return "O limite gratuito do Gemini foi atingido. Aguarde a renovação da cota e tente novamente.";
   if (status >= 500) return "O Gemini está temporariamente indisponível. Tente novamente em alguns instantes.";
+  if (status === 400 && /image|inline.?data|mime.?type|document|pdf/i.test(details)) {
+    return "O Gemini não conseguiu processar este arquivo. Tente outra foto ou um arquivo com formato diferente.";
+  }
+  if (status === 400 && details) return `O Gemini rejeitou a solicitação: ${details}`;
   return details || "Não foi possível ler a nota agora. Tente novamente.";
 }
 
@@ -171,7 +179,7 @@ async function requestGemini(path, apiKey, options = {}) {
 
   const responseBody = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(response.status, responseBody?.error?.message));
+    throw new Error(getApiErrorMessage(response.status, responseBody?.error));
   }
   return responseBody;
 }
@@ -226,7 +234,7 @@ export async function analyzeMarketReceipt(file, apiKey) {
         temperature: 0.1,
         responseFormat: {
           text: {
-            mimeType: "application/json",
+            mimeType: "APPLICATION_JSON",
             schema: receiptSchema,
           },
         },
