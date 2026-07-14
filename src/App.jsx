@@ -951,6 +951,37 @@ function App() {
     }
   }
 
+  async function handleDeleteResourceMonth(collectionName, items, listLabel) {
+    if (!ensureCanManageData()) return false;
+    if (!items.length) return false;
+
+    const monthLabel = formatMonthLabel(selectedMonth);
+    const itemLabel = items.length === 1 ? "lançamento" : "lançamentos";
+    const confirmed = window.confirm(
+      `Apagar permanentemente ${items.length} ${itemLabel} de ${listLabel} em ${monthLabel}?\n\nEsta ação não pode ser desfeita.`,
+    );
+    if (!confirmed) return false;
+
+    try {
+      const deletionTargets = items.map((item) => doc(db, collectionName, item.id));
+      if (collectionName === "marketItems") {
+        const receiptIds = new Set(items.map((item) => item.receiptId).filter(Boolean));
+        receiptIds.forEach((receiptId) => deletionTargets.push(doc(db, "marketReceipts", receiptId)));
+      }
+
+      for (let index = 0; index < deletionTargets.length; index += 450) {
+        const batch = writeBatch(db);
+        deletionTargets.slice(index, index + 450).forEach((target) => batch.delete(target));
+        await batch.commit();
+      }
+      setActionMessage(`${items.length} ${itemLabel} de ${monthLabel} excluído${items.length === 1 ? "" : "s"} com sucesso.`);
+      return true;
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "apagar a lista do mês"));
+      return false;
+    }
+  }
+
   async function handleUpdateResourceItem(item, updatedData) {
     if (!ensureCanManageData()) return;
 
@@ -1622,6 +1653,8 @@ function App() {
             onEditOtherPayment={(item) => setEditingResourceItem({ ...item, kind: "other-payments" })}
             onDeleteMarketItem={(itemId) => handleDeleteResourceItem("marketItems", itemId, "este item")}
             onDeleteOtherPayment={(itemId) => handleDeleteResourceItem("otherPayments", itemId, "este pagamento")}
+            onDeleteMarketMonth={(items) => handleDeleteResourceMonth("marketItems", items, "Mercado")}
+            onDeleteOtherPaymentMonth={(items) => handleDeleteResourceMonth("otherPayments", items, "Outros pagamentos")}
             onMonthChange={setSelectedMonth}
             onMarketSubmit={handleCreateMarketItem}
             onMarketReceiptSubmit={handleCreateMarketReceipt}
@@ -3385,6 +3418,8 @@ function OtherAccountsView({
   onEditOtherPayment,
   onDeleteMarketItem,
   onDeleteOtherPayment,
+  onDeleteMarketMonth,
+  onDeleteOtherPaymentMonth,
   onMonthChange,
   onMarketSubmit,
   onMarketReceiptSubmit,
@@ -3425,6 +3460,7 @@ function OtherAccountsView({
         onChange={isMarket ? onMarketChange : onOtherPaymentChange}
         onEdit={isMarket ? onEditMarketItem : onEditOtherPayment}
         onDelete={isMarket ? onDeleteMarketItem : onDeleteOtherPayment}
+        onDeleteMonth={isMarket ? onDeleteMarketMonth : onDeleteOtherPaymentMonth}
         onMonthChange={onMonthChange}
         onSubmit={isMarket ? onMarketSubmit : onOtherPaymentSubmit}
         onMarketReceiptSubmit={onMarketReceiptSubmit}
@@ -3778,11 +3814,13 @@ function ResourceListView({
   onChange,
   onEdit,
   onDelete,
+  onDeleteMonth,
   onMonthChange,
   onMarketReceiptSubmit,
   onSubmit,
 }) {
   const isMarket = kind === "market";
+  const [isDeletingMonth, setIsDeletingMonth] = useState(false);
   const monthlyItems = useMemo(
     () => items.filter((item) => {
       const itemDate = isMarket ? item.purchasedAt : item.paidAt;
@@ -3798,6 +3836,15 @@ function ResourceListView({
     Number(String(form.quantity || 0).replace(",", ".")) * Number(String(form.unitValue || 0).replace(",", ".")),
   );
   const dateField = isMarket ? "purchasedAt" : "paidAt";
+
+  async function handleDeleteMonth() {
+    setIsDeletingMonth(true);
+    try {
+      await onDeleteMonth(monthlyItems);
+    } finally {
+      setIsDeletingMonth(false);
+    }
+  }
 
   return (
     <div className="resource-page">
@@ -3863,18 +3910,29 @@ function ResourceListView({
             <span className="eyebrow">Controle mensal</span>
             <h2>{formatMonthLabel(selectedMonth)}</h2>
           </div>
-          <div className="resource-month-controls">
-            <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, -1))} title="Mês anterior" type="button">
-              <ChevronLeft size={18} />
+          <div className="resource-list-actions">
+            <button
+              className="resource-delete-month-button"
+              type="button"
+              disabled={!monthlyItems.length || isDeletingMonth}
+              onClick={handleDeleteMonth}
+            >
+              {isDeletingMonth ? <LoaderCircle className="spin-icon" size={17} /> : <Trash2 size={17} />}
+              {isDeletingMonth ? "Apagando…" : "Apagar lista do mês"}
             </button>
-            <label className="month-filter">
-              <Calendar size={18} />
-              <span aria-hidden="true">{formatMonthName(selectedMonth)}</span>
-              <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
-            </label>
-            <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, 1))} title="Próximo mês" type="button">
-              <ChevronRight size={18} />
-            </button>
+            <div className="resource-month-controls">
+              <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, -1))} title="Mês anterior" type="button">
+                <ChevronLeft size={18} />
+              </button>
+              <label className="month-filter">
+                <Calendar size={18} />
+                <span aria-hidden="true">{formatMonthName(selectedMonth)}</span>
+                <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
+              </label>
+              <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, 1))} title="Próximo mês" type="button">
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
         </div>
 

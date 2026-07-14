@@ -2192,6 +2192,38 @@ textarea:focus {
   gap: 8px;
 }
 
+.resource-list-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.resource-delete-month-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger);
+  font-weight: 750;
+}
+
+.resource-delete-month-button:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+.resource-delete-month-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .resource-form-panel h2,
 .resource-list-panel h2 {
   margin: 5px 0 0;
@@ -3266,6 +3298,24 @@ textarea:focus {
 }
 
 @media (max-width: 680px) {
+  .resource-list-actions,
+  .resource-month-controls {
+    width: 100%;
+  }
+
+  .resource-month-controls {
+    order: 1;
+  }
+
+  .resource-month-controls .month-filter {
+    flex: 1;
+  }
+
+  .resource-delete-month-button {
+    order: 2;
+    width: 100%;
+  }
+
   .receipt-import-copy {
     align-items: center;
   }
