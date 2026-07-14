@@ -3540,7 +3540,6 @@ function OtherAccountsView({
           marketItems={marketItems}
           otherPayments={otherPayments}
           selectedMonth={selectedMonth}
-          onMonthChange={onMonthChange}
         />
       ) : (
         <ResourceListView
@@ -3562,7 +3561,7 @@ function OtherAccountsView({
   );
 }
 
-function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onMonthChange }) {
+function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth }) {
   const selectedYear = selectedMonth.slice(0, 4);
   const dashboard = useMemo(() => {
     const marketYearItems = marketItems.filter((item) => (
@@ -3641,7 +3640,6 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
             <h2>Resumo anual de {selectedYear}</h2>
             <p>Totais do ano para Mercado e Outros pagamentos.</p>
           </div>
-          <ResourceMonthSwitcher selectedMonth={selectedMonth} onMonthChange={onMonthChange} />
         </div>
         <div className="other-dashboard-total">
           <span>Total combinado em {selectedYear}</span>
