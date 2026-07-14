@@ -3425,12 +3425,22 @@ function OtherAccountsView({
   onMarketReceiptSubmit,
   onOtherPaymentSubmit,
 }) {
-  const [activeTab, setActiveTab] = useState("market");
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const isDashboard = activeTab === "dashboard";
   const isMarket = activeTab === "market";
 
   return (
     <div className="other-accounts-page">
       <div className="resource-tabs" role="tablist" aria-label="Tipo de lançamento">
+        <button
+          className={isDashboard ? "resource-tab active" : "resource-tab"}
+          onClick={() => setActiveTab("dashboard")}
+          role="tab"
+          type="button"
+          aria-selected={isDashboard}
+        >
+          <BarChart3 size={18} /> Painel
+        </button>
         <button
           className={isMarket ? "resource-tab active" : "resource-tab"}
           onClick={() => setActiveTab("market")}
@@ -3441,7 +3451,7 @@ function OtherAccountsView({
           <ShoppingCart size={18} /> Mercado
         </button>
         <button
-          className={!isMarket ? "resource-tab active" : "resource-tab"}
+          className={activeTab === "other-payments" ? "resource-tab active" : "resource-tab"}
           onClick={() => setActiveTab("other-payments")}
           role="tab"
           type="button"
@@ -3451,20 +3461,183 @@ function OtherAccountsView({
         </button>
       </div>
 
-      <ResourceListView
-        form={isMarket ? marketForm : otherPaymentForm}
-        formError={isMarket ? marketFormError : otherPaymentFormError}
-        items={isMarket ? marketItems : otherPayments}
-        kind={activeTab}
-        selectedMonth={selectedMonth}
-        onChange={isMarket ? onMarketChange : onOtherPaymentChange}
-        onEdit={isMarket ? onEditMarketItem : onEditOtherPayment}
-        onDelete={isMarket ? onDeleteMarketItem : onDeleteOtherPayment}
-        onDeleteMonth={isMarket ? onDeleteMarketMonth : onDeleteOtherPaymentMonth}
-        onMonthChange={onMonthChange}
-        onSubmit={isMarket ? onMarketSubmit : onOtherPaymentSubmit}
-        onMarketReceiptSubmit={onMarketReceiptSubmit}
-      />
+      {isDashboard ? (
+        <OtherAccountsDashboard
+          marketItems={marketItems}
+          otherPayments={otherPayments}
+          selectedMonth={selectedMonth}
+          onMonthChange={onMonthChange}
+        />
+      ) : (
+        <ResourceListView
+          form={isMarket ? marketForm : otherPaymentForm}
+          formError={isMarket ? marketFormError : otherPaymentFormError}
+          items={isMarket ? marketItems : otherPayments}
+          kind={activeTab}
+          selectedMonth={selectedMonth}
+          onChange={isMarket ? onMarketChange : onOtherPaymentChange}
+          onEdit={isMarket ? onEditMarketItem : onEditOtherPayment}
+          onDelete={isMarket ? onDeleteMarketItem : onDeleteOtherPayment}
+          onDeleteMonth={isMarket ? onDeleteMarketMonth : onDeleteOtherPaymentMonth}
+          onMonthChange={onMonthChange}
+          onSubmit={isMarket ? onMarketSubmit : onOtherPaymentSubmit}
+          onMarketReceiptSubmit={onMarketReceiptSubmit}
+        />
+      )}
+    </div>
+  );
+}
+
+function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onMonthChange }) {
+  const dashboard = useMemo(() => {
+    const marketMonthItems = marketItems.filter((item) => (
+      item.monthKey || monthFromDate(item.purchasedAt)
+    ) === selectedMonth);
+    const otherMonthItems = otherPayments.filter((item) => (
+      item.monthKey || monthFromDate(item.paidAt)
+    ) === selectedMonth);
+    const marketTotal = roundMoney(marketMonthItems.reduce((sum, item) => sum + Number(item.totalValue || 0), 0));
+    const otherTotal = roundMoney(otherMonthItems.reduce((sum, item) => sum + Number(item.totalValue || 0), 0));
+    const total = roundMoney(marketTotal + otherTotal);
+    const count = marketMonthItems.length + otherMonthItems.length;
+    const locations = new Map();
+
+    marketMonthItems.forEach((item) => {
+      const label = String(item.market || "Mercado não informado").trim();
+      const key = `market:${label.toLowerCase()}`;
+      const current = locations.get(key) || { label, kind: "Mercado", total: 0, count: 0 };
+      current.total = roundMoney(current.total + Number(item.totalValue || 0));
+      current.count += 1;
+      locations.set(key, current);
+    });
+    otherMonthItems.forEach((item) => {
+      const label = String(item.place || "Local não informado").trim();
+      const key = `other:${label.toLowerCase()}`;
+      const current = locations.get(key) || { label, kind: "Outros", total: 0, count: 0 };
+      current.total = roundMoney(current.total + Number(item.totalValue || 0));
+      current.count += 1;
+      locations.set(key, current);
+    });
+
+    return {
+      total,
+      count,
+      average: count ? roundMoney(total / count) : 0,
+      market: {
+        total: marketTotal,
+        count: marketMonthItems.length,
+        percent: total ? (marketTotal / total) * 100 : 0,
+        locations: new Set(marketMonthItems.map((item) => item.market).filter(Boolean)).size,
+      },
+      other: {
+        total: otherTotal,
+        count: otherMonthItems.length,
+        percent: total ? (otherTotal / total) * 100 : 0,
+        locations: new Set(otherMonthItems.map((item) => item.place).filter(Boolean)).size,
+      },
+      topLocations: [...locations.values()].sort((a, b) => b.total - a.total).slice(0, 5),
+    };
+  }, [marketItems, otherPayments, selectedMonth]);
+
+  const largestLocationTotal = dashboard.topLocations[0]?.total || 0;
+
+  return (
+    <div className="other-dashboard">
+      <section className="panel other-dashboard-hero">
+        <div className="other-dashboard-toolbar">
+          <div>
+            <span className="eyebrow">Visão consolidada</span>
+            <h2>Resumo de {formatMonthName(selectedMonth)}</h2>
+            <p>Mercado e Outros pagamentos no mesmo painel.</p>
+          </div>
+          <div className="resource-month-controls">
+            <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, -1))} title="Mês anterior" type="button">
+              <ChevronLeft size={18} />
+            </button>
+            <label className="month-filter">
+              <Calendar size={18} />
+              <span aria-hidden="true">{formatMonthName(selectedMonth)}</span>
+              <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
+            </label>
+            <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, 1))} title="Próximo mês" type="button">
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="other-dashboard-total">
+          <span>Total combinado</span>
+          <strong>{formatCurrency(dashboard.total)}</strong>
+          <small>{dashboard.count} {dashboard.count === 1 ? "lançamento" : "lançamentos"} • média de {formatCurrency(dashboard.average)}</small>
+        </div>
+      </section>
+
+      <div className="other-dashboard-summary-grid">
+        <article className="panel other-dashboard-type-card market">
+          <div className="other-dashboard-card-heading">
+            <span className="other-dashboard-type-icon"><ShoppingCart size={21} /></span>
+            <div><span>Mercado</span><small>{dashboard.market.percent.toFixed(0)}% do total</small></div>
+          </div>
+          <strong>{formatCurrency(dashboard.market.total)}</strong>
+          <div className="other-dashboard-card-meta">
+            <span>{dashboard.market.count} itens</span>
+            <span>{dashboard.market.locations} mercados</span>
+          </div>
+        </article>
+
+        <article className="panel other-dashboard-type-card other">
+          <div className="other-dashboard-card-heading">
+            <span className="other-dashboard-type-icon"><WalletCards size={21} /></span>
+            <div><span>Outros pagamentos</span><small>{dashboard.other.percent.toFixed(0)}% do total</small></div>
+          </div>
+          <strong>{formatCurrency(dashboard.other.total)}</strong>
+          <div className="other-dashboard-card-meta">
+            <span>{dashboard.other.count} lançamentos</span>
+            <span>{dashboard.other.locations} locais</span>
+          </div>
+        </article>
+      </div>
+
+      <div className="other-dashboard-detail-grid">
+        <section className="panel other-dashboard-distribution">
+          <div className="section-heading">
+            <div><span className="eyebrow">Distribuição</span><h3>Participação no mês</h3></div>
+          </div>
+          {[
+            { label: "Mercado", value: dashboard.market.total, percent: dashboard.market.percent, className: "market" },
+            { label: "Outros pagamentos", value: dashboard.other.total, percent: dashboard.other.percent, className: "other" },
+          ].map((row) => (
+            <div className="other-dashboard-distribution-row" key={row.label}>
+              <div><span>{row.label}</span><strong>{formatCurrency(row.value)}</strong></div>
+              <div className="other-dashboard-progress" aria-label={`${row.label}: ${row.percent.toFixed(0)}%`}>
+                <span className={row.className} style={{ width: `${row.percent}%` }} />
+              </div>
+            </div>
+          ))}
+          {!dashboard.count && <div className="empty-state compact">Nenhum lançamento neste mês.</div>}
+        </section>
+
+        <section className="panel other-dashboard-locations">
+          <div className="section-heading">
+            <div><span className="eyebrow">Maiores gastos</span><h3>Principais locais</h3></div>
+          </div>
+          {dashboard.topLocations.length ? (
+            <div className="other-dashboard-location-list">
+              {dashboard.topLocations.map((location) => (
+                <div className="other-dashboard-location" key={`${location.kind}-${location.label}`}>
+                  <div className="other-dashboard-location-copy">
+                    <strong>{location.label}</strong>
+                    <span>{location.kind} • {location.count} {location.count === 1 ? "lançamento" : "lançamentos"}</span>
+                  </div>
+                  <strong>{formatCurrency(location.total)}</strong>
+                  <div className="other-dashboard-location-bar"><span style={{ width: `${largestLocationTotal ? (location.total / largestLocationTotal) * 100 : 0}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state compact">Nenhum local para exibir.</div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
