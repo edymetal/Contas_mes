@@ -27,7 +27,7 @@ const receiptSchema = {
         type: "object",
         properties: {
           product: { type: "string", description: "Nome do produto exatamente como impresso em italiano" },
-          description: { type: "string", description: "Descrição curta do produto em português" },
+          description: { type: "string", description: "Categoria genérica em português com 1 palavra ou, no máximo, 2 palavras" },
           quantity: { type: "number", description: "Quantidade ou peso comprado; use 1 quando não indicado" },
           unit: { type: "string", description: "Unidade, como un, kg ou l" },
           unitValue: { type: "number", description: "Preço por unidade/peso; use o total da linha se não indicado" },
@@ -50,7 +50,9 @@ const prompt = `Analise integralmente esta nota fiscal/scontrino de supermercado
 Extraia todos os produtos e os dados fiscais visíveis. Não invente informações ilegíveis ou ausentes.
 Regras importantes:
 - preserve o nome original italiano de cada produto em product;
-- escreva apenas uma tradução/explicação curta em português em description;
+- em description, escreva somente a categoria genérica do produto em português, com 1 palavra ou, no máximo, 2 palavras;
+- não repita marca, sabor, peso, volume, quantidade ou tamanho em description;
+- use categorias simples e consistentes, por exemplo: Leite, Pães, Salsicha, Cerveja, Biscoitos, Chocolates, Salgadinhos, Açúcar, Papel Higiênico, Taxas/Sacolas, Café e Detergente;
 - converta vírgulas decimais italianas para números JSON;
 - diferencie quantidade/peso, preço unitário, desconto e total final da linha;
 - datas devem usar YYYY-MM-DD e horários HH:mm;
@@ -105,6 +107,44 @@ function roundMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+const receiptCategoryRules = [
+  [/shopper|sacchett|borsa bio/, "Taxas/Sacolas"],
+  [/birra|cerveja/, "Cerveja"],
+  [/wurstel|salsicc/, "Salsicha"],
+  [/biscott/, "Biscoitos"],
+  [/cioccol|snicker|\bmars\b/, "Chocolates"],
+  [/patatin|salgadinh/, "Salgadinhos"],
+  [/zuccher|acucar/, "Açúcar"],
+  [/igienic/, "Papel Higiênico"],
+  [/caffe|cafe/, "Café"],
+  [/deters|deterg|lavapiatt/, "Detergente"],
+  [/\blatte\b|\bleite\b/, "Leite"],
+  [/salumer|prosciutt|salame|mortadell|\bfrios\b|embutid/, "Frios"],
+  [/pane|panin|baguette|sfornasole|\bpao\b|\bpaes\b/, "Pães"],
+  [/formaggi|formaggio|mozzarell|queijo/, "Queijos"],
+  [/yogurt|iogurte/, "Iogurte"],
+  [/\buova\b|\bovo|ovos/, "Ovos"],
+  [/\briso\b|arroz/, "Arroz"],
+  [/pasta|spaghetti|penne|macarrao/, "Massas"],
+  [/\bpollo\b|frango/, "Frango"],
+  [/\bacqua\b|\bagua\b/, "Água"],
+];
+
+export function normalizeReceiptCategory(product, description) {
+  const normalizedSource = `${product || ""} ${description || ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const matchedCategory = receiptCategoryRules.find(([pattern]) => pattern.test(normalizedSource));
+  if (matchedCategory) return matchedCategory[1];
+
+  const words = String(description || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 2) return words.join(" ");
+  const connectors = new Set(["a", "as", "com", "da", "das", "de", "do", "dos", "e", "em", "para"]);
+  const meaningfulWords = words.filter((word) => !connectors.has(word.toLowerCase()));
+  return (meaningfulWords.length ? meaningfulWords : words).slice(0, 2).join(" ");
+}
+
 function normalizeReceipt(receipt) {
   const normalizedItems = (Array.isArray(receipt.items) ? receipt.items : [])
     .filter((item) => item && String(item.product || "").trim())
@@ -114,7 +154,7 @@ function normalizeReceipt(receipt) {
       const unitValue = Number(item.unitValue) > 0 ? roundMoney(item.unitValue) : roundMoney(totalValue / quantity);
       return {
         product: String(item.product).trim(),
-        description: String(item.description || "").trim(),
+        description: normalizeReceiptCategory(item.product, item.description),
         quantity,
         unit: String(item.unit || "un").trim() || "un",
         unitValue,
