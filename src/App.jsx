@@ -186,13 +186,19 @@ function capitalizeFirst(value) {
 
 function formatMonthLabel(monthKey) {
   if (!monthKey) return "Sem mes";
+  const [year] = monthKey.split("-").map(Number);
+  return `${formatMonthName(monthKey)} ${year}`;
+}
+
+function formatMonthName(monthKey) {
+  if (!monthKey) return "Sem mês";
   const [year, month] = monthKey.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, 1));
   const monthLabel = new Intl.DateTimeFormat("pt-BR", {
     month: "long",
     timeZone: "UTC",
   }).format(date);
-  return `${capitalizeFirst(monthLabel)} ${year}`;
+  return capitalizeFirst(monthLabel);
 }
 
 function getExpenseMonthKey({ dueDate, expenseDate, type }) {
@@ -2320,7 +2326,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";
-    return formatMonthLabel(selectedMonth);
+    return formatMonthName(selectedMonth);
   }, [selectedMonth]);
 
   function handlePrevMonth() {
@@ -2353,7 +2359,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             type="button"
             className={`person-month-picker-btn ${isPickerOpen ? "active" : ""}`}
             onClick={() => setIsPickerOpen(!isPickerOpen)}
-            title="Escolher mês e ano"
+            title="Escolher mês"
           >
             <Calendar size={16} className="picker-icon" />
             <span>{formattedMonthName}</span>
@@ -3863,6 +3869,7 @@ function ResourceListView({
             </button>
             <label className="month-filter">
               <Calendar size={18} />
+              <span aria-hidden="true">{formatMonthName(selectedMonth)}</span>
               <input type="month" aria-label="Selecionar mês" value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)} />
             </label>
             <button className="icon-button" onClick={() => onMonthChange(shiftMonth(selectedMonth, 1))} title="Próximo mês" type="button">
