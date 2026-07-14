@@ -3576,8 +3576,15 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
     const total = roundMoney(marketTotal + otherTotal);
     const count = marketYearItems.length + otherYearItems.length;
     const locations = new Map();
+    const monthlyTotals = new Map(MONTHS_PT.map(({ value }) => [
+      `${selectedYear}-${value}`,
+      { market: 0, other: 0 },
+    ]));
 
     marketYearItems.forEach((item) => {
+      const monthKey = item.monthKey || monthFromDate(item.purchasedAt);
+      const month = monthlyTotals.get(monthKey);
+      if (month) month.market = roundMoney(month.market + Number(item.totalValue || 0));
       const label = String(item.market || "Mercado não informado").trim();
       const key = `market:${label.toLowerCase()}`;
       const current = locations.get(key) || { label, kind: "Mercado", total: 0, count: 0 };
@@ -3586,6 +3593,9 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
       locations.set(key, current);
     });
     otherYearItems.forEach((item) => {
+      const monthKey = item.monthKey || monthFromDate(item.paidAt);
+      const month = monthlyTotals.get(monthKey);
+      if (month) month.other = roundMoney(month.other + Number(item.totalValue || 0));
       const label = String(item.place || "Local não informado").trim();
       const key = `other:${label.toLowerCase()}`;
       const current = locations.get(key) || { label, kind: "Outros", total: 0, count: 0 };
@@ -3610,6 +3620,12 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
         percent: total ? (otherTotal / total) * 100 : 0,
         locations: new Set(otherYearItems.map((item) => item.place).filter(Boolean)).size,
       },
+      months: [...monthlyTotals.entries()].map(([monthKey, values]) => ({
+        monthKey,
+        market: values.market,
+        other: values.other,
+        total: roundMoney(values.market + values.other),
+      })),
       topLocations: [...locations.values()].sort((a, b) => b.total - a.total).slice(0, 5),
     };
   }, [marketItems, otherPayments, selectedYear]);
@@ -3659,6 +3675,45 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
           </div>
         </article>
       </div>
+
+      <section className="panel other-dashboard-months">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Evolução anual</span>
+            <h3>Valores por mês em {selectedYear}</h3>
+          </div>
+        </div>
+        <div className="other-dashboard-month-table-wrap">
+          <table className="other-dashboard-month-table">
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Mercado</th>
+                <th>Outros pagamentos</th>
+                <th>Total combinado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboard.months.map((month) => (
+                <tr className={month.total ? "" : "is-empty"} key={month.monthKey}>
+                  <th scope="row">{formatMonthName(month.monthKey)}</th>
+                  <td>{formatCurrency(month.market)}</td>
+                  <td>{formatCurrency(month.other)}</td>
+                  <td><strong>{formatCurrency(month.total)}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>Total de {selectedYear}</th>
+                <td>{formatCurrency(dashboard.market.total)}</td>
+                <td>{formatCurrency(dashboard.other.total)}</td>
+                <td><strong>{formatCurrency(dashboard.total)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
 
       <div className="other-dashboard-detail-grid">
         <section className="panel other-dashboard-distribution">

@@ -2278,6 +2278,66 @@ textarea:focus {
   font-size: 0.84rem;
 }
 
+.other-dashboard-months .section-heading {
+  margin-bottom: 18px;
+}
+
+.other-dashboard-months h3 {
+  margin: 4px 0 0;
+}
+
+.other-dashboard-month-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.other-dashboard-month-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.other-dashboard-month-table th,
+.other-dashboard-month-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.other-dashboard-month-table thead th {
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.other-dashboard-month-table th:first-child {
+  text-align: left;
+}
+
+.other-dashboard-month-table th:not(:first-child),
+.other-dashboard-month-table td {
+  text-align: right;
+}
+
+.other-dashboard-month-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--panel-muted) 52%, transparent);
+}
+
+.other-dashboard-month-table tbody tr.is-empty {
+  color: var(--muted);
+}
+
+.other-dashboard-month-table tfoot th,
+.other-dashboard-month-table tfoot td {
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--primary) 8%, var(--panel));
+  color: var(--primary);
+  font-weight: 800;
+}
+
 .other-dashboard-distribution h3,
 .other-dashboard-locations h3 {
   margin: 4px 0 0;
