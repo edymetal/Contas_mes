@@ -3563,20 +3563,21 @@ function OtherAccountsView({
 }
 
 function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onMonthChange }) {
+  const selectedYear = selectedMonth.slice(0, 4);
   const dashboard = useMemo(() => {
-    const marketMonthItems = marketItems.filter((item) => (
+    const marketYearItems = marketItems.filter((item) => (
       item.monthKey || monthFromDate(item.purchasedAt)
-    ) === selectedMonth);
-    const otherMonthItems = otherPayments.filter((item) => (
+    ).startsWith(selectedYear));
+    const otherYearItems = otherPayments.filter((item) => (
       item.monthKey || monthFromDate(item.paidAt)
-    ) === selectedMonth);
-    const marketTotal = roundMoney(marketMonthItems.reduce((sum, item) => sum + Number(item.totalValue || 0), 0));
-    const otherTotal = roundMoney(otherMonthItems.reduce((sum, item) => sum + Number(item.totalValue || 0), 0));
+    ).startsWith(selectedYear));
+    const marketTotal = roundMoney(marketYearItems.reduce((sum, item) => sum + Number(item.totalValue || 0), 0));
+    const otherTotal = roundMoney(otherYearItems.reduce((sum, item) => sum + Number(item.totalValue || 0), 0));
     const total = roundMoney(marketTotal + otherTotal);
-    const count = marketMonthItems.length + otherMonthItems.length;
+    const count = marketYearItems.length + otherYearItems.length;
     const locations = new Map();
 
-    marketMonthItems.forEach((item) => {
+    marketYearItems.forEach((item) => {
       const label = String(item.market || "Mercado não informado").trim();
       const key = `market:${label.toLowerCase()}`;
       const current = locations.get(key) || { label, kind: "Mercado", total: 0, count: 0 };
@@ -3584,7 +3585,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
       current.count += 1;
       locations.set(key, current);
     });
-    otherMonthItems.forEach((item) => {
+    otherYearItems.forEach((item) => {
       const label = String(item.place || "Local não informado").trim();
       const key = `other:${label.toLowerCase()}`;
       const current = locations.get(key) || { label, kind: "Outros", total: 0, count: 0 };
@@ -3599,19 +3600,19 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
       average: count ? roundMoney(total / count) : 0,
       market: {
         total: marketTotal,
-        count: marketMonthItems.length,
+        count: marketYearItems.length,
         percent: total ? (marketTotal / total) * 100 : 0,
-        locations: new Set(marketMonthItems.map((item) => item.market).filter(Boolean)).size,
+        locations: new Set(marketYearItems.map((item) => item.market).filter(Boolean)).size,
       },
       other: {
         total: otherTotal,
-        count: otherMonthItems.length,
+        count: otherYearItems.length,
         percent: total ? (otherTotal / total) * 100 : 0,
-        locations: new Set(otherMonthItems.map((item) => item.place).filter(Boolean)).size,
+        locations: new Set(otherYearItems.map((item) => item.place).filter(Boolean)).size,
       },
       topLocations: [...locations.values()].sort((a, b) => b.total - a.total).slice(0, 5),
     };
-  }, [marketItems, otherPayments, selectedMonth]);
+  }, [marketItems, otherPayments, selectedYear]);
 
   const largestLocationTotal = dashboard.topLocations[0]?.total || 0;
 
@@ -3621,13 +3622,13 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
         <div className="other-dashboard-toolbar">
           <div>
             <span className="eyebrow">Visão consolidada</span>
-            <h2>Resumo de {formatMonthName(selectedMonth)}</h2>
-            <p>Mercado e Outros pagamentos no mesmo painel.</p>
+            <h2>Resumo anual de {selectedYear}</h2>
+            <p>Totais do ano para Mercado e Outros pagamentos.</p>
           </div>
           <ResourceMonthSwitcher selectedMonth={selectedMonth} onMonthChange={onMonthChange} />
         </div>
         <div className="other-dashboard-total">
-          <span>Total combinado</span>
+          <span>Total combinado em {selectedYear}</span>
           <strong>{formatCurrency(dashboard.total)}</strong>
           <small>{dashboard.count} {dashboard.count === 1 ? "lançamento" : "lançamentos"} • média de {formatCurrency(dashboard.average)}</small>
         </div>
@@ -3637,7 +3638,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
         <article className="panel other-dashboard-type-card market">
           <div className="other-dashboard-card-heading">
             <span className="other-dashboard-type-icon"><ShoppingCart size={21} /></span>
-            <div><span>Mercado</span><small>{dashboard.market.percent.toFixed(0)}% do total</small></div>
+            <div><span>Mercado em {selectedYear}</span><small>{dashboard.market.percent.toFixed(0)}% do total</small></div>
           </div>
           <strong>{formatCurrency(dashboard.market.total)}</strong>
           <div className="other-dashboard-card-meta">
@@ -3649,7 +3650,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
         <article className="panel other-dashboard-type-card other">
           <div className="other-dashboard-card-heading">
             <span className="other-dashboard-type-icon"><WalletCards size={21} /></span>
-            <div><span>Outros pagamentos</span><small>{dashboard.other.percent.toFixed(0)}% do total</small></div>
+            <div><span>Outros pagamentos em {selectedYear}</span><small>{dashboard.other.percent.toFixed(0)}% do total</small></div>
           </div>
           <strong>{formatCurrency(dashboard.other.total)}</strong>
           <div className="other-dashboard-card-meta">
@@ -3662,7 +3663,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
       <div className="other-dashboard-detail-grid">
         <section className="panel other-dashboard-distribution">
           <div className="section-heading">
-            <div><span className="eyebrow">Distribuição</span><h3>Participação no mês</h3></div>
+            <div><span className="eyebrow">Distribuição</span><h3>Participação no ano</h3></div>
           </div>
           {[
             { label: "Mercado", value: dashboard.market.total, percent: dashboard.market.percent, className: "market" },
@@ -3675,7 +3676,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth, onM
               </div>
             </div>
           ))}
-          {!dashboard.count && <div className="empty-state compact">Nenhum lançamento neste mês.</div>}
+          {!dashboard.count && <div className="empty-state compact">Nenhum lançamento neste ano.</div>}
         </section>
 
         <section className="panel other-dashboard-locations">
