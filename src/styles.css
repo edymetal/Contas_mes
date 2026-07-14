@@ -1762,15 +1762,18 @@ textarea:focus {
 }
 
 .receipt-key-status {
-  display: flex;
+  display: inline-flex;
   grid-column: 1 / -1;
+  justify-self: start;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 36px;
-  padding: 7px 11px;
+  justify-content: flex-start;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 5px 6px 5px 9px;
   border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--line));
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   background: color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--panel));
   color: var(--muted);
   font-size: 0.78rem;
@@ -1799,13 +1802,18 @@ textarea:focus {
 }
 
 .receipt-key-status button {
-  padding: 0;
+  padding: 5px 9px;
   border: 0;
-  background: transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.receipt-key-status button:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .gemini-key-modal {
