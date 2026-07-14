@@ -3515,9 +3515,12 @@ function MarketReceiptImporter({ onConfirm }) {
           </button>
         </div>
         <div className={apiKey ? "receipt-key-status configured" : "receipt-key-status"}>
-          <span><KeyRound size={17} /> {apiKey ? "Chave Gemini configurada neste aparelho" : "Chave Gemini ainda não configurada"}</span>
+          <span>
+            {apiKey ? <span className="receipt-key-active-icon"><Check size={12} strokeWidth={3} /></span> : <KeyRound size={15} />}
+            {apiKey ? "Gemini ativa" : "Chave Gemini necessária"}
+          </span>
           <button type="button" onClick={() => setIsKeyModalOpen(true)}>
-            {apiKey ? "Trocar ou remover" : "Configurar chave"}
+            {apiKey ? "Gerenciar" : "Configurar"}
           </button>
         </div>
         {isAnalyzing && (
