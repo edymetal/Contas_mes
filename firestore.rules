@@ -2,35 +2,67 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function edneyEmail() {
-      return request.auth != null && request.auth.token.email in [
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function adminEmail() {
+      return signedIn() && request.auth.token.email in [
         "edneypugleise@gmail.com",
         "edneypugliese.dev@gmail.com"
       ];
     }
 
+    function allowedEmail() {
+      return signedIn() && request.auth.token.email in [
+        "edneypugleise@gmail.com",
+        "edneypugliese.dev@gmail.com",
+        "soniapugleise@gmail.com",
+        "RODNEYPUGLEISEMACHADO@gmail.com",
+        "rodneypugleisemachado@gmail.com"
+      ];
+    }
+
+    function ownsProfile(profileId) {
+      return signedIn() && (
+        (profileId == "edney" && adminEmail()) ||
+        (profileId == "sonia" && request.auth.token.email == "soniapugleise@gmail.com") ||
+        (profileId == "rodney" && request.auth.token.email in [
+          "RODNEYPUGLEISEMACHADO@gmail.com",
+          "rodneypugleisemachado@gmail.com"
+        ])
+      );
+    }
+
     match /expenses/{expenseId} {
-      allow read, create, update, delete: if edneyEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
 
     match /settlements/{settlementId} {
-      allow read, create, update, delete: if edneyEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
 
     match /marketItems/{itemId} {
-      allow read, create, update, delete: if edneyEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
 
     match /marketReceipts/{receiptId} {
-      allow read, create, update, delete: if edneyEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
 
     match /otherPayments/{paymentId} {
-      allow read, create, update, delete: if edneyEmail();
+      allow read: if allowedEmail();
+      allow create, update, delete: if adminEmail();
     }
 
     match /userProfiles/{profileId} {
-      allow read, create, update: if edneyEmail();
+      allow read: if allowedEmail();
+      allow create, update: if adminEmail() || ownsProfile(profileId);
+      allow delete: if adminEmail();
     }
   }
 }
