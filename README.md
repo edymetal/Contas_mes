@@ -30,24 +30,18 @@ npm run dev
 
 ## Leitura de notas fiscais com Gemini
 
-O fluxo **Outras Contas > Mercado** aceita fotos JPG/PNG/WebP e notas em PDF. A leitura usa o modelo `gemini-3.5-flash` em uma Cloud Function autenticada; a chave nunca deve ser adicionada a uma variavel `VITE_*` ou ao codigo do navegador.
+O fluxo **Outras Contas > Mercado** aceita fotos JPG/PNG/WebP e notas em PDF, todas em italiano. A leitura usa o modelo `gemini-3.5-flash` diretamente no navegador e funciona com a cota gratuita da Gemini API, sem Cloud Functions ou plano Blaze.
 
-Configure e publique o backend uma vez:
+Na primeira utilização:
 
-```bash
-npx firebase-tools login
-npx firebase-tools use SEU_PROJECT_ID
-npx firebase-tools functions:secrets:set GEMINI_API_KEY
-npx firebase-tools deploy --only functions:analyzeMarketReceipt,firestore:rules
-```
+1. Entre em **Outras Contas > Mercado**.
+2. Clique em **Configurar chave**.
+3. Cole uma chave criada no [Google AI Studio](https://aistudio.google.com/app/apikey).
+4. Depois da validação, fotografe ou envie a nota e confira todos os dados reconhecidos antes de adicioná-los.
 
-O comando de secret solicita a chave de forma interativa. Use uma chave exclusiva, restrita a Gemini API, e nao grave a chave em `.env`, GitHub Secrets usados pelo frontend ou arquivos versionados.
+A chave fica no `localStorage` daquele navegador e é enviada somente ao endpoint oficial do Gemini durante a análise. Ela não é incluída no bundle público nem precisa ser cadastrada no GitHub. Use uma chave exclusiva, restrita à Gemini API, e configure-a apenas em aparelhos confiáveis. Ao limpar os dados do navegador, será necessário informá-la novamente.
 
-Para testar a funcao localmente, instale tambem as dependencias do backend:
-
-```bash
-npm install --prefix functions
-```
+Não use `VITE_GEMINI_API_KEY`: toda variável `VITE_*` é incorporada ao JavaScript público durante o build.
 
 ## Publicar no GitHub Pages
 
@@ -60,20 +54,8 @@ O projeto esta preparado para build estatico com Vite. No GitHub:
 
 O workflow `.github/workflows/deploy.yml` gera a pasta `dist` e publica no GitHub Pages.
 
-O deploy do GitHub Pages publica apenas o frontend. Quando houver alteracoes em `functions/` ou `firestore.rules`, publique-as com o comando Firebase acima.
-
-### Deploy automatico pelo GitHub Actions
-
-O workflow tambem pode atualizar o secret no Firebase e publicar a funcao e as regras. Para habilitar esse job, configure estes Actions secrets:
-
-- `GEMINI_API_KEY`: chave exclusiva da Gemini API.
-- `FIREBASE_TOKEN`: credencial do Firebase CLI usada apenas pelo runner.
-
-Gere e cadastre o token sem coloca-lo em arquivos do projeto:
+O deploy do GitHub Pages publica apenas o frontend. Quando houver alterações em `firestore.rules`, publique as regras separadamente:
 
 ```bash
-npx firebase-tools login:ci
-gh secret set FIREBASE_TOKEN --repo edymetal/Contas_mes
+npx firebase-tools deploy --only firestore:rules
 ```
-
-O primeiro comando mostra o token e o segundo solicita que ele seja colado de forma protegida. Sem os dois secrets, o job do backend e ignorado e a publicacao do frontend continua normalmente. O `FIREBASE_TOKEN` e suportado pelo Firebase CLI, mas e uma opcao legada; para ambientes maiores, substitua-o por Application Default Credentials com Workload Identity Federation.

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Home,
+  KeyRound,
   LogOut,
   Menu,
   LoaderCircle,
@@ -43,7 +44,13 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
-import { analyzeMarketReceipt } from "./services/receiptAnalysis";
+import {
+  analyzeMarketReceipt,
+  getStoredGeminiApiKey,
+  removeStoredGeminiApiKey,
+  saveStoredGeminiApiKey,
+  validateGeminiApiKey,
+} from "./services/receiptAnalysis";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
 import packageInfo from "../package.json";
 
@@ -3423,6 +3430,8 @@ function OtherAccountsView({
 function MarketReceiptImporter({ onConfirm }) {
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [apiKey, setApiKey] = useState(() => getStoredGeminiApiKey());
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(null);
@@ -3440,6 +3449,15 @@ function MarketReceiptImporter({ onConfirm }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  function openFilePicker(inputRef) {
+    if (!apiKey) {
+      setError("Configure sua chave gratuita do Gemini para analisar a nota.");
+      setIsKeyModalOpen(true);
+      return;
+    }
+    inputRef.current?.click();
+  }
+
   async function handleSelectedFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -3448,7 +3466,7 @@ function MarketReceiptImporter({ onConfirm }) {
     setPreview({ name: file.name, type: file.type, url: URL.createObjectURL(file) });
     setIsAnalyzing(true);
     try {
-      const result = await analyzeMarketReceipt(file);
+      const result = await analyzeMarketReceipt(file, apiKey);
       setDraft({
         ...result,
         purchasedAt: result.purchasedAt || todayInputValue(),
@@ -3489,11 +3507,17 @@ function MarketReceiptImporter({ onConfirm }) {
             accept="image/jpeg,image/png,image/webp,application/pdf"
             onChange={handleSelectedFile}
           />
-          <button className="primary-button" type="button" disabled={isAnalyzing} onClick={() => cameraInputRef.current?.click()}>
+          <button className="primary-button" type="button" disabled={isAnalyzing} onClick={() => openFilePicker(cameraInputRef)}>
             <Camera size={18} /> Tirar foto
           </button>
-          <button className="secondary-button" type="button" disabled={isAnalyzing} onClick={() => fileInputRef.current?.click()}>
+          <button className="secondary-button" type="button" disabled={isAnalyzing} onClick={() => openFilePicker(fileInputRef)}>
             <Upload size={18} /> Enviar arquivo
+          </button>
+        </div>
+        <div className={apiKey ? "receipt-key-status configured" : "receipt-key-status"}>
+          <span><KeyRound size={17} /> {apiKey ? "Chave Gemini configurada neste aparelho" : "Chave Gemini ainda não configurada"}</span>
+          <button type="button" onClick={() => setIsKeyModalOpen(true)}>
+            {apiKey ? "Trocar ou remover" : "Configurar chave"}
           </button>
         </div>
         {isAnalyzing && (
@@ -3517,7 +3541,94 @@ function MarketReceiptImporter({ onConfirm }) {
           }}
         />
       )}
+
+      {isKeyModalOpen && (
+        <GeminiApiKeyModal
+          hasStoredKey={Boolean(apiKey)}
+          onClose={() => setIsKeyModalOpen(false)}
+          onSaved={(newKey) => {
+            const storedKey = saveStoredGeminiApiKey(newKey);
+            setApiKey(storedKey);
+            setError("");
+            setIsKeyModalOpen(false);
+          }}
+          onRemove={() => {
+            removeStoredGeminiApiKey();
+            setApiKey("");
+            setError("Chave removida deste aparelho.");
+            setIsKeyModalOpen(false);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function GeminiApiKeyModal({ hasStoredKey, onClose, onSaved, onRemove }) {
+  const [apiKey, setApiKey] = useState("");
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setValidationError("");
+    setIsValidating(true);
+    try {
+      const validKey = await validateGeminiApiKey(apiKey);
+      onSaved(validKey);
+    } catch (keyError) {
+      setValidationError(keyError?.message || "Não foi possível validar a chave.");
+    } finally {
+      setIsValidating(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="modal gemini-key-modal" role="dialog" aria-modal="true" aria-labelledby="gemini-key-title">
+        <div className="section-heading gemini-key-heading">
+          <div>
+            <span className="eyebrow">Configuração gratuita</span>
+            <h2 id="gemini-key-title">Chave da API do Gemini</h2>
+          </div>
+          <button className="icon-button" type="button" aria-label="Fechar" onClick={onClose}><X size={20} /></button>
+        </div>
+        <span className="receipt-import-icon"><KeyRound size={22} /></span>
+        <p>
+          A chave fica salva somente neste navegador e é enviada diretamente ao Google quando uma nota é analisada.
+          Ela não entra no código nem na publicação do GitHub Pages.
+        </p>
+        <form onSubmit={handleSubmit}>
+          <label className="form-field">
+            <span>Chave da API</span>
+            <input
+              autoComplete="new-password"
+              autoFocus
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder={hasStoredKey ? "Cole uma nova chave para substituir" : "Cole aqui sua chave da API"}
+              disabled={isValidating}
+            />
+          </label>
+          <p className="gemini-key-help">
+            Use uma chave exclusiva e restrita à Gemini API. Você pode criá-la no <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>.
+          </p>
+          {validationError && <p className="form-error">{validationError}</p>}
+          <div className="modal-actions gemini-key-actions">
+            {hasStoredKey && (
+              <button className="danger-link-button" type="button" disabled={isValidating} onClick={onRemove}>
+                <Trash2 size={17} /> Remover deste aparelho
+              </button>
+            )}
+            <button className="secondary-button" type="button" disabled={isValidating} onClick={onClose}>Cancelar</button>
+            <button className="primary-button" type="submit" disabled={isValidating || !apiKey.trim()}>
+              {isValidating ? <><LoaderCircle className="spin-icon" size={18} /> Validando…</> : <><Check size={18} /> Validar e salvar</>}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 

@@ -1761,6 +1761,97 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.receipt-key-status {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--panel));
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.receipt-key-status.configured {
+  border-color: color-mix(in srgb, var(--success, #16a34a) 32%, var(--line));
+  background: color-mix(in srgb, var(--success, #16a34a) 7%, var(--panel));
+}
+
+.receipt-key-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.receipt-key-status button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gemini-key-modal {
+  position: relative;
+  width: min(620px, 100%);
+}
+
+.gemini-key-heading {
+  margin-bottom: 18px;
+}
+
+.gemini-key-modal > .receipt-import-icon {
+  margin-bottom: 14px;
+}
+
+.gemini-key-modal > p,
+.gemini-key-help {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.gemini-key-modal form {
+  margin-top: 20px;
+}
+
+.gemini-key-help {
+  margin: 9px 0 0;
+  font-size: 0.82rem;
+}
+
+.gemini-key-help a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.gemini-key-actions {
+  flex-wrap: wrap;
+}
+
+.danger-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.danger-link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .receipt-analysis-status,
 .receipt-warning {
   display: flex;
@@ -3148,6 +3239,11 @@ textarea:focus {
   .receipt-import-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .receipt-key-status {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .receipt-review-backdrop {
