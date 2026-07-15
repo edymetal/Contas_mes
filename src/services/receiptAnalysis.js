@@ -3,8 +3,8 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const STORAGE_KEY = "contas_mes_gemini_api_key";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const MAX_FILE_SIZE = 7 * 1024 * 1024;
-const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
-const RETRY_DELAYS_MS = [500, 1500];
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 const receiptSchema = {
   type: "object",
@@ -190,18 +190,27 @@ function normalizeReceipt(receipt) {
 function getApiErrorMessage(status, error = {}) {
   const details = String(error?.message || "").trim();
   const reason = error?.details?.find((item) => item?.reason)?.reason || "";
+  const apiStatus = String(error?.status || "").trim();
+  const errorCode = [
+    `HTTP ${status}`,
+    apiStatus && apiStatus !== reason ? apiStatus : "",
+    reason,
+  ].filter(Boolean).join(" / ");
+  const withDetails = (message) => `${message} Código: ${errorCode}.${details ? ` Detalhes: ${details}` : ""}`;
+
   if (reason === "API_KEY_INVALID" || /api key not valid|invalid api key/i.test(details)) {
-    return "A chave Gemini é inválida. Crie uma nova chave no Google AI Studio e configure-a novamente.";
+    return withDetails("A chave Gemini é inválida. Crie uma nova chave no Google AI Studio e configure-a novamente.");
   }
-  if (status === 401 || status === 403) return "A chave Gemini não tem acesso ao modelo. Confira a chave e as restrições da API.";
-  if (status === 404) return `O modelo ${MODEL} não está disponível para esta chave.`;
-  if (status === 429) return "O limite gratuito do Gemini foi atingido. Aguarde a renovação da cota e tente novamente.";
-  if (status >= 500) return "O Gemini está temporariamente indisponível. Tente novamente em alguns instantes.";
-  if (status === 400 && /image|inline.?data|mime.?type|document|pdf/i.test(details)) {
-    return "O Gemini não conseguiu processar este arquivo. Tente outra foto ou um arquivo com formato diferente.";
+  if (status === 401 || status === 403) {
+    return withDetails("A chave Gemini não tem acesso ao modelo. Confira a chave e as restrições da API.");
   }
-  if (status === 400 && details) return `O Gemini rejeitou a solicitação: ${details}`;
-  return details || "Não foi possível ler a nota agora. Tente novamente.";
+  if (status === 404) return withDetails(`O modelo ${MODEL} não está disponível para esta chave.`);
+  if (status === 429) {
+    return withDetails("O limite ou a cota do Gemini foi atingido. Aguarde a renovação e tente novamente.");
+  }
+  if (status >= 500) return withDetails("O Gemini está temporariamente indisponível.");
+  if (status === 400) return withDetails("O Gemini rejeitou a solicitação.");
+  return withDetails("Não foi possível ler a nota agora.");
 }
 
 async function requestGemini(path, apiKey, options = {}) {
@@ -224,7 +233,8 @@ async function requestGemini(path, apiKey, options = {}) {
     if (response.ok) return responseBody;
 
     if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < RETRY_DELAYS_MS.length) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+      const jitter = Math.round(Math.random() * 250);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt] + jitter));
       continue;
     }
 
@@ -281,27 +291,33 @@ export async function analyzeMarketReceipt(file, apiKey) {
         ],
       }],
       generationConfig: {
-        responseFormat: {
-          text: {
-            mimeType: "application/json",
-            schema: receiptSchema,
-          },
-        },
+        responseMimeType: "application/json",
+        responseJsonSchema: receiptSchema,
       },
     }),
   });
 
-  const responseText = response?.candidates?.[0]?.content?.parts
+  const candidate = response?.candidates?.[0];
+  const responseText = candidate?.content?.parts
     ?.map((part) => part?.text || "")
     .join("")
     .trim();
-  if (!responseText) throw new Error("O Gemini não devolveu informações da nota.");
+  if (!responseText) {
+    const responseDetails = [
+      candidate?.finishReason && `motivo=${candidate.finishReason}`,
+      response?.promptFeedback?.blockReason && `bloqueio=${response.promptFeedback.blockReason}`,
+      response?.modelVersion && `modelo=${response.modelVersion}`,
+      response?.responseId && `resposta=${response.responseId}`,
+    ].filter(Boolean).join(", ");
+    throw new Error(`O Gemini não devolveu informações da nota.${responseDetails ? ` Detalhes: ${responseDetails}.` : ""}`);
+  }
 
   let receipt;
   try {
     receipt = normalizeReceipt(JSON.parse(responseText));
-  } catch {
-    throw new Error("O Gemini devolveu uma resposta incompleta. Tente analisar a nota novamente.");
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`O Gemini devolveu uma resposta inválida. Detalhes: ${reason}`);
   }
   if (!receipt.items.length) {
     throw new Error("Nenhum produto foi identificado. Tente uma foto mais nítida e completa.");
