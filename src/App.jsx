@@ -1575,32 +1575,35 @@ function App() {
           })}
         </nav>
 
-        <div className="user-card">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {firebaseUser?.photoURL ? (
-              <img
-                src={firebaseUser.photoURL}
-                alt={profile.name}
-                className="user-avatar"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="user-avatar-placeholder">
-                {profile.name.charAt(0).toUpperCase()}
+        <div className="sidebar-footer">
+          <div className="user-card">
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {firebaseUser?.photoURL ? (
+                <img
+                  src={firebaseUser.photoURL}
+                  alt={profile.name}
+                  className="user-avatar"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="user-avatar-placeholder">
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <span>Logado como</span>
+                <strong>{profile.name}</strong>
+                <small>{formatEmail(firebaseUser?.email)}</small>
               </div>
-            )}
-            <div>
-              <span>Logado como</span>
-              <strong>{profile.name}</strong>
-              <small>{formatEmail(firebaseUser?.email)}</small>
             </div>
+            <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
+              <LogOut size={18} />
+            </button>
           </div>
-          <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
-            <LogOut size={18} />
-          </button>
-        </div>
-        <div className="app-version" aria-label={`Versao do sistema ${appVersion}`}>
-          Versao {appVersion}
+          <div className="app-version" aria-label={`Versão do sistema ${appVersion}`}>
+            <span>Versão do sistema</span>
+            <strong>{appVersion}</strong>
+          </div>
         </div>
       </aside>
 
