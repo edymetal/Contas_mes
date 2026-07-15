@@ -3094,7 +3094,16 @@ textarea:focus {
 }
 
 .settlement-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 0;
+}
+
+.settlement-history-heading > div:first-child {
+  display: grid;
+  gap: 4px;
 }
 
 .settlement-history-empty {
@@ -3610,6 +3619,11 @@ textarea:focus {
   .resource-delete-month-button {
     order: 2;
     width: 100%;
+  }
+
+  .settlement-history-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .receipt-import-copy {

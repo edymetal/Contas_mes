@@ -2656,6 +2656,7 @@ function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
 function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, rows, settlementPayments = [] }) {
   const [paymentForms, setPaymentForms] = useState({});
   const [activeSettlementKey, setActiveSettlementKey] = useState(null);
+  const [historyMonth, setHistoryMonth] = useState(() => monthFromDate(todayInputValue()));
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [editingPaymentForm, setEditingPaymentForm] = useState({
     amount: "",
@@ -2663,8 +2664,12 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
     type: "PIX",
     description: "",
   });
+  const filteredSettlementPayments = useMemo(
+    () => settlementPayments.filter((payment) => getPaidAtMonthKey(payment) === historyMonth),
+    [historyMonth, settlementPayments],
+  );
   const paymentsByMonth = useMemo(() => {
-    const grouped = settlementPayments.reduce((acc, payment) => {
+    const grouped = filteredSettlementPayments.reduce((acc, payment) => {
       const monthKey = getPaidAtMonthKey(payment);
       const currentGroup = acc.get(monthKey) || {
         monthKey,
@@ -2679,7 +2684,7 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
     }, new Map());
 
     return Array.from(grouped.values()).sort((a, b) => (b.monthKey || "").localeCompare(a.monthKey || ""));
-  }, [settlementPayments]);
+  }, [filteredSettlementPayments]);
 
   function getRowKey(row) {
     return `${row.fromId}->${row.toId}`;
@@ -2699,6 +2704,12 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
       setActiveSettlementKey(null);
     }
   }, [activeSettlementKey, rows]);
+
+  useEffect(() => {
+    if (editingPaymentId && !filteredSettlementPayments.some((payment) => payment.id === editingPaymentId)) {
+      setEditingPaymentId(null);
+    }
+  }, [editingPaymentId, filteredSettlementPayments]);
 
   function updatePaymentForm(row, field, value) {
     const key = getRowKey(row);
@@ -2900,12 +2911,17 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
 
       <div className="settlement-history">
         <div className="section-heading settlement-history-heading">
-          <h2>Historico de pagamentos</h2>
-          <span>{settlementPayments.length} pagamento(s)</span>
+          <div>
+            <h2>Histórico de pagamentos</h2>
+            <span>{filteredSettlementPayments.length} pagamento(s) em {formatMonthLabel(historyMonth)}</span>
+          </div>
+          <ResourceMonthSwitcher selectedMonth={historyMonth} onMonthChange={setHistoryMonth} />
         </div>
 
-        {!settlementPayments.length ? (
-          <div className="empty-state settlement-history-empty">Nenhum pagamento registrado.</div>
+        {!filteredSettlementPayments.length ? (
+          <div className="empty-state settlement-history-empty">
+            Nenhum pagamento registrado em {formatMonthLabel(historyMonth)}.
+          </div>
         ) : (
           <div className="settlement-history-list">
             {paymentsByMonth.map((group) => (
