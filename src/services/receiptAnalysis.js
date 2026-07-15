@@ -3,6 +3,8 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const STORAGE_KEY = "contas_mes_gemini_api_key";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const MAX_FILE_SIZE = 7 * 1024 * 1024;
+const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
+const RETRY_DELAYS_MS = [500, 1500];
 
 const receiptSchema = {
   type: "object",
@@ -203,25 +205,33 @@ function getApiErrorMessage(status, error = {}) {
 }
 
 async function requestGemini(path, apiKey, options = {}) {
-  let response;
-  try {
-    response = await fetch(`${GEMINI_API_BASE}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-        ...options.headers,
-      },
-    });
-  } catch {
-    throw new Error("Não foi possível conectar ao Gemini. Confira sua internet e tente novamente.");
-  }
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(`${GEMINI_API_BASE}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+          ...options.headers,
+        },
+      });
+    } catch {
+      throw new Error("Não foi possível conectar ao Gemini. Confira sua internet e tente novamente.");
+    }
 
-  const responseBody = await response.json().catch(() => ({}));
-  if (!response.ok) {
+    const responseBody = await response.json().catch(() => ({}));
+    if (response.ok) return responseBody;
+
+    if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < RETRY_DELAYS_MS.length) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+      continue;
+    }
+
     throw new Error(getApiErrorMessage(response.status, responseBody?.error));
   }
-  return responseBody;
+
+  throw new Error("Não foi possível ler a nota agora. Tente novamente.");
 }
 
 export function getStoredGeminiApiKey() {
@@ -271,10 +281,9 @@ export async function analyzeMarketReceipt(file, apiKey) {
         ],
       }],
       generationConfig: {
-        temperature: 0.1,
         responseFormat: {
           text: {
-            mimeType: "APPLICATION_JSON",
+            mimeType: "application/json",
             schema: receiptSchema,
           },
         },
