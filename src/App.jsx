@@ -4057,6 +4057,7 @@ function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
           {Math.abs(difference) > 0.02 && (
             <div className="receipt-warning"><AlertTriangle size={18} /><span>A soma dos itens difere do total da nota em {formatCurrency(Math.abs(difference))}. Confira descontos e valores.</span></div>
           )}
+          <div className="receipt-ai-note"><strong>Modelo utilizado:</strong> {draft.model}</div>
           {draft.notes && <div className="receipt-ai-note"><strong>Observação da leitura:</strong> {draft.notes}</div>}
 
           <div className="receipt-review-table-wrap">

@@ -1,4 +1,6 @@
-const MODEL = "gemini-3.5-flash";
+const PRIMARY_MODEL = "gemini-3.5-flash";
+const FALLBACK_MODEL = "gemini-3.1-flash-lite";
+const MODEL_CANDIDATES = [PRIMARY_MODEL, FALLBACK_MODEL];
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const STORAGE_KEY = "contas_mes_gemini_api_key";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
@@ -147,7 +149,7 @@ export function normalizeReceiptCategory(product, description) {
   return (meaningfulWords.length ? meaningfulWords : words).slice(0, 2).join(" ");
 }
 
-function normalizeReceipt(receipt) {
+function normalizeReceipt(receipt, model = PRIMARY_MODEL) {
   const normalizedItems = (Array.isArray(receipt.items) ? receipt.items : [])
     .filter((item) => item && String(item.product || "").trim())
     .map((item) => {
@@ -183,7 +185,7 @@ function normalizeReceipt(receipt) {
     confidence: Math.min(1, Math.max(0, Number(receipt.confidence) || 0)),
     notes: String(receipt.notes || "").trim(),
     items: normalizedItems,
-    model: MODEL,
+    model,
   };
 }
 
@@ -204,7 +206,7 @@ function getApiErrorMessage(status, error = {}) {
   if (status === 401 || status === 403) {
     return withDetails("A chave Gemini não tem acesso ao modelo. Confira a chave e as restrições da API.");
   }
-  if (status === 404) return withDetails(`O modelo ${MODEL} não está disponível para esta chave.`);
+  if (status === 404) return withDetails("O modelo solicitado não está disponível para esta chave.");
   if (status === 429) {
     return withDetails("O limite ou a cota do Gemini foi atingido. Aguarde a renovação e tente novamente.");
   }
@@ -238,7 +240,10 @@ async function requestGemini(path, apiKey, options = {}) {
       continue;
     }
 
-    throw new Error(getApiErrorMessage(response.status, responseBody?.error));
+    const apiError = new Error(getApiErrorMessage(response.status, responseBody?.error));
+    apiError.status = response.status;
+    apiError.apiStatus = responseBody?.error?.status || "";
+    throw apiError;
   }
 
   throw new Error("Não foi possível ler a nota agora. Tente novamente.");
@@ -262,7 +267,7 @@ export function removeStoredGeminiApiKey() {
 export async function validateGeminiApiKey(apiKey) {
   const normalizedKey = String(apiKey || "").trim();
   if (!normalizedKey) throw new Error("Informe a chave da API do Gemini.");
-  await requestGemini(`/models/${MODEL}`, normalizedKey, { method: "GET", headers: {} });
+  await requestGemini(`/models/${PRIMARY_MODEL}`, normalizedKey, { method: "GET", headers: {} });
   return normalizedKey;
 }
 
@@ -280,22 +285,46 @@ export async function analyzeMarketReceipt(file, apiKey) {
 
   const dataUrl = await readAsDataUrl(preparedFile);
   const base64 = String(dataUrl).split(",")[1];
-  const response = await requestGemini(`/models/${MODEL}:generateContent`, normalizedKey, {
-    method: "POST",
-    body: JSON.stringify({
-      contents: [{
-        role: "user",
-        parts: [
-          { inlineData: { data: base64, mimeType: preparedFile.type } },
-          { text: prompt },
-        ],
-      }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseJsonSchema: receiptSchema,
-      },
-    }),
+  const requestBody = JSON.stringify({
+    contents: [{
+      role: "user",
+      parts: [
+        { inlineData: { data: base64, mimeType: preparedFile.type } },
+        { text: prompt },
+      ],
+    }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseJsonSchema: receiptSchema,
+    },
   });
+
+  let response;
+  let selectedModel = PRIMARY_MODEL;
+  const modelErrors = [];
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      response = await requestGemini(`/models/${model}:generateContent`, normalizedKey, {
+        method: "POST",
+        body: requestBody,
+      });
+      selectedModel = model;
+      break;
+    } catch (error) {
+      modelErrors.push(`${model}: ${error?.message || String(error)}`);
+      const canFallback = (error?.status === 429 || error?.status >= 500) && model !== FALLBACK_MODEL;
+      if (!canFallback) {
+        if (modelErrors.length > 1) {
+          throw new Error(`Nenhum modelo do Gemini conseguiu analisar a nota. Tentativas: ${modelErrors.join(" | ")}`);
+        }
+        throw error;
+      }
+    }
+  }
+
+  if (!response) {
+    throw new Error(`Nenhum modelo do Gemini conseguiu analisar a nota. Tentativas: ${modelErrors.join(" | ")}`);
+  }
 
   const candidate = response?.candidates?.[0];
   const responseText = candidate?.content?.parts
@@ -314,7 +343,7 @@ export async function analyzeMarketReceipt(file, apiKey) {
 
   let receipt;
   try {
-    receipt = normalizeReceipt(JSON.parse(responseText));
+    receipt = normalizeReceipt(JSON.parse(responseText), selectedModel);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`O Gemini devolveu uma resposta inválida. Detalhes: ${reason}`);
