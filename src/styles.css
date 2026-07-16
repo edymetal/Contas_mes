@@ -2612,7 +2612,60 @@ textarea:focus {
 /* Expense & Settlement Lists */
 .expense-list {
   display: grid;
+  gap: 28px;
+}
+
+.expense-payer-group,
+.expense-payer-items {
+  display: grid;
+}
+
+.expense-payer-group {
+  gap: 12px;
+}
+
+.expense-payer-items {
   gap: 16px;
+}
+
+.expense-payer-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.expense-payer-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--primary), var(--line));
+}
+
+.expense-payer-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.expense-payer-label svg {
+  color: var(--primary);
+}
+
+.expense-payer-label strong {
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.expense-payer-divider small {
+  order: 2;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .person-payment-summary {
