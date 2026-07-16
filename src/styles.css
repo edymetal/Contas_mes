@@ -2645,19 +2645,19 @@ textarea:focus {
 .expense-payer-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.84rem;
+  gap: 10px;
   white-space: nowrap;
 }
 
-.expense-payer-label svg {
-  color: var(--primary);
+.expense-payer-label .person-avatar {
+  width: 40px;
+  height: 40px;
+  border-width: 2px;
 }
 
 .expense-payer-label strong {
   color: var(--text);
-  font-size: 0.94rem;
+  font-size: 1.08rem;
 }
 
 .expense-payer-divider small {

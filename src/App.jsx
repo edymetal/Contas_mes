@@ -2547,55 +2547,59 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
         <div className="empty-state">Nenhuma conta para este mês.</div>
       ) : (
         <div className="expense-list">
-          {expensesByPayer.map(({ payerId, expenses: payerExpenses }) => (
-            <section className="expense-payer-group" key={payerId}>
-              <div className="expense-payer-divider">
-                <div className="expense-payer-label">
-                  <UserRound size={17} aria-hidden="true" />
-                  <span>Pago por</span>
-                  <strong>{personName(payerId)}</strong>
+          {expensesByPayer.map(({ payerId, expenses: payerExpenses }) => {
+            const payer = getPersonById(payerId);
+            const payerPhotoUrl = getPersonPhotoUrl(payer, firebaseUser, userProfiles);
+
+            return (
+              <section className="expense-payer-group" key={payerId} aria-label={`Contas pagas por ${personName(payerId)}`}>
+                <div className="expense-payer-divider">
+                  <div className="expense-payer-label">
+                    <PersonAvatar person={payer} photoUrl={payerPhotoUrl} />
+                    <strong>{personName(payerId)}</strong>
+                  </div>
+                  <small>
+                    {payerExpenses.length} {payerExpenses.length === 1 ? "conta" : "contas"}
+                  </small>
                 </div>
-                <small>
-                  {payerExpenses.length} {payerExpenses.length === 1 ? "conta" : "contas"}
-                </small>
-              </div>
 
-              <div className="expense-payer-items">
-                {payerExpenses.map((expense) => {
-                  const share = getShare(expense, personId);
-                  const isPayer = expense.payerId === personId;
-                  const displayStatus = isPayer ? "self" : share?.status;
-                  const isPaidOrSettled = isSettledStatus(displayStatus);
-                  const amountClassName = isPaidOrSettled ? "money-positive" : "money-negative";
-                  const amountLabel = isPaidOrSettled
-                    ? formatCurrency(share?.amount)
-                    : formatSignedCurrency(share?.amount, "negative");
+                <div className="expense-payer-items">
+                  {payerExpenses.map((expense) => {
+                    const share = getShare(expense, personId);
+                    const isPayer = expense.payerId === personId;
+                    const displayStatus = isPayer ? "self" : share?.status;
+                    const isPaidOrSettled = isSettledStatus(displayStatus);
+                    const amountClassName = isPaidOrSettled ? "money-positive" : "money-negative";
+                    const amountLabel = isPaidOrSettled
+                      ? formatCurrency(share?.amount)
+                      : formatSignedCurrency(share?.amount, "negative");
 
-                  return (
-                    <article className="expense-card" key={expense.id}>
-                      <div className="expense-main">
-                        <h3>{expense.title}</h3>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                          <span className="tag">{expense.category}</span>
-                          {expense.installment && (
-                            <span className="tag" style={{ background: "var(--panel-muted)", color: "var(--muted)", borderColor: "var(--line)" }}>
-                              {formatInstallmentLabel(expense.installment)}
-                            </span>
-                          )}
+                    return (
+                      <article className="expense-card" key={expense.id}>
+                        <div className="expense-main">
+                          <h3>{expense.title}</h3>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span className="tag">{expense.category}</span>
+                            {expense.installment && (
+                              <span className="tag" style={{ background: "var(--panel-muted)", color: "var(--muted)", borderColor: "var(--line)" }}>
+                                {formatInstallmentLabel(expense.installment)}
+                              </span>
+                            )}
+                          </div>
+                          <p>Vencimento: {formatDate(expense.dueDate)}</p>
                         </div>
-                        <p>Vencimento: {formatDate(expense.dueDate)}</p>
-                      </div>
 
-                      <div className="expense-side">
-                        <strong className={amountClassName}>{amountLabel}</strong>
-                        <StatusBadge status={displayStatus} />
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                        <div className="expense-side">
+                          <strong className={amountClassName}>{amountLabel}</strong>
+                          <StatusBadge status={displayStatus} />
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </section>
