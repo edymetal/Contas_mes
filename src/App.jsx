@@ -1548,8 +1548,13 @@ function App() {
             <div className="brand-mark">
               <Home size={24} />
             </div>
-            <div>
-              <strong>Contas</strong>
+            <div className="brand-copy">
+              <div className="brand-title-row">
+                <strong>Contas</strong>
+                <span className="app-version" aria-label={`Versão do sistema ${appVersion}`}>
+                  v{appVersion}
+                </span>
+              </div>
               <span>Compartilhadas</span>
             </div>
           </div>
@@ -1599,10 +1604,6 @@ function App() {
             <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
               <LogOut size={18} />
             </button>
-          </div>
-          <div className="app-version" aria-label={`Versão do sistema ${appVersion}`}>
-            <span>Versão do sistema</span>
-            <strong>{appVersion}</strong>
           </div>
         </div>
       </aside>

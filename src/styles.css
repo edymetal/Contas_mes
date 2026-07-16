@@ -116,11 +116,17 @@ button {
   height: 100vh;
   padding: 32px 24px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
   border-right: 1px solid var(--line);
   background: var(--sidebar-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   z-index: 10;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-header {
@@ -136,11 +142,17 @@ button {
   gap: 14px;
 }
 
-.brand > div:last-child {
+.brand-copy {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+.brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .brand.large {
@@ -265,19 +277,15 @@ button {
 }
 
 .app-version {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-muted);
   color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 600;
-  text-align: center;
-}
-
-.app-version strong {
-  color: var(--text);
-  font-size: inherit;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .user-avatar {
