@@ -162,6 +162,22 @@ function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function getPlaceSuggestions(payments) {
+  const uniquePlaces = new Map();
+
+  payments.forEach((payment) => {
+    const place = String(payment.place || "").trim();
+    if (!place) return;
+
+    const normalizedPlace = place.toLocaleLowerCase("pt-BR");
+    if (!uniquePlaces.has(normalizedPlace)) uniquePlaces.set(normalizedPlace, place);
+  });
+
+  return Array.from(uniquePlaces.values()).sort((first, second) => (
+    first.localeCompare(second, "pt-BR", { sensitivity: "base" })
+  ));
+}
+
 function getFirebaseActionError(error, action) {
   if (error?.code === "permission-denied") {
     return `Sem permissão para ${action}. Publique as regras do Firestore atualizadas para liberar Mercado e Outros pagamentos.`;
@@ -529,6 +545,7 @@ function App() {
   const [marketFormError, setMarketFormError] = useState("");
   const [otherPaymentFormError, setOtherPaymentFormError] = useState("");
   const canManageData = isAdminProfile(profile);
+  const otherPaymentPlaceSuggestions = useMemo(() => getPlaceSuggestions(otherPayments), [otherPayments]);
 
   useEffect(() => {
     if (!hasFirebaseConfig) {
@@ -1664,6 +1681,7 @@ function App() {
             marketItems={marketItems}
             otherPaymentForm={otherPaymentForm}
             otherPaymentFormError={otherPaymentFormError}
+            otherPaymentPlaceSuggestions={otherPaymentPlaceSuggestions}
             otherPayments={otherPayments}
             selectedMonth={selectedMonth}
             onMarketChange={(field, value) => setMarketForm((current) => ({ ...current, [field]: value }))}
@@ -1741,6 +1759,7 @@ function App() {
       {canManageData && editingResourceItem && (
         <EditResourceItemModal
           item={editingResourceItem}
+          placeSuggestions={otherPaymentPlaceSuggestions}
           onClose={() => setEditingResourceItem(null)}
           onSave={handleUpdateResourceItem}
         />
@@ -3545,6 +3564,7 @@ function OtherAccountsView({
   marketItems,
   otherPaymentForm,
   otherPaymentFormError,
+  otherPaymentPlaceSuggestions,
   otherPayments,
   selectedMonth,
   onMarketChange,
@@ -3608,6 +3628,7 @@ function OtherAccountsView({
           formError={isMarket ? marketFormError : otherPaymentFormError}
           items={isMarket ? marketItems : otherPayments}
           kind={activeTab}
+          placeSuggestions={otherPaymentPlaceSuggestions}
           selectedMonth={selectedMonth}
           onChange={isMarket ? onMarketChange : onOtherPaymentChange}
           onEdit={isMarket ? onEditMarketItem : onEditOtherPayment}
@@ -4161,6 +4182,7 @@ function ResourceListView({
   formError,
   items,
   kind,
+  placeSuggestions,
   selectedMonth,
   onChange,
   onEdit,
@@ -4217,7 +4239,14 @@ function ResourceListView({
               value={isMarket ? form.market : form.place}
               onChange={(event) => onChange(isMarket ? "market" : "place", event.target.value)}
               placeholder={isMarket ? "Ex.: ARD" : "Ex.: Amazon"}
+              list={isMarket ? undefined : "other-payment-place-suggestions"}
+              autoComplete="off"
             />
+            {!isMarket && (
+              <datalist id="other-payment-place-suggestions">
+                {placeSuggestions.map((place) => <option key={place} value={place} />)}
+              </datalist>
+            )}
           </label>
           <label>
             Data
@@ -4634,7 +4663,7 @@ function FixedExpensesView({ groups, selectedMonth }) {
   );
 }
 
-function EditResourceItemModal({ item, onClose, onSave }) {
+function EditResourceItemModal({ item, placeSuggestions, onClose, onSave }) {
   const isMarket = item.kind === "market";
   const [form, setForm] = useState({
     market: item.market || "",
@@ -4683,8 +4712,15 @@ function EditResourceItemModal({ item, onClose, onSave }) {
               <input
                 value={isMarket ? form.market : form.place}
                 onChange={(event) => updateField(isMarket ? "market" : "place", event.target.value)}
+                list={isMarket ? undefined : "edit-other-payment-place-suggestions"}
+                autoComplete="off"
                 required
               />
+              {!isMarket && (
+                <datalist id="edit-other-payment-place-suggestions">
+                  {placeSuggestions.map((place) => <option key={place} value={place} />)}
+                </datalist>
+              )}
             </label>
             <label>
               <span>Data</span>
