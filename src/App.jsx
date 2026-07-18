@@ -3964,24 +3964,12 @@ function MarketReceiptImporter({ onConfirm }) {
   return (
     <>
       <section className="panel receipt-import-panel">
-        <div className="receipt-import-content">
-          <div className="receipt-import-copy">
-            <span className="receipt-import-icon"><Sparkles size={22} /></span>
-            <div>
-              <span className="eyebrow">Preenchimento automático</span>
-              <h2>Importar nota fiscal italiana</h2>
-              <p>Fotografe ou envie a nota. O Gemini identifica mercado, data, totais e todos os produtos para você conferir antes de adicionar.</p>
-            </div>
-          </div>
-          <div className={apiKey ? "receipt-key-status configured" : "receipt-key-status"}>
-            <span>
-              <span className={`status-indicator ${apiKey ? "active" : "pending"}`}></span>
-              {apiKey ? <Check size={12} strokeWidth={3} className="status-icon" /> : <KeyRound size={14} className="status-icon" />}
-              {apiKey ? "Gemini ativa" : "Chave Gemini necessária"}
-            </span>
-            <button type="button" onClick={() => setIsKeyModalOpen(true)}>
-              {apiKey ? "Gerenciar" : "Configurar"}
-            </button>
+        <div className="receipt-import-copy">
+          <span className="receipt-import-icon"><Sparkles size={22} /></span>
+          <div>
+            <span className="eyebrow">Preenchimento automático</span>
+            <h2>Importar nota fiscal italiana</h2>
+            <p>Fotografe ou envie a nota. O Gemini identifica mercado, data, totais e todos os produtos para você conferir antes de adicionar.</p>
           </div>
         </div>
         <div className="receipt-import-actions">
@@ -4005,6 +3993,15 @@ function MarketReceiptImporter({ onConfirm }) {
           </button>
           <button className="secondary-button" type="button" disabled={isAnalyzing} onClick={() => openFilePicker(fileInputRef)}>
             <Upload size={18} /> Enviar arquivo
+          </button>
+        </div>
+        <div className={apiKey ? "receipt-key-status configured" : "receipt-key-status"}>
+          <span>
+            {apiKey ? <span className="receipt-key-active-icon"><Check size={12} strokeWidth={3} /></span> : <KeyRound size={15} />}
+            {apiKey ? "Gemini ativa" : "Chave Gemini necessária"}
+          </span>
+          <button type="button" onClick={() => setIsKeyModalOpen(true)}>
+            {apiKey ? "Gerenciar" : "Configurar"}
           </button>
         </div>
         {isAnalyzing && (
