@@ -769,6 +769,36 @@ function App() {
     };
   }, [expenses]);
 
+  const dashboardYearSummary = useMemo(() => {
+    const year = selectedMonth.slice(0, 4);
+    const sourceExpenses = allExpenses.length ? allExpenses : monthlyExpenses;
+    const normalizedExpenses = getNormalizedExpenses(sourceExpenses);
+    const months = MONTHS_PT.map((month) => {
+      const monthKey = `${year}-${month.value}`;
+      const monthExpenses = normalizedExpenses.filter(
+        (expense) => getExpenseDisplayMonthKey(expense) === monthKey,
+      );
+
+      return {
+        monthKey,
+        label: month.short,
+        count: monthExpenses.length,
+        total: roundMoney(monthExpenses.reduce((sum, expense) => sum + Number(expense.totalValue || 0), 0)),
+      };
+    });
+    const total = roundMoney(months.reduce((sum, month) => sum + month.total, 0));
+    const largestMonthTotal = Math.max(...months.map((month) => month.total), 1);
+
+    return {
+      year,
+      total,
+      months: months.map((month) => ({
+        ...month,
+        percent: (month.total / largestMonthTotal) * 100,
+      })),
+    };
+  }, [allExpenses, monthlyExpenses, selectedMonth]);
+
   const selectedMonthSettlementPayments = useMemo(
     () => settlementPayments.filter((payment) => getSettlementPaymentMonthKey(payment) === selectedMonth),
     [selectedMonth, settlementPayments],
@@ -1662,6 +1692,8 @@ function App() {
             dataLoading={dataLoading}
             expenses={expenses}
             metrics={metrics}
+            selectedMonth={selectedMonth}
+            yearSummary={dashboardYearSummary}
           />
         )}
 
@@ -1809,7 +1841,7 @@ function LoginScreen({ error, missingConfig, onLogin }) {
   );
 }
 
-function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics }) {
+function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics, selectedMonth, yearSummary }) {
   const totalCount = expenses.length;
   const averageExpense = totalCount ? breakdown.total / totalCount : 0;
   const rateioTotal = roundMoney(metrics.pending + metrics.paid);
@@ -1886,6 +1918,34 @@ function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics }
             </div>
           </article>
         ))}
+      </section>
+
+      <section className="panel dashboard-panel dashboard-year-panel">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Período de 1 ano</span>
+            <h2>Valores mensais de {yearSummary.year}</h2>
+          </div>
+          <strong>{formatCurrency(yearSummary.total)}</strong>
+        </div>
+
+        <div className="dashboard-year-grid">
+          {yearSummary.months.map((month) => (
+            <article
+              className={`dashboard-year-month ${month.monthKey === selectedMonth ? "selected" : ""}`}
+              key={month.monthKey}
+            >
+              <div>
+                <span>{month.label}</span>
+                <small>{month.count} {month.count === 1 ? "conta" : "contas"}</small>
+              </div>
+              <strong>{formatCurrency(month.total)}</strong>
+              <div className="dashboard-year-track" aria-hidden="true">
+                <span style={{ width: `${month.percent}%` }} />
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="dashboard-layout">

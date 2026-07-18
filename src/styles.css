@@ -815,6 +815,96 @@ button {
   white-space: nowrap;
 }
 
+.dashboard-year-panel .section-heading {
+  margin-bottom: 20px;
+}
+
+.dashboard-year-panel .section-heading > strong {
+  color: var(--primary);
+  font-size: 1.35rem;
+}
+
+.dashboard-year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-year-month {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+}
+
+.dashboard-year-month.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.dashboard-year-month > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dashboard-year-month span,
+.dashboard-year-month small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.dashboard-year-month > div:first-child span {
+  color: var(--text);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.dashboard-year-month > strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-year-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track-bg);
+}
+
+.dashboard-year-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #38bdf8);
+}
+
+@media (max-width: 900px) {
+  .dashboard-year-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-year-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-year-panel .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .dashboard-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
