@@ -170,6 +170,7 @@ function getPlaceSuggestions(payments) {
     if (!place) return;
 
     const normalizedPlace = place.toLocaleLowerCase("pt-BR");
+    if (normalizedPlace === "local não informado") return;
     if (!uniquePlaces.has(normalizedPlace)) uniquePlaces.set(normalizedPlace, place);
   });
 
@@ -3558,6 +3559,13 @@ function ResourceMonthSwitcher({ selectedMonth, onMonthChange }) {
   );
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
 function OtherAccountsView({
   marketForm,
   marketFormError,
@@ -4235,17 +4243,20 @@ function ResourceListView({
         <form className="form-grid resource-form" onSubmit={onSubmit}>
           <label>
             {isMarket ? "Mercado" : "Local"}
-            <input
-              value={isMarket ? form.market : form.place}
-              onChange={(event) => onChange(isMarket ? "market" : "place", event.target.value)}
-              placeholder={isMarket ? "Ex.: ARD" : "Ex.: Amazon"}
-              list={isMarket ? undefined : "other-payment-place-suggestions"}
-              autoComplete="off"
-            />
-            {!isMarket && (
-              <datalist id="other-payment-place-suggestions">
-                {placeSuggestions.map((place) => <option key={place} value={place} />)}
-              </datalist>
+            {isMarket ? (
+              <input
+                value={form.market}
+                onChange={(event) => onChange("market", event.target.value)}
+                placeholder="Ex.: ARD"
+              />
+            ) : (
+              <PlaceAutocomplete
+                id="new-other-payment-place"
+                value={form.place}
+                suggestions={placeSuggestions}
+                onChange={(value) => onChange("place", value)}
+                placeholder="Ex.: Amazon"
+              />
             )}
           </label>
           <label>
@@ -4351,6 +4362,95 @@ function ResourceListView({
           {!monthlyItems.length && <div className="empty-state">Nenhum lançamento neste mês.</div>}
         </div>
       </section>
+    </div>
+  );
+}
+
+function PlaceAutocomplete({ id, value, suggestions, onChange, placeholder, required = false }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const searchValue = normalizeSearchText(value.trim());
+  const filteredSuggestions = useMemo(() => {
+    if (!searchValue) return [];
+
+    return suggestions
+      .filter((suggestion) => {
+        const normalizedSuggestion = normalizeSearchText(suggestion);
+        return normalizedSuggestion.includes(searchValue) && normalizedSuggestion !== searchValue;
+      })
+      .slice(0, 8);
+  }, [searchValue, suggestions]);
+  const showSuggestions = isOpen && filteredSuggestions.length > 0;
+
+  function selectSuggestion(suggestion) {
+    onChange(suggestion);
+    setIsOpen(false);
+    setActiveIndex(0);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Escape") {
+      setIsOpen(false);
+      return;
+    }
+
+    if (!filteredSuggestions.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setIsOpen(true);
+      setActiveIndex((current) => Math.min(current + 1, filteredSuggestions.length - 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setIsOpen(true);
+      setActiveIndex((current) => Math.max(current - 1, 0));
+    } else if (event.key === "Enter" && showSuggestions) {
+      event.preventDefault();
+      selectSuggestion(filteredSuggestions[activeIndex]);
+    }
+  }
+
+  return (
+    <div
+      className="place-autocomplete"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
+      }}
+    >
+      <input
+        aria-autocomplete="list"
+        aria-controls={`${id}-options`}
+        aria-expanded={showSuggestions}
+        autoComplete="off"
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setActiveIndex(0);
+          setIsOpen(Boolean(event.target.value.trim()));
+        }}
+        onFocus={() => setIsOpen(Boolean(value.trim()))}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        role="combobox"
+        required={required}
+      />
+      {showSuggestions && (
+        <div className="place-autocomplete-options" id={`${id}-options`} role="listbox">
+          {filteredSuggestions.map((suggestion, index) => (
+            <button
+              aria-selected={index === activeIndex}
+              className={index === activeIndex ? "active" : ""}
+              key={suggestion}
+              onClick={() => selectSuggestion(suggestion)}
+              onMouseDown={(event) => event.preventDefault()}
+              role="option"
+              tabIndex={-1}
+              type="button"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -4709,17 +4809,16 @@ function EditResourceItemModal({ item, placeSuggestions, onClose, onSave }) {
           <div className="form-grid">
             <label>
               <span>{isMarket ? "Mercado" : "Local"}</span>
-              <input
-                value={isMarket ? form.market : form.place}
-                onChange={(event) => updateField(isMarket ? "market" : "place", event.target.value)}
-                list={isMarket ? undefined : "edit-other-payment-place-suggestions"}
-                autoComplete="off"
-                required
-              />
-              {!isMarket && (
-                <datalist id="edit-other-payment-place-suggestions">
-                  {placeSuggestions.map((place) => <option key={place} value={place} />)}
-                </datalist>
+              {isMarket ? (
+                <input value={form.market} onChange={(event) => updateField("market", event.target.value)} required />
+              ) : (
+                <PlaceAutocomplete
+                  id="edit-other-payment-place"
+                  value={form.place}
+                  suggestions={placeSuggestions}
+                  onChange={(value) => updateField("place", value)}
+                  required
+                />
               )}
             </label>
             <label>
