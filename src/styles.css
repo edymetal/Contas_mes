@@ -3470,6 +3470,16 @@ textarea:focus {
   min-width: 0;
 }
 
+.settlement-history-actions .icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.settlement-history-edit input[readonly] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 /* Modals */
 .modal-backdrop {
   position: fixed;

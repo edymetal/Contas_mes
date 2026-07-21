@@ -52,6 +52,13 @@ import {
   validateGeminiApiKey,
 } from "./services/receiptAnalysis";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE, getPersonById, getProfileByEmail } from "./config/people";
+import {
+  calculateSettlementRows,
+  collectPendingSettlementShares,
+  getSettlementAccountingMonth,
+  hasLaterSettlementPayment,
+  resolveLegacyAffectedShares,
+} from "./domain/settlements";
 import packageInfo from "../package.json";
 
 const appVersion = import.meta.env.VITE_APP_VERSION || packageInfo.version;
@@ -1519,45 +1526,97 @@ function App() {
     setActionMessage("Pagamento registrado.");
   }
 
-  function queueSettlementShareUpdates(batch, row, { isSettled, paidAt, paymentType, now }) {
-    expenses.forEach((expense) => {
-      const updates = {};
-      const directShare = getShare(expense, row.fromId);
-      const reverseShare = getShare(expense, row.toId);
+  function queueAffectedShareUpdates(
+    batch,
+    sourceExpenses,
+    affectedShares,
+    settlement,
+    { isSettled, paidAt, paymentType, now },
+  ) {
+    const expensesById = new Map(sourceExpenses.map((expense) => [expense.id, expense]));
+    const updatesByExpenseId = new Map();
 
-      if (expense.payerId === row.toId && ["pending", "settled"].includes(directShare?.status)) {
-        updates[`shares.${row.fromId}.status`] = isSettled ? "settled" : "pending";
-        updates[`shares.${row.fromId}.payment`] = isSettled
-          ? {
-              paidAt,
-              type: paymentType,
-              description: `Liquidado no acerto mensal de ${selectedMonth}`,
-              registeredBy: profile.id,
-              registeredAt: now,
-            }
-          : null;
+    affectedShares.forEach((affectedShare) => {
+      const expense = expensesById.get(affectedShare.expenseId);
+      const share = expense?.shares?.[affectedShare.personId];
+      if (!expense || !share) {
+        throw new Error("Um dos rateios vinculados ao acerto não foi encontrado.");
       }
 
-      if (expense.payerId === row.fromId && ["pending", "settled"].includes(reverseShare?.status)) {
-        updates[`shares.${row.toId}.status`] = isSettled ? "settled" : "pending";
-        updates[`shares.${row.toId}.payment`] = isSettled
-          ? {
-              paidAt,
-              type: "Compensacao",
-              description: `Compensado no acerto mensal de ${selectedMonth}`,
-              registeredBy: profile.id,
-              registeredAt: now,
-            }
-          : null;
+      if (share.payment?.settlementId && share.payment.settlementId !== settlement.id) {
+        throw new Error("Um rateio deste acerto já foi alterado por outro pagamento.");
+      }
+      if (isSettled && !["pending", "settled"].includes(share.status)) {
+        throw new Error("Um rateio deste acerto possui um status que não pode ser liquidado automaticamente.");
       }
 
-      if (Object.keys(updates).length) {
-        batch.update(doc(db, "expenses", expense.id), {
-          ...updates,
-          updatedAt: serverTimestamp(),
-        });
-      }
+      const existingSettlementPayment = share.status === "settled" ? share.payment : null;
+      const updates = updatesByExpenseId.get(expense.id) || {};
+      updates[`shares.${affectedShare.personId}.status`] = isSettled
+        ? "settled"
+        : affectedShare.previousStatus || "pending";
+      updates[`shares.${affectedShare.personId}.payment`] = isSettled
+        ? {
+            settlementId: settlement.id,
+            paidAt,
+            type: affectedShare.direction === "reverse" ? "Compensação" : paymentType,
+            description:
+              affectedShare.direction === "reverse"
+                ? `Compensado no acerto mensal de ${settlement.monthKey}`
+                : `Liquidado no acerto mensal de ${settlement.monthKey}`,
+            registeredBy: existingSettlementPayment?.registeredBy || profile.id,
+            registeredAt: existingSettlementPayment?.registeredAt || now,
+          }
+        : affectedShare.previousPayment ?? null;
+      updatesByExpenseId.set(expense.id, updates);
     });
+
+    updatesByExpenseId.forEach((updates, expenseId) => {
+      batch.update(doc(db, "expenses", expenseId), {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    });
+  }
+
+  async function loadSettlementContext(payment) {
+    const accountingMonth = getSettlementAccountingMonth(payment);
+    if (!accountingMonth) throw new Error("O acerto não possui um mês contábil válido.");
+
+    const [expensesSnapshot, settlementsSnapshot] = await Promise.all([
+      getDocs(collection(db, "expenses")),
+      getDocs(query(collection(db, "settlements"), where("monthKey", "==", accountingMonth))),
+    ]);
+    const persistedExpenses = expensesSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const persistedPayments = settlementsSnapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .filter((item) => item.kind === "payment");
+    const persistedPayment = persistedPayments.find((item) => item.id === payment.id);
+    if (!persistedPayment) throw new Error("O pagamento selecionado não foi encontrado.");
+
+    return {
+      accountingMonth,
+      monthExpenses: getExpensesForMonth(persistedExpenses, accountingMonth),
+      persistedPayment: { ...persistedPayment, monthKey: accountingMonth },
+      persistedPayments,
+    };
+  }
+
+  function getAffectedSharesForExistingPayment(payment, monthExpenses) {
+    if (Array.isArray(payment.affectedShares) && payment.affectedShares.length) {
+      return payment.affectedShares;
+    }
+
+    const legacyResolution = resolveLegacyAffectedShares(monthExpenses, payment);
+    if (legacyResolution.ambiguous) {
+      throw new Error(
+        "Este acerto antigo não pode ser relacionado com segurança aos rateios originais. Nenhum dado foi alterado.",
+      );
+    }
+    if (!legacyResolution.affectedShares.length) {
+      throw new Error("Nenhum rateio vinculado a este acerto antigo foi encontrado. Nenhum dado foi alterado.");
+    }
+    return legacyResolution.affectedShares;
   }
 
   async function registerSettlementPayment(row, paymentData) {
@@ -1580,66 +1639,57 @@ function App() {
     const paidAt = paymentData.paidAt || todayInputValue();
     const paymentType = paymentData.type || "PIX";
     const description = paymentData.description?.trim() || "";
-    const batch = writeBatch(db);
-    const now = new Date().toISOString();
-    const settlementRef = doc(collection(db, "settlements"));
+    try {
+      const batch = writeBatch(db);
+      const now = new Date().toISOString();
+      const settlementRef = doc(collection(db, "settlements"));
+      const settlement = {
+        id: settlementRef.id,
+        monthKey: selectedMonth,
+        fromId: row.fromId,
+        toId: row.toId,
+      };
+      const affectedShares = isFullPayment ? collectPendingSettlementShares(expenses, row) : [];
 
-    if (isFullPayment) {
-      expenses.forEach((expense) => {
-        const updates = {};
-        const directShare = getShare(expense, row.fromId);
-        const reverseShare = getShare(expense, row.toId);
-
-        if (expense.payerId === row.toId && directShare?.status === "pending") {
-          updates[`shares.${row.fromId}.status`] = "settled";
-          updates[`shares.${row.fromId}.payment`] = {
-            paidAt,
-            type: paymentType,
-            description: `Liquidado no acerto mensal de ${selectedMonth}`,
-            registeredBy: profile.id,
-            registeredAt: now,
-          };
+      if (isFullPayment) {
+        if (!affectedShares.length) {
+          setActionMessage("Nenhum rateio pendente foi encontrado para quitar.");
+          return false;
         }
+        queueAffectedShareUpdates(batch, expenses, affectedShares, settlement, {
+          isSettled: true,
+          paidAt,
+          paymentType,
+          now,
+        });
+      }
 
-        if (expense.payerId === row.fromId && reverseShare?.status === "pending") {
-          updates[`shares.${row.toId}.status`] = "settled";
-          updates[`shares.${row.toId}.payment`] = {
-            paidAt,
-            type: "Compensação",
-            description: `Compensado no acerto mensal de ${selectedMonth}`,
-            registeredBy: profile.id,
-            registeredAt: now,
-          };
-        }
-
-        if (Object.keys(updates).length) {
-          batch.update(doc(db, "expenses", expense.id), {
-            ...updates,
-            updatedAt: serverTimestamp(),
-          });
-        }
+      batch.set(settlementRef, {
+        schemaVersion: 2,
+        kind: "payment",
+        monthKey: selectedMonth,
+        fromId: row.fromId,
+        toId: row.toId,
+        amount: paymentAmount,
+        paidAt,
+        type: paymentType,
+        description,
+        status: isFullPayment ? "settled" : "partial",
+        balanceBeforePayment: remainingAmount,
+        balanceAfterPayment: roundMoney(remainingAmount - paymentAmount),
+        affectedShares,
+        createdBy: profile.id,
+        createdAtClient: now,
+        createdAt: serverTimestamp(),
       });
+
+      await batch.commit();
+      setActionMessage(isFullPayment ? "Dívida quitada com sucesso." : "Pagamento parcial registrado.");
+      return true;
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "registrar o pagamento de acerto"));
+      return false;
     }
-
-    batch.set(settlementRef, {
-      kind: "payment",
-      monthKey: selectedMonth,
-      fromId: row.fromId,
-      toId: row.toId,
-      amount: paymentAmount,
-      paidAt,
-      type: paymentType,
-      description,
-      status: isFullPayment ? "settled" : "partial",
-      balanceBeforePayment: remainingAmount,
-      balanceAfterPayment: roundMoney(remainingAmount - paymentAmount),
-      createdBy: profile.id,
-      createdAt: serverTimestamp(),
-    });
-
-    await batch.commit();
-    setActionMessage(isFullPayment ? "Dívida quitada com sucesso." : "Pagamento parcial registrado.");
-    return true;
   }
 
   async function updateSettlementPayment(payment, paymentData) {
@@ -1651,64 +1701,107 @@ function App() {
       return false;
     }
 
-    const paymentAmount = roundMoney(rawAmount);
-    const balanceBeforePayment = Number(payment.balanceBeforePayment || payment.amount || 0);
-    if (balanceBeforePayment > 0 && paymentAmount > balanceBeforePayment) {
-      setActionMessage(`O valor nao pode passar de ${formatCurrency(balanceBeforePayment)}.`);
+    try {
+      const context = await loadSettlementContext(payment);
+      const currentPayment = context.persistedPayment;
+      const paymentAmount = roundMoney(rawAmount);
+      const currentAmount = roundMoney(currentPayment.amount);
+      const amountChanged = paymentAmount !== currentAmount;
+      const balanceBeforePayment = Number(currentPayment.balanceBeforePayment || currentPayment.amount || 0);
+      if (balanceBeforePayment > 0 && paymentAmount > balanceBeforePayment) {
+        setActionMessage(`O valor não pode passar de ${formatCurrency(balanceBeforePayment)}.`);
+        return false;
+      }
+      if (amountChanged && hasLaterSettlementPayment(currentPayment, context.persistedPayments)) {
+        setActionMessage("Ajuste primeiro os pagamentos mais recentes deste acerto antes de alterar o valor.");
+        return false;
+      }
+
+      const paidAt = paymentData.paidAt || todayInputValue();
+      const paymentType = paymentData.type || "PIX";
+      const description = paymentData.description?.trim() || "";
+      const isSettled = balanceBeforePayment > 0 && paymentAmount >= balanceBeforePayment;
+      const wasSettled = currentPayment.status === "settled";
+      const batch = writeBatch(db);
+      const now = new Date().toISOString();
+      let affectedShares = [];
+
+      if (wasSettled) {
+        affectedShares = getAffectedSharesForExistingPayment(currentPayment, context.monthExpenses);
+        queueAffectedShareUpdates(batch, context.monthExpenses, affectedShares, currentPayment, {
+          isSettled,
+          paidAt,
+          paymentType,
+          now,
+        });
+      } else if (isSettled) {
+        affectedShares = collectPendingSettlementShares(context.monthExpenses, currentPayment);
+        if (!affectedShares.length) {
+          setActionMessage("Nenhum rateio pendente foi encontrado para quitar neste mês.");
+          return false;
+        }
+        queueAffectedShareUpdates(batch, context.monthExpenses, affectedShares, currentPayment, {
+          isSettled: true,
+          paidAt,
+          paymentType,
+          now,
+        });
+      }
+
+      batch.update(doc(db, "settlements", currentPayment.id), {
+        schemaVersion: 2,
+        amount: paymentAmount,
+        paidAt,
+        type: paymentType,
+        description,
+        status: isSettled ? "settled" : "partial",
+        balanceAfterPayment: balanceBeforePayment > 0 ? roundMoney(balanceBeforePayment - paymentAmount) : 0,
+        affectedShares: isSettled ? affectedShares : [],
+        updatedAt: serverTimestamp(),
+        updatedBy: profile.id,
+      });
+
+      await batch.commit();
+      setActionMessage("Pagamento de acerto atualizado.");
+      return true;
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "atualizar o pagamento de acerto"));
       return false;
     }
-
-    const paidAt = paymentData.paidAt || todayInputValue();
-    const paymentType = paymentData.type || "PIX";
-    const description = paymentData.description?.trim() || "";
-
-    const isSettled = balanceBeforePayment > 0 && paymentAmount >= balanceBeforePayment;
-    const batch = writeBatch(db);
-    const now = new Date().toISOString();
-
-    if (payment.status === "settled" || isSettled) {
-      queueSettlementShareUpdates(batch, payment, {
-        isSettled,
-        paidAt,
-        paymentType,
-        now,
-      });
-    }
-
-    batch.update(doc(db, "settlements", payment.id), {
-      amount: paymentAmount,
-      paidAt,
-      type: paymentType,
-      description,
-      status: isSettled ? "settled" : "partial",
-      balanceAfterPayment: balanceBeforePayment > 0 ? roundMoney(balanceBeforePayment - paymentAmount) : 0,
-      updatedAt: serverTimestamp(),
-      updatedBy: profile.id,
-    });
-
-    await batch.commit();
-
-    setActionMessage("Pagamento de acerto atualizado.");
-    return true;
   }
 
   async function deleteSettlementPayment(payment) {
     if (!ensureCanManageData()) return;
-    if (!window.confirm("Tem certeza que deseja apagar este pagamento do historico?")) return;
+    const accountingMonth = getSettlementAccountingMonth(payment);
+    if (!window.confirm(
+      `Apagar o pagamento de ${formatCurrency(payment.amount)} referente a ${formatMonthLabel(accountingMonth)}?`,
+    )) return;
 
-    const batch = writeBatch(db);
-    if (payment.status === "settled") {
-      queueSettlementShareUpdates(batch, payment, {
-        isSettled: false,
-        paidAt: payment.paidAt || todayInputValue(),
-        paymentType: payment.type || "PIX",
-        now: new Date().toISOString(),
-      });
+    try {
+      const context = await loadSettlementContext(payment);
+      const currentPayment = context.persistedPayment;
+      if (hasLaterSettlementPayment(currentPayment, context.persistedPayments)) {
+        setActionMessage("Apague primeiro os pagamentos mais recentes deste acerto.");
+        return;
+      }
+
+      const batch = writeBatch(db);
+      if (currentPayment.status === "settled") {
+        const affectedShares = getAffectedSharesForExistingPayment(currentPayment, context.monthExpenses);
+        queueAffectedShareUpdates(batch, context.monthExpenses, affectedShares, currentPayment, {
+          isSettled: false,
+          paidAt: currentPayment.paidAt || todayInputValue(),
+          paymentType: currentPayment.type || "PIX",
+          now: new Date().toISOString(),
+        });
+      }
+
+      batch.delete(doc(db, "settlements", currentPayment.id));
+      await batch.commit();
+      setActionMessage("Pagamento de acerto apagado.");
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "apagar o pagamento de acerto"));
     }
-
-    batch.delete(doc(db, "settlements", payment.id));
-    await batch.commit();
-    setActionMessage("Pagamento de acerto apagado.");
   }
 
   async function handleDeleteExpense(expense) {
@@ -3504,6 +3597,7 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                 <div className="settlement-history-month-list">
                   {group.payments.map((payment) => {
                     const isEditing = editingPaymentId === payment.id;
+                    const hasLaterPayment = hasLaterSettlementPayment(payment, settlementPayments);
 
                     return (
                       <article className="settlement-history-item" key={payment.id}>
@@ -3520,6 +3614,8 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                           onChange={(event) =>
                             setEditingPaymentForm((current) => ({ ...current, amount: event.target.value }))
                           }
+                          readOnly={hasLaterPayment}
+                          title={hasLaterPayment ? "Ajuste primeiro os pagamentos mais recentes deste acerto." : ""}
                           required
                         />
                       </label>
@@ -3550,7 +3646,7 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                       </label>
 
                       <label className="settlement-history-description">
-                        <span>Descricao</span>
+                        <span>Descrição</span>
                         <input
                           value={editingPaymentForm.description}
                           onChange={(event) =>
@@ -3559,6 +3655,12 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                           placeholder="Ex: transferencia recebida"
                         />
                       </label>
+
+                      {hasLaterPayment && (
+                        <small className="settlement-history-description">
+                          O valor está protegido porque há pagamentos posteriores. Data, tipo e descrição ainda podem ser editados.
+                        </small>
+                      )}
 
                       <div className="settlement-history-actions">
                         <button className="primary-button" type="submit">
@@ -3580,6 +3682,7 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                           {formatDate(payment.paidAt)} - {payment.type || "PIX"}
                           {payment.description ? ` - ${payment.description}` : ""}
                         </small>
+                        <small>Referente a {formatMonthLabel(payment.monthKey)}</small>
                       </div>
 
                       <div className="settlement-history-actions">
@@ -3594,8 +3697,9 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                         <button
                           className="icon-button"
                           onClick={() => onDeletePayment(payment)}
-                          title="Apagar pagamento"
+                          title={hasLaterPayment ? "Apague primeiro os pagamentos mais recentes deste acerto" : "Apagar pagamento"}
                           type="button"
+                          disabled={hasLaterPayment}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -3613,73 +3717,6 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
       </div>
     </section>
   );
-}
-
-function calculateSettlementRows(expenses, settlementPayments = []) {
-  const balances = new Map();
-  const paidBalances = new Map();
-
-  expenses.forEach((expense) => {
-    Object.entries(expense.shares || {}).forEach(([personId, share]) => {
-      if (personId === expense.payerId || !["pending", "settled"].includes(share.status)) return;
-      const key = `${personId}->${expense.payerId}`;
-      balances.set(key, (balances.get(key) || 0) + Number(share.amount || 0));
-    });
-  });
-
-  settlementPayments.forEach((payment) => {
-    const key = `${payment.fromId}->${payment.toId}`;
-    paidBalances.set(key, roundMoney((paidBalances.get(key) || 0) + Number(payment.amount || 0)));
-  });
-
-  const rows = [];
-  for (let index = 0; index < PEOPLE.length; index += 1) {
-    for (let nextIndex = index + 1; nextIndex < PEOPLE.length; nextIndex += 1) {
-      const first = PEOPLE[index].id;
-      const second = PEOPLE[nextIndex].id;
-      const firstOwesSecond = roundMoney(balances.get(`${first}->${second}`) || 0);
-      const secondOwesFirst = roundMoney(balances.get(`${second}->${first}`) || 0);
-      const firstPaidSecond = roundMoney(paidBalances.get(`${first}->${second}`) || 0);
-      const secondPaidFirst = roundMoney(paidBalances.get(`${second}->${first}`) || 0);
-      const firstOpenDebt = roundMoney(Math.max(firstOwesSecond - firstPaidSecond, 0));
-      const secondOpenDebt = roundMoney(Math.max(secondOwesFirst - secondPaidFirst, 0));
-      const net = roundMoney(firstOpenDebt - secondOpenDebt);
-
-      if (net > 0) {
-        const paidAmount = Math.min(firstPaidSecond, firstOwesSecond);
-        const crossPaidAmount = Math.min(secondOpenDebt, firstOwesSecond - paidAmount);
-        const remainingAmount = roundMoney(firstOwesSecond - paidAmount - crossPaidAmount);
-        if (remainingAmount > 0) {
-          rows.push({
-            fromId: first,
-            toId: second,
-            originalAmount: firstOwesSecond,
-            paidAmount,
-            crossPaidAmount,
-            amount: remainingAmount,
-          });
-        }
-      }
-
-      if (net < 0) {
-        const paidAmount = Math.min(secondPaidFirst, secondOwesFirst);
-        const crossPaidAmount = Math.min(firstOpenDebt, secondOwesFirst - paidAmount);
-        const remainingAmount = roundMoney(secondOwesFirst - paidAmount - crossPaidAmount);
-        if (remainingAmount > 0) {
-          rows.push({
-            fromId: second,
-            toId: first,
-            originalAmount: secondOwesFirst,
-            paidAmount,
-            crossPaidAmount,
-            amount: remainingAmount,
-          });
-        }
-      }
-    }
-  }
-
-  return rows;
 }
 
 function SettingsPanel({ theme, setTheme }) {
