@@ -3863,45 +3863,26 @@ function SettingsPanel({ theme, setTheme }) {
             Escolha como prefere visualizar o painel de despesas.
           </p>
 
-          <div className="checkbox-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-            <button
-              type="button"
-              className={`checkbox-card ${theme === "light" ? "active" : ""}`}
-              style={{
-                cursor: "pointer",
-                border: theme === "light" ? "2px solid var(--primary)" : "1px solid var(--line)",
-                background: "var(--input-bg)",
-                padding: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontWeight: theme === "light" ? "bold" : "normal"
-              }}
-              onClick={() => setTheme("light")}
-            >
-              <span style={{ color: "var(--text)" }}>☀️ Tema Claro</span>
-              {theme === "light" && <Check size={18} style={{ color: "var(--primary)" }} />}
-            </button>
-
-            <button
-              type="button"
-              className={`checkbox-card ${theme === "dark" ? "active" : ""}`}
-              style={{
-                cursor: "pointer",
-                border: theme === "dark" ? "2px solid var(--primary)" : "1px solid var(--line)",
-                background: "var(--input-bg)",
-                padding: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontWeight: theme === "dark" ? "bold" : "normal"
-              }}
-              onClick={() => setTheme("dark")}
-            >
-              <span style={{ color: "var(--text)" }}>🌙 Tema Escuro</span>
-              {theme === "dark" && <Check size={18} style={{ color: "var(--primary)" }} />}
-            </button>
-          </div>
+          <button
+            aria-checked={theme === "dark"}
+            aria-label="Alternar entre tema claro e tema escuro"
+            className="theme-switch-control"
+            data-theme-mode={theme}
+            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+            role="switch"
+            title={theme === "dark" ? "Tema escuro ativo. Clique para usar o tema claro." : "Tema claro ativo. Clique para usar o tema escuro."}
+            type="button"
+          >
+            <span className={theme === "light" ? "theme-switch-label active" : "theme-switch-label"}>
+              ☀️ Tema Claro
+            </span>
+            <span className="theme-switch-track" aria-hidden="true">
+              <span className="theme-switch-thumb">{theme === "dark" ? "🌙" : "☀️"}</span>
+            </span>
+            <span className={theme === "dark" ? "theme-switch-label active" : "theme-switch-label"}>
+              🌙 Tema Escuro
+            </span>
+          </button>
         </div>
 
         <hr style={{ border: "0", borderTop: "1px solid var(--line)", margin: "8px 0" }} />
