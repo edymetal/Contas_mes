@@ -2059,6 +2059,7 @@ function App() {
             allExpenses={allExpenses}
             expenses={expenses}
             selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
             onEdit={setEditingExpense}
             onDelete={handleDeleteExpense}
             dataLoading={dataLoading}
@@ -4817,7 +4818,7 @@ function sumInstallmentExpenses(expenses) {
     .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
 }
 
-function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
+function ManagePanel({ allExpenses = [], expenses, selectedMonth, onMonthChange, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
   const expenseSource = allExpenses.length ? allExpenses : expenses;
   const monthlyInstallmentKeys = useMemo(() => {
@@ -4869,14 +4870,6 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
     fixed: `${fixedExpensesCount} conta(s) fixa(s)`,
   }[manageView];
 
-  if (dataLoading) {
-    return <div className="empty-state">Carregando...</div>;
-  }
-
-  if (!expenses.length && !installmentSummaries.length && !fixedExpensesCount) {
-    return <div className="empty-state">Nenhuma conta cadastrada neste mês.</div>;
-  }
-
   return (
     <section className="panel">
       <div className="section-heading manage-heading">
@@ -4885,6 +4878,7 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
           <span>{viewCount}</span>
         </div>
         <div className="manage-actions">
+          <ResourceMonthSwitcher selectedMonth={selectedMonth} onMonthChange={onMonthChange} />
           <button
             className={manageView === "installments" ? "primary-button" : "secondary-button"}
             onClick={() => setManageView((current) => (current === "installments" ? "month" : "installments"))}
@@ -4902,7 +4896,9 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
         </div>
       </div>
 
-      {manageView === "installments" ? (
+      {dataLoading ? (
+        <div className="empty-state">Carregando...</div>
+      ) : manageView === "installments" ? (
         <InstallmentSeriesView
           activeInstallments={activeInstallments}
           finishedInstallments={finishedInstallments}

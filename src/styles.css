@@ -3798,6 +3798,24 @@ textarea:focus {
     width: 100%;
   }
 
+  .manage-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manage-actions {
+    width: 100%;
+  }
+
+  .manage-actions > .resource-month-controls {
+    order: 0;
+  }
+
+  .manage-actions > .primary-button,
+  .manage-actions > .secondary-button {
+    width: 100%;
+  }
+
   .resource-month-controls {
     order: 1;
   }
