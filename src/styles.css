@@ -3807,10 +3807,6 @@ textarea:focus {
     width: 100%;
   }
 
-  .manage-actions > .resource-month-controls {
-    order: 0;
-  }
-
   .manage-actions > .primary-button,
   .manage-actions > .secondary-button {
     width: 100%;

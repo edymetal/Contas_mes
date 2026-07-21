@@ -1977,6 +1977,9 @@ function App() {
               <span className="eyebrow">{selectedMonth}</span>
               <h1>{getViewTitle(activeView)}</h1>
             </div>
+            {activeView === "manage" && (
+              <ResourceMonthSwitcher selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+            )}
           </header>
 
         {actionMessage && <div className="notice">{actionMessage}</div>}
@@ -2059,7 +2062,6 @@ function App() {
             allExpenses={allExpenses}
             expenses={expenses}
             selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
             onEdit={setEditingExpense}
             onDelete={handleDeleteExpense}
             dataLoading={dataLoading}
@@ -4818,7 +4820,7 @@ function sumInstallmentExpenses(expenses) {
     .reduce((sum, expense) => roundMoney(sum + Number(expense.totalValue || 0)), 0);
 }
 
-function ManagePanel({ allExpenses = [], expenses, selectedMonth, onMonthChange, onEdit, onDelete, dataLoading }) {
+function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
   const expenseSource = allExpenses.length ? allExpenses : expenses;
   const monthlyInstallmentKeys = useMemo(() => {
@@ -4878,7 +4880,6 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onMonthChange,
           <span>{viewCount}</span>
         </div>
         <div className="manage-actions">
-          <ResourceMonthSwitcher selectedMonth={selectedMonth} onMonthChange={onMonthChange} />
           <button
             className={manageView === "installments" ? "primary-button" : "secondary-button"}
             onClick={() => setManageView((current) => (current === "installments" ? "month" : "installments"))}
