@@ -59,9 +59,17 @@ import {
   hasLaterSettlementPayment,
   resolveLegacyAffectedShares,
 } from "./domain/settlements";
+import {
+  BACKUP_COLLECTIONS,
+  createBackupPayload,
+  formatBackupSummary,
+  restoreFirestoreTimestamps,
+  validateAndNormalizeBackupPayload,
+} from "./domain/backup";
 import packageInfo from "../package.json";
 
 const appVersion = import.meta.env.VITE_APP_VERSION || packageInfo.version;
+const MAX_BACKUP_FILE_SIZE = 25 * 1024 * 1024;
 
 const MONTHS_PT = [
   { value: "01", short: "Jan" },
@@ -3728,25 +3736,19 @@ function SettingsPanel({ theme, setTheme }) {
     setIsExporting(true);
     setBackupMessage(null);
     try {
-      const expensesSnap = await getDocs(collection(db, "expenses"));
-      const settlementsSnap = await getDocs(collection(db, "settlements"));
-
-      const expenses = expensesSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      const settlements = settlementsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      const exportObj = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        expenses,
-        settlements
-      };
+      const snapshots = await Promise.all(
+        BACKUP_COLLECTIONS.map(({ key }) => getDocs(collection(db, key))),
+      );
+      const collectionData = Object.fromEntries(
+        BACKUP_COLLECTIONS.map(({ key }, index) => [
+          key,
+          snapshots[index].docs.map((document) => ({
+            ...document.data(),
+            id: document.id,
+          })),
+        ]),
+      );
+      const exportObj = createBackupPayload(collectionData);
 
       const jsonString = JSON.stringify(exportObj, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
@@ -3757,7 +3759,10 @@ function SettingsPanel({ theme, setTheme }) {
       link.click();
       URL.revokeObjectURL(url);
 
-      setBackupMessage({ type: "success", text: "Backup exportado com sucesso!" });
+      setBackupMessage({
+        type: "success",
+        text: `Backup completo exportado: ${formatBackupSummary(exportObj)}.`,
+      });
     } catch (error) {
       console.error("Erro ao exportar backup:", error);
       setBackupMessage({ type: "error", text: `Erro ao exportar backup: ${error.message || error}` });
@@ -3766,37 +3771,32 @@ function SettingsPanel({ theme, setTheme }) {
     }
   }
 
-  function restoreTimestamps(obj) {
-    if (obj === null || obj === undefined) return obj;
-    if (typeof obj !== "object") return obj;
-
-    if (
-      typeof obj.seconds === "number" &&
-      typeof obj.nanoseconds === "number" &&
-      Object.keys(obj).length === 2
-    ) {
-      return new Timestamp(obj.seconds, obj.nanoseconds);
+  async function importCollection(collectionName, items) {
+    for (let index = 0; index < items.length; index += 400) {
+      const batch = writeBatch(db);
+      items.slice(index, index + 400).forEach((item) => {
+        const { id, ...docData } = item;
+        const restoredData = restoreFirestoreTimestamps(
+          docData,
+          (seconds, nanoseconds) => new Timestamp(seconds, nanoseconds),
+        );
+        batch.set(doc(db, collectionName, id), restoredData, { merge: true });
+      });
+      await batch.commit();
     }
-
-    if (Array.isArray(obj)) {
-      return obj.map(restoreTimestamps);
-    }
-
-    const restored = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        restored[key] = restoreTimestamps(obj[key]);
-      }
-    }
-    return restored;
   }
 
   async function handleImport(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    const input = event.currentTarget;
 
-    if (!window.confirm("A importação irá adicionar ou atualizar as contas com base no backup. Deseja continuar?")) {
-      event.target.value = "";
+    if (file.size > MAX_BACKUP_FILE_SIZE) {
+      setBackupMessage({
+        type: "error",
+        text: "O arquivo excede o limite de 25 MB permitido para importação.",
+      });
+      input.value = "";
       return;
     }
 
@@ -3807,80 +3807,35 @@ function SettingsPanel({ theme, setTheme }) {
     reader.onload = async (e) => {
       try {
         const text = e.target.result;
-        const data = JSON.parse(text);
+        const data = validateAndNormalizeBackupPayload(JSON.parse(text));
+        const summary = formatBackupSummary(data);
+        const confirmed = window.confirm(
+          `Backup versão ${data.version}: ${summary}.\n\n` +
+          "A importação adiciona ou atualiza esses registros e não apaga os dados atuais. Deseja continuar?",
+        );
+        if (!confirmed) return;
 
-        if (!data || (!data.expenses && !data.settlements)) {
-          throw new Error("Formato de backup inválido. O arquivo JSON deve conter as coleções de contas.");
-        }
-
-        let importedExpensesCount = 0;
-        let importedSettlementsCount = 0;
-
-        // Import expenses
-        if (data.expenses && data.expenses.length > 0) {
-          let batch = writeBatch(db);
-          let count = 0;
-          for (const item of data.expenses) {
-            const { id, ...docData } = item;
-            const restoredData = restoreTimestamps(docData);
-
-            const docRef = doc(db, "expenses", id);
-            batch.set(docRef, restoredData, { merge: true });
-            count++;
-            importedExpensesCount++;
-
-            if (count === 400) {
-              await batch.commit();
-              batch = writeBatch(db);
-              count = 0;
-            }
-          }
-          if (count > 0) {
-            await batch.commit();
-          }
-        }
-
-        // Import settlements
-        if (data.settlements && data.settlements.length > 0) {
-          let batch = writeBatch(db);
-          let count = 0;
-          for (const item of data.settlements) {
-            const { id, ...docData } = item;
-            const restoredData = restoreTimestamps(docData);
-
-            const docRef = doc(db, "settlements", id);
-            batch.set(docRef, restoredData, { merge: true });
-            count++;
-            importedSettlementsCount++;
-
-            if (count === 400) {
-              await batch.commit();
-              batch = writeBatch(db);
-              count = 0;
-            }
-          }
-          if (count > 0) {
-            await batch.commit();
-          }
+        for (const { key } of BACKUP_COLLECTIONS) {
+          await importCollection(key, data[key]);
         }
 
         setBackupMessage({
           type: "success",
-          text: `Backup importado com sucesso! ${importedExpensesCount} contas e ${importedSettlementsCount} acertos processados.`
+          text: `Backup versão ${data.version} importado com sucesso: ${summary}.`,
         });
       } catch (error) {
         console.error("Erro ao importar backup:", error);
         setBackupMessage({ type: "error", text: `Erro ao importar backup: ${error.message || error}` });
       } finally {
         setIsImporting(false);
-        event.target.value = "";
+        input.value = "";
       }
     };
 
     reader.onerror = () => {
       setBackupMessage({ type: "error", text: "Erro ao ler o arquivo selecionado." });
       setIsImporting(false);
-      event.target.value = "";
+      input.value = "";
     };
 
     reader.readAsText(file);
@@ -3926,8 +3881,12 @@ function SettingsPanel({ theme, setTheme }) {
 
         <div>
           <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>Backup de Dados</h3>
-          <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: "0.9rem" }}>
-            Exporte suas contas e acertos para um arquivo JSON ou importe um backup existente.
+          <p style={{ margin: "0 0 8px", color: "var(--muted)", fontSize: "0.9rem" }}>
+            Exporte e restaure contas, acertos, Mercado, outros pagamentos e perfis em um arquivo JSON.
+          </p>
+          <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: "0.82rem" }}>
+            A importação adiciona ou atualiza registros, sem apagar os dados atuais. As notas de mercado incluem os
+            metadados registrados; o arquivo original não é armazenado pelo sistema.
           </p>
 
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
@@ -3966,6 +3925,8 @@ function SettingsPanel({ theme, setTheme }) {
 
           {backupMessage && (
             <div
+              aria-live="polite"
+              role={backupMessage.type === "error" ? "alert" : "status"}
               style={{
                 marginTop: "16px",
                 padding: "12px",
