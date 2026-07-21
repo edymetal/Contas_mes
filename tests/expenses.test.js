@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addMonths,
+  filterExpensesForMonth,
   formatInstallmentLabel,
   getExpenseKind,
   getExpenseMonthKey,
@@ -139,6 +140,10 @@ test("normaliza o mês das parcelas a partir da primeira parcela rastreada", () 
   assert.equal(normalized.find((expense) => expense.id === "installment-3").displayMonthKey, "2026-05");
   assert.deepEqual(
     getExpensesForMonth(expenses, "2026-05").map((expense) => expense.id),
+    ["installment-3"],
+  );
+  assert.deepEqual(
+    filterExpensesForMonth(normalized, "2026-05").map((expense) => expense.id),
     ["installment-3"],
   );
 });

@@ -69,6 +69,7 @@ import {
 import { getAuthErrorMessage, getFirebaseActionError } from "./domain/errors";
 import {
   addMonths,
+  filterExpensesForMonth,
   formatInstallmentLabel,
   getExpenseDisplayMonthKey,
   getExpenseKind,
@@ -305,11 +306,12 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
-  const [monthlyExpenses, setMonthlyExpenses] = useState([]);
   const [allExpenses, setAllExpenses] = useState([]);
   const [settlementPayments, setSettlementPayments] = useState([]);
   const [marketItems, setMarketItems] = useState([]);
   const [otherPayments, setOtherPayments] = useState([]);
+  const [marketItemsLoading, setMarketItemsLoading] = useState(false);
+  const [otherPaymentsLoading, setOtherPaymentsLoading] = useState(false);
   const [userProfiles, setUserProfiles] = useState({});
   const [dataLoading, setDataLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -345,11 +347,13 @@ function App() {
         if (!user) {
           setProfile(null);
           setActiveView("dashboard");
-          setMonthlyExpenses([]);
           setAllExpenses([]);
           setSettlementPayments([]);
           setMarketItems([]);
           setOtherPayments([]);
+          setMarketItemsLoading(false);
+          setOtherPaymentsLoading(false);
+          setDataLoading(false);
           setUserProfiles({});
           setPaymentTarget(null);
           setEditingExpense(null);
@@ -434,8 +438,9 @@ function App() {
   }, [profile]);
 
   useEffect(() => {
-    if (!profile || !db) return undefined;
+    if (!profile || !db || !canManageData || activeView !== "other-accounts") return undefined;
 
+    setMarketItemsLoading(true);
     return onSnapshot(
       collection(db, "marketItems"),
       (snapshot) => {
@@ -444,14 +449,19 @@ function App() {
             .map((item) => ({ id: item.id, ...item.data() }))
             .sort((a, b) => (b.purchasedAt || "").localeCompare(a.purchasedAt || "")),
         );
+        setMarketItemsLoading(false);
       },
-      (error) => setActionMessage(getFirebaseActionError(error, "carregar os itens de mercado")),
+      (error) => {
+        setMarketItemsLoading(false);
+        setActionMessage(getFirebaseActionError(error, "carregar os itens de mercado"));
+      },
     );
-  }, [profile]);
+  }, [activeView, canManageData, profile]);
 
   useEffect(() => {
-    if (!profile || !db) return undefined;
+    if (!profile || !db || !canManageData || activeView !== "other-accounts") return undefined;
 
+    setOtherPaymentsLoading(true);
     return onSnapshot(
       collection(db, "otherPayments"),
       (snapshot) => {
@@ -460,38 +470,19 @@ function App() {
             .map((item) => ({ id: item.id, ...item.data() }))
             .sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || "")),
         );
+        setOtherPaymentsLoading(false);
       },
-      (error) => setActionMessage(getFirebaseActionError(error, "carregar os outros pagamentos")),
+      (error) => {
+        setOtherPaymentsLoading(false);
+        setActionMessage(getFirebaseActionError(error, "carregar os outros pagamentos"));
+      },
     );
-  }, [profile]);
+  }, [activeView, canManageData, profile]);
 
   useEffect(() => {
     if (!profile || !db) return undefined;
 
     setDataLoading(true);
-    const expensesQuery = query(collection(db, "expenses"), where("monthKey", "==", selectedMonth));
-
-    return onSnapshot(
-      expensesQuery,
-      (snapshot) => {
-        const nextExpenses = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .filter(isValidInstallmentExpense)
-          .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
-
-        setMonthlyExpenses(nextExpenses);
-        setDataLoading(false);
-      },
-      (error) => {
-        setDataLoading(false);
-        setActionMessage(getFirebaseActionError(error, "carregar as contas do mês"));
-      },
-    );
-  }, [profile, selectedMonth]);
-
-  useEffect(() => {
-    if (!profile || !db) return undefined;
-
     const expensesQuery = query(collection(db, "expenses"));
 
     return onSnapshot(
@@ -503,8 +494,12 @@ function App() {
           .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
 
         setAllExpenses(nextExpenses);
+        setDataLoading(false);
       },
-      (error) => setActionMessage(getFirebaseActionError(error, "carregar o histórico de contas")),
+      (error) => {
+        setDataLoading(false);
+        setActionMessage(getFirebaseActionError(error, "carregar o histórico de contas"));
+      },
     );
   }, [profile]);
 
@@ -638,10 +633,15 @@ function App() {
     );
   }, [profile]);
 
-  const expenses = useMemo(() => {
-    const sourceExpenses = allExpenses.length ? allExpenses : monthlyExpenses;
-    return getExpensesForMonth(sourceExpenses, selectedMonth);
-  }, [allExpenses, monthlyExpenses, selectedMonth]);
+  const normalizedExpenses = useMemo(
+    () => getNormalizedExpenses(allExpenses),
+    [allExpenses],
+  );
+
+  const expenses = useMemo(
+    () => filterExpensesForMonth(normalizedExpenses, selectedMonth),
+    [normalizedExpenses, selectedMonth],
+  );
 
   const metrics = useMemo(() => {
     return expenses.reduce(
@@ -707,8 +707,6 @@ function App() {
 
   const dashboardYearSummary = useMemo(() => {
     const year = selectedMonth.slice(0, 4);
-    const sourceExpenses = allExpenses.length ? allExpenses : monthlyExpenses;
-    const normalizedExpenses = getNormalizedExpenses(sourceExpenses);
     const months = MONTHS_PT.map((month) => {
       const monthKey = `${year}-${month.value}`;
       const monthExpenses = normalizedExpenses.filter(
@@ -733,7 +731,7 @@ function App() {
         percent: (month.total / largestMonthTotal) * 100,
       })),
     };
-  }, [allExpenses, monthlyExpenses, selectedMonth]);
+  }, [normalizedExpenses, selectedMonth]);
 
   const selectedMonthSettlementPayments = useMemo(
     () => settlementPayments.filter((payment) => getSettlementPaymentMonthKey(payment) === selectedMonth),
@@ -1954,7 +1952,7 @@ function App() {
             )}
           </header>
 
-        {actionMessage && <div className="notice">{actionMessage}</div>}
+        {actionMessage && <div className="notice" role="status" aria-live="polite">{actionMessage}</div>}
 
         {activeView === "dashboard" && (
           <Dashboard
@@ -1980,6 +1978,7 @@ function App() {
 
         {canManageData && activeView === "other-accounts" && (
           <OtherAccountsView
+            dataLoading={marketItemsLoading || otherPaymentsLoading}
             marketForm={marketForm}
             marketFormError={marketFormError}
             marketItems={marketItems}
@@ -3782,6 +3781,7 @@ function normalizeSearchText(value) {
 }
 
 function OtherAccountsView({
+  dataLoading,
   marketForm,
   marketFormError,
   marketItems,
@@ -3808,7 +3808,7 @@ function OtherAccountsView({
   const isMarket = activeTab === "market";
 
   return (
-    <div className="other-accounts-page">
+    <div className="other-accounts-page" aria-busy={dataLoading}>
       <div className="resource-tabs" role="tablist" aria-label="Tipo de lançamento">
         <button
           className={isDashboard ? "resource-tab active" : "resource-tab"}
@@ -3839,7 +3839,12 @@ function OtherAccountsView({
         </button>
       </div>
 
-      {isDashboard ? (
+      {dataLoading ? (
+        <div className="panel empty-state" role="status" aria-live="polite">
+          <LoaderCircle className="spin-icon" size={20} />
+          Carregando lançamentos...
+        </div>
+      ) : isDashboard ? (
         <OtherAccountsDashboard
           marketItems={marketItems}
           otherPayments={otherPayments}

@@ -349,10 +349,14 @@ export function getNormalizedExpenses(expenses) {
   return [...regularExpenses, ...normalizedInstallments];
 }
 
-export function getExpensesForMonth(expenses, monthKey) {
-  return getNormalizedExpenses(expenses)
+export function filterExpensesForMonth(normalizedExpenses, monthKey) {
+  return normalizedExpenses
     .filter((expense) => getExpenseDisplayMonthKey(expense) === monthKey)
     .sort((first, second) => (first.dueDate || "").localeCompare(second.dueDate || ""));
+}
+
+export function getExpensesForMonth(expenses, monthKey) {
+  return filterExpensesForMonth(getNormalizedExpenses(expenses), monthKey);
 }
 
 export function sumInstallmentExpenses(expenses) {

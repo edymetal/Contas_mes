@@ -40,6 +40,7 @@ npm run build
 ```
 
 As regras financeiras puras ficam em `src/domain` e possuem testes de regressão independentes da interface.
+O build também falha automaticamente se algum chunk JavaScript ultrapassar 400 KB.
 
 ## Leitura de notas fiscais com Gemini
 
