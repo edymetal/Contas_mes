@@ -133,6 +133,13 @@ function shiftMonth(monthStr, delta) {
   return `${yearOut}-${monthOut}`;
 }
 
+function getMonthDistance(fromMonth, toMonth) {
+  if (!fromMonth || !toMonth) return 0;
+  const [fromYear, fromMonthNumber] = fromMonth.split("-").map(Number);
+  const [toYear, toMonthNumber] = toMonth.split("-").map(Number);
+  return (toYear - fromYear) * 12 + (toMonthNumber - fromMonthNumber);
+}
+
 const navItems = [
   { id: "dashboard", label: "Painel", icon: BarChart3 },
   { id: "new", label: "Nova conta", icon: Plus },
@@ -371,6 +378,37 @@ function isSameInstallmentSeries(referenceExpense, candidateExpense) {
     getLegacyInstallmentSeriesKey(referenceExpense, referenceInfo) ===
     getLegacyInstallmentSeriesKey(candidateExpense, candidateInfo)
   );
+}
+
+function getFirestoreTimestampKey(value) {
+  if (!value) return "";
+  const seconds = value.seconds ?? value._seconds;
+  const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
+  if (Number.isFinite(Number(seconds))) return `${seconds}:${nanoseconds}`;
+  return "";
+}
+
+function getLegacyFixedSeriesKey(expense) {
+  const createdAtKey = getFirestoreTimestampKey(expense?.createdAt);
+  if (createdAtKey) return `created:${expense.createdBy || ""}:${createdAtKey}`;
+
+  return [
+    (expense?.title || "").trim().toLowerCase(),
+    expense?.payerId || "",
+    String(expense?.totalValue || ""),
+    (expense?.participants || []).slice().sort().join(","),
+    expense?.category || "",
+  ].join("|");
+}
+
+function isSameFixedSeries(referenceExpense, candidateExpense) {
+  if (!isFixedExpense(referenceExpense) || !isFixedExpense(candidateExpense)) return false;
+
+  if (referenceExpense.fixedSeriesId && candidateExpense.fixedSeriesId) {
+    return referenceExpense.fixedSeriesId === candidateExpense.fixedSeriesId;
+  }
+
+  return getLegacyFixedSeriesKey(referenceExpense) === getLegacyFixedSeriesKey(candidateExpense);
 }
 
 async function commitFirestoreMutations(mutations) {
@@ -1213,6 +1251,7 @@ function App() {
     const batch = writeBatch(db);
     const finalInstallmentDueDate = type === "installment" ? addMonths(computedDueDate, runs - 1) : "";
     const installmentSeriesId = type === "installment" ? doc(collection(db, "expenses")).id : null;
+    const fixedSeriesId = type === "recurring" ? doc(collection(db, "expenses")).id : null;
 
     for (let index = 0; index < runs; index += 1) {
       const currentDueDate = addMonths(computedDueDate, index);
@@ -1267,6 +1306,7 @@ function App() {
         installment: label,
         installmentMeta,
         installmentSeriesId,
+        fixedSeriesId,
         shares,
         createdBy: profile.id,
         createdAt: serverTimestamp(),
@@ -1530,14 +1570,17 @@ function App() {
       allExpenses.find((item) => item.id === expenseId) ||
       expenses.find((item) => item.id === expenseId);
     const installmentInfo = getInstallmentInfo(selectedExpense);
+    const fixedExpense = isFixedExpense(selectedExpense);
     const confirmationMessage = installmentInfo
       ? `Tem certeza que deseja excluir a parcela ${installmentInfo.current} e todas as parcelas seguintes desta conta?`
-      : "Tem certeza que deseja excluir esta conta?";
+      : fixedExpense
+        ? "Tem certeza que deseja excluir esta conta fixa deste mês e de todos os meses seguintes?"
+        : "Tem certeza que deseja excluir esta conta?";
 
     if (!expenseId || !window.confirm(confirmationMessage)) return;
 
     try {
-      if (!installmentInfo) {
+      if (!installmentInfo && !fixedExpense) {
         await deleteDoc(doc(db, "expenses", expenseId));
         setActionMessage("Conta excluída com sucesso.");
         return;
@@ -1546,6 +1589,30 @@ function App() {
       const snapshot = await getDocs(collection(db, "expenses"));
       const persistedExpenses = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
       const referenceExpense = persistedExpenses.find((item) => item.id === expenseId);
+
+      if (fixedExpense) {
+        if (!referenceExpense || !isFixedExpense(referenceExpense)) {
+          throw new Error("A conta fixa selecionada não foi encontrada.");
+        }
+
+        const referenceMonth = getExpenseDisplayMonthKey(referenceExpense);
+        const deletionTargets = persistedExpenses.filter((item) => (
+          isSameFixedSeries(referenceExpense, item) &&
+          getExpenseDisplayMonthKey(item) >= referenceMonth
+        ));
+
+        await commitFirestoreMutations(
+          deletionTargets.map((item) => ({
+            operation: "delete",
+            reference: doc(db, "expenses", item.id),
+          })),
+        );
+        setActionMessage(
+          `${deletionTargets.length} ${deletionTargets.length === 1 ? "mês excluído" : "meses excluídos"} da conta fixa com sucesso.`,
+        );
+        return;
+      }
+
       const referenceInfo = getInstallmentInfo(referenceExpense);
       if (!referenceExpense || !referenceInfo) throw new Error("A conta selecionada não foi encontrada.");
 
@@ -1620,6 +1687,55 @@ function App() {
 
     const oldInstallmentInfo = getInstallmentInfo(oldExpense);
     const updatedInstallmentInfo = getInstallmentInfo({ installment: updatedData.installment });
+
+    if (isFixedExpense(oldExpense)) {
+      const seriesExpenses = persistedExpenses.filter((item) => isSameFixedSeries(oldExpense, item));
+      const seriesId = oldExpense.fixedSeriesId || doc(collection(db, "expenses")).id;
+      const referenceMonth = getExpenseDisplayMonthKey(oldExpense);
+      const mutations = [];
+
+      seriesExpenses.forEach((item) => {
+        const itemMonth = getExpenseDisplayMonthKey(item);
+        if (!itemMonth) return;
+
+        if (itemMonth < referenceMonth) {
+          if (item.fixedSeriesId !== seriesId) {
+            mutations.push({
+              operation: "update",
+              reference: doc(db, "expenses", item.id),
+              data: { fixedSeriesId: seriesId, updatedAt: serverTimestamp() },
+            });
+          }
+          return;
+        }
+
+        const monthOffset = getMonthDistance(referenceMonth, itemMonth);
+        const dueDate = addMonths(updatedData.dueDate, monthOffset);
+        mutations.push({
+          operation: "update",
+          reference: doc(db, "expenses", item.id),
+          data: {
+            title: updatedData.title.trim(),
+            totalValue: rawValue,
+            dueDate,
+            monthKey: getExpenseMonthKey({ dueDate, expenseDate: "", type: "recurring" }),
+            category: updatedData.category,
+            payerId: updatedData.payerId,
+            participants: updatedData.participants,
+            shares: buildShares(item.shares, dueDate),
+            installment: "Fixo",
+            installmentMeta: null,
+            fixedSeriesId: seriesId,
+            updatedAt: serverTimestamp(),
+          },
+        });
+      });
+
+      await commitFirestoreMutations(mutations);
+      setActionMessage("Conta fixa e meses seguintes atualizados com sucesso.");
+      setEditingExpense(null);
+      return;
+    }
 
     if (oldInstallmentInfo && updatedInstallmentInfo) {
       const seriesExpenses = persistedExpenses.filter((item) => isSameInstallmentSeries(oldExpense, item));
@@ -4845,7 +4961,13 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
                       className="icon-button"
                       style={{ color: "var(--danger)" }}
                       onClick={() => onDelete(expense)}
-                      title={getInstallmentInfo(expense) ? "Excluir esta parcela e as seguintes" : "Excluir despesa"}
+                      title={
+                        getInstallmentInfo(expense)
+                          ? "Excluir esta parcela e as seguintes"
+                          : isFixedExpense(expense)
+                            ? "Excluir esta conta fixa e os meses seguintes"
+                            : "Excluir despesa"
+                      }
                       type="button"
                     >
                       <Trash2 size={16} />
@@ -5118,6 +5240,7 @@ function EditExpenseModal({ expense, onClose, onSave }) {
 
   const match = expense.installment ? expense.installment.match(/Parcela (\d+) de (\d+)/) : null;
   const isInstallment = !!match;
+  const isFixed = isFixedExpense(expense);
   const [currentInstallment, setCurrentInstallment] = useState(match ? Number(match[1]) : 1);
   const [totalInstallments, setTotalInstallments] = useState(match ? Number(match[2]) : 1);
 
@@ -5178,7 +5301,9 @@ function EditExpenseModal({ expense, onClose, onSave }) {
             <span>
               {isInstallment
                 ? "As alterações serão aplicadas a esta parcela e às seguintes"
-                : "Ajuste os detalhes e o rateio"}
+                : isFixed
+                  ? "As alterações serão aplicadas a este mês e aos seguintes"
+                  : "Ajuste os detalhes e o rateio"}
             </span>
           </div>
           <button className="icon-button" onClick={onClose} type="button">
