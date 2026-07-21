@@ -5009,14 +5009,21 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
     [expenses],
   );
   const fixedExpensesCount = fixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
+  const singleExpenses = useMemo(
+    () => expenses.filter((expense) => getExpenseKind(expense) === "normal"),
+    [expenses],
+  );
+  const listedExpenses = manageView === "single" ? singleExpenses : expenses;
 
   const viewTitle = {
-    month: "Contas do Mes",
+    month: "Contas do Mês",
+    single: "Contas Únicas",
     installments: "Contas Parceladas",
     fixed: "Contas Fixas",
   }[manageView];
   const viewCount = {
     month: `${expenses.length} registro(s)`,
+    single: `${singleExpenses.length} conta(s) única(s)`,
     installments: `${installmentSummaries.length} parcelamento(s)`,
     fixed: `${fixedExpensesCount} conta(s) fixa(s)`,
   }[manageView];
@@ -5030,18 +5037,25 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
         </div>
         <div className="manage-actions">
           <button
+            className={manageView === "single" ? "primary-button" : "secondary-button"}
+            onClick={() => setManageView((current) => (current === "single" ? "month" : "single"))}
+            type="button"
+          >
+            {manageView === "single" ? "Ver contas do mês" : `Contas Únicas (${singleExpenses.length})`}
+          </button>
+          <button
             className={manageView === "installments" ? "primary-button" : "secondary-button"}
             onClick={() => setManageView((current) => (current === "installments" ? "month" : "installments"))}
             type="button"
           >
-            {manageView === "installments" ? "Ver contas do mes" : `Contas Parceladas (${installmentSummaries.length})`}
+            {manageView === "installments" ? "Ver contas do mês" : `Contas Parceladas (${installmentSummaries.length})`}
           </button>
           <button
             className={manageView === "fixed" ? "primary-button" : "secondary-button"}
             onClick={() => setManageView((current) => (current === "fixed" ? "month" : "fixed"))}
             type="button"
           >
-            {manageView === "fixed" ? "Ver contas do mes" : `Contas Fixas (${fixedExpensesCount})`}
+            {manageView === "fixed" ? "Ver contas do mês" : `Contas Fixas (${fixedExpensesCount})`}
           </button>
         </div>
       </div>
@@ -5057,8 +5071,10 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
         />
       ) : manageView === "fixed" ? (
         <FixedExpensesView groups={fixedExpenseGroups} selectedMonth={selectedMonth} />
-      ) : !expenses.length ? (
-        <div className="empty-state">Nenhuma conta cadastrada neste mes.</div>
+      ) : !listedExpenses.length ? (
+        <div className="empty-state">
+          {manageView === "single" ? "Nenhuma conta única cadastrada neste mês." : "Nenhuma conta cadastrada neste mês."}
+        </div>
       ) : (
       <div className="table-wrap">
         <table>
@@ -5074,7 +5090,7 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
             </tr>
           </thead>
           <tbody>
-            {expenses.map((expense) => (
+            {listedExpenses.map((expense) => (
               <tr key={expense.id}>
                 <td>
                   <div style={{ display: "flex", flexDirection: "column" }}>
