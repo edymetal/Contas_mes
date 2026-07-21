@@ -5037,25 +5037,36 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
         </div>
         <div className="manage-actions">
           <button
+            aria-pressed={manageView === "month"}
+            className={manageView === "month" ? "primary-button" : "secondary-button"}
+            onClick={() => setManageView("month")}
+            type="button"
+          >
+            Contas ({expenses.length})
+          </button>
+          <button
+            aria-pressed={manageView === "single"}
             className={manageView === "single" ? "primary-button" : "secondary-button"}
-            onClick={() => setManageView((current) => (current === "single" ? "month" : "single"))}
+            onClick={() => setManageView("single")}
             type="button"
           >
-            {manageView === "single" ? "Ver contas do mês" : `Contas Únicas (${singleExpenses.length})`}
+            Contas Únicas ({singleExpenses.length})
           </button>
           <button
+            aria-pressed={manageView === "installments"}
             className={manageView === "installments" ? "primary-button" : "secondary-button"}
-            onClick={() => setManageView((current) => (current === "installments" ? "month" : "installments"))}
+            onClick={() => setManageView("installments")}
             type="button"
           >
-            {manageView === "installments" ? "Ver contas do mês" : `Contas Parceladas (${installmentSummaries.length})`}
+            Contas Parceladas ({installmentSummaries.length})
           </button>
           <button
+            aria-pressed={manageView === "fixed"}
             className={manageView === "fixed" ? "primary-button" : "secondary-button"}
-            onClick={() => setManageView((current) => (current === "fixed" ? "month" : "fixed"))}
+            onClick={() => setManageView("fixed")}
             type="button"
           >
-            {manageView === "fixed" ? "Ver contas do mês" : `Contas Fixas (${fixedExpensesCount})`}
+            Contas Fixas ({fixedExpensesCount})
           </button>
         </div>
       </div>
