@@ -99,7 +99,7 @@ export function isValidInstallmentExpense(expense) {
   return installmentInfo.current <= installmentInfo.total;
 }
 
-function isSettledStatus(status) {
+export function isSettledStatus(status) {
   return status === "paid" || status === "settled" || status === "self";
 }
 

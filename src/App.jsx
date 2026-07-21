@@ -85,6 +85,7 @@ import {
   isFixedExpense,
   isSameFixedSeries,
   isSameInstallmentSeries,
+  isSettledStatus,
   isValidInstallmentExpense,
   monthFromDate,
   roundMoney,

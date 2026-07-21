@@ -16,11 +16,20 @@ import {
   isFixedExpense,
   isSameFixedSeries,
   isSameInstallmentSeries,
+  isSettledStatus,
   isValidInstallmentExpense,
   roundMoney,
   shiftMonth,
   sumInstallmentExpenses,
 } from "../src/domain/expenses.js";
+
+test("identifica os status que representam uma cota liquidada", () => {
+  assert.equal(isSettledStatus("paid"), true);
+  assert.equal(isSettledStatus("settled"), true);
+  assert.equal(isSettledStatus("self"), true);
+  assert.equal(isSettledStatus("pending"), false);
+  assert.equal(isSettledStatus(undefined), false);
+});
 
 function installment({
   current,
