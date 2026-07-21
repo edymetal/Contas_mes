@@ -506,6 +506,37 @@ function getInstallmentSeriesSummaries(expenses) {
     .sort((a, b) => (a.finalDueDate || "").localeCompare(b.finalDueDate || ""));
 }
 
+function getInstallmentSeriesMissingHistory(expenses) {
+  const groups = new Map();
+
+  expenses.filter(isValidInstallmentExpense).forEach((expense) => {
+    const installmentInfo = getInstallmentInfo(expense);
+    if (!installmentInfo) return;
+
+    const key = getInstallmentSeriesKey(expense, installmentInfo);
+    const group = groups.get(key) || {
+      key,
+      first: installmentInfo.current,
+      total: installmentInfo.total,
+      firstExpense: expense,
+      expenses: [],
+    };
+
+    group.expenses.push(expense);
+    group.total = Math.max(group.total, installmentInfo.total);
+    if (
+      installmentInfo.current < group.first ||
+      (installmentInfo.current === group.first && (expense.dueDate || "") < (group.firstExpense?.dueDate || ""))
+    ) {
+      group.first = installmentInfo.current;
+      group.firstExpense = expense;
+    }
+    groups.set(key, group);
+  });
+
+  return Array.from(groups.values()).filter((group) => group.first > 1 && group.firstExpense?.dueDate);
+}
+
 function getFixedExpenseMonthGroups(expenses) {
   const groups = new Map();
 
@@ -621,6 +652,7 @@ function App() {
   const [otherPaymentForm, setOtherPaymentForm] = useState(emptyOtherPaymentForm);
   const [marketFormError, setMarketFormError] = useState("");
   const [otherPaymentFormError, setOtherPaymentFormError] = useState("");
+  const installmentHistoryRepairInProgress = useRef(false);
   const canManageData = isAdminProfile(profile);
   const otherPaymentPlaceSuggestions = useMemo(() => getPlaceSuggestions(otherPayments), [otherPayments]);
 
@@ -762,6 +794,117 @@ function App() {
       setAllExpenses(nextExpenses);
     });
   }, [profile]);
+
+  useEffect(() => {
+    if (
+      !canManageData ||
+      !profile?.id ||
+      !db ||
+      !allExpenses.length ||
+      installmentHistoryRepairInProgress.current
+    ) {
+      return;
+    }
+
+    const incompleteSeries = getInstallmentSeriesMissingHistory(allExpenses);
+    if (!incompleteSeries.length) return;
+
+    installmentHistoryRepairInProgress.current = true;
+
+    async function repairInstallmentHistory() {
+      const mutations = [];
+      let restoredCount = 0;
+
+      incompleteSeries.forEach((group) => {
+        const firstExpense = group.firstExpense;
+        const firstInfo = getInstallmentInfo(firstExpense);
+        if (!firstInfo) return;
+
+        const seriesId = firstExpense.installmentSeriesId || doc(collection(db, "expenses")).id;
+        const finalDueDate = firstInfo.finalDueDate || addMonths(firstExpense.dueDate, group.total - group.first);
+        const participants = firstExpense.participants || [];
+        const shareAmount = roundMoney(Number(firstExpense.totalValue || 0) / Math.max(participants.length, 1));
+
+        group.expenses.forEach((expense) => {
+          const info = getInstallmentInfo(expense);
+          if (!info) return;
+
+          if (
+            expense.installmentSeriesId !== seriesId ||
+            info.total !== group.total ||
+            info.finalDueDate !== finalDueDate
+          ) {
+            mutations.push({
+              operation: "update",
+              reference: doc(db, "expenses", expense.id),
+              data: {
+                installmentMeta: {
+                  current: info.current,
+                  total: group.total,
+                  finalDueDate,
+                },
+                installmentSeriesId: seriesId,
+                updatedAt: serverTimestamp(),
+              },
+            });
+          }
+        });
+
+        for (let current = 1; current < group.first; current += 1) {
+          const dueDate = addMonths(firstExpense.dueDate, current - group.first);
+          const shares = participants.reduce((acc, personId) => {
+            const isPayer = personId === firstExpense.payerId;
+            acc[personId] = {
+              amount: shareAmount,
+              status: isPayer ? "self" : "paid",
+              payment: { type: "Pago", paidAt: dueDate },
+            };
+            return acc;
+          }, {});
+
+          mutations.push({
+            operation: "set",
+            reference: doc(collection(db, "expenses")),
+            data: {
+              title: firstExpense.title || "Conta parcelada",
+              totalValue: Number(firstExpense.totalValue || 0),
+              expenseDate: "",
+              expensePaymentMethod: "",
+              dueDate,
+              monthKey: getExpenseMonthKey({ dueDate, expenseDate: "", type: "installment" }),
+              category: firstExpense.category || "Outros",
+              payerId: firstExpense.payerId,
+              participants,
+              installment: `Parcela ${current} de ${group.total}`,
+              installmentMeta: {
+                current,
+                total: group.total,
+                finalDueDate,
+              },
+              installmentSeriesId: seriesId,
+              fixedSeriesId: null,
+              shares,
+              createdBy: firstExpense.createdBy || profile.id,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+          restoredCount += 1;
+        }
+      });
+
+      try {
+        await commitFirestoreMutations(mutations);
+        setActionMessage(`${restoredCount} parcela(s) anterior(es) recuperada(s) com sucesso.`);
+      } catch (error) {
+        setActionMessage(getFirebaseActionError(error, "recuperar as parcelas anteriores"));
+      } finally {
+        installmentHistoryRepairInProgress.current = false;
+      }
+    }
+
+    repairInstallmentHistory();
+  }, [allExpenses, canManageData, profile]);
 
   useEffect(() => {
     if (!profile || !db) return undefined;
@@ -1224,6 +1367,7 @@ function App() {
 
     let runs = 1;
     let valuePerMonth = rawValue;
+    let installmentStartDueDate = computedDueDate;
 
     const currentInstallment = Number(form.currentInstallment) || 1;
     const totalInstallments = Number(form.installmentsCount) || 12;
@@ -1241,7 +1385,8 @@ function App() {
         setFormError("A parcela atual não pode ser maior que o total de parcelas.");
         return;
       }
-      runs = totalInstallments - currentInstallment + 1;
+      runs = totalInstallments;
+      installmentStartDueDate = addMonths(computedDueDate, 1 - currentInstallment);
       valuePerMonth = rawValue;
     } else if (type === "recurring") {
       runs = 12;
@@ -1249,12 +1394,14 @@ function App() {
     }
 
     const batch = writeBatch(db);
-    const finalInstallmentDueDate = type === "installment" ? addMonths(computedDueDate, runs - 1) : "";
+    const firstGeneratedDueDate = type === "installment" ? installmentStartDueDate : computedDueDate;
+    const finalInstallmentDueDate = type === "installment" ? addMonths(firstGeneratedDueDate, runs - 1) : "";
     const installmentSeriesId = type === "installment" ? doc(collection(db, "expenses")).id : null;
     const fixedSeriesId = type === "recurring" ? doc(collection(db, "expenses")).id : null;
 
     for (let index = 0; index < runs; index += 1) {
-      const currentDueDate = addMonths(computedDueDate, index);
+      const currentDueDate = addMonths(firstGeneratedDueDate, index);
+      const installmentNumber = index + 1;
       const currentExpenseDate = type === "normal" ? form.expenseDate || "" : "";
       const currentMonthKey = getExpenseMonthKey({
         dueDate: currentDueDate,
@@ -1264,24 +1411,26 @@ function App() {
       
       const shareAmount = roundMoney(valuePerMonth / form.participants.length);
       const shares = form.participants.reduce((acc, personId) => {
+        const isHistoricalInstallment = type === "installment" && installmentNumber < currentInstallment;
+        const isPayer = personId === form.payerId;
         acc[personId] = {
           amount: shareAmount,
-          status: personId === form.payerId ? "self" : "pending",
-          payment: personId === form.payerId ? { type: "Pago", paidAt: currentDueDate } : null,
+          status: isPayer ? "self" : isHistoricalInstallment ? "paid" : "pending",
+          payment: isPayer || isHistoricalInstallment ? { type: "Pago", paidAt: currentDueDate } : null,
         };
         return acc;
       }, {});
 
       let label = "";
       if (type === "installment") {
-        label = `Parcela ${currentInstallment + index} de ${totalInstallments}`;
+        label = `Parcela ${installmentNumber} de ${totalInstallments}`;
       } else if (type === "recurring") {
         label = "Fixo";
       }
       const installmentMeta =
         type === "installment"
           ? {
-              current: currentInstallment + index,
+              current: installmentNumber,
               total: totalInstallments,
               finalDueDate: finalInstallmentDueDate,
             }
@@ -2458,7 +2607,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           {form.type === "installment" && (
             <>
               <label>
-                <span>Próximo vencimento</span>
+                <span>Vencimento da parcela atual</span>
                 <input
                   type="date"
                   value={form.dueDate}
@@ -2577,7 +2726,7 @@ function NewExpenseForm({ form, formError, onChange, onSubmit, onToggleParticipa
           }}>
             {form.type === "installment" && (
               <p style={{ margin: 0 }}>
-                💡 <strong>Conta Parcelada:</strong> Cada parcela tem o valor de <strong>{formatCurrency(form.totalValue)}</strong> (totalizando <strong>{formatCurrency(Number(form.totalValue) * form.installmentsCount)}</strong> para a compra inteira de <strong>{form.installmentsCount} parcelas</strong>). Serão cadastradas <strong>{Number(form.installmentsCount) - (Number(form.currentInstallment) || 1) + 1} parcelas</strong> (da {form.currentInstallment}ª até a {form.installmentsCount}ª) a partir do mês selecionado.
+                💡 <strong>Conta Parcelada:</strong> Cada parcela tem o valor de <strong>{formatCurrency(form.totalValue)}</strong> (totalizando <strong>{formatCurrency(Number(form.totalValue) * form.installmentsCount)}</strong> para a compra inteira de <strong>{form.installmentsCount} parcelas</strong>). Serão cadastradas todas as <strong>{form.installmentsCount} parcelas</strong>. Quando a parcela atual for maior que 1, as anteriores serão incluídas nos meses correspondentes como já pagas.
               </p>
             )}
             {form.type === "recurring" && (
