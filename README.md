@@ -32,6 +32,15 @@ npm install
 npm run dev
 ```
 
+## Validar alterações
+
+```bash
+npm test
+npm run build
+```
+
+As regras financeiras puras ficam em `src/domain` e possuem testes de regressão independentes da interface.
+
 ## Leitura de notas fiscais com Gemini
 
 O fluxo **Outras Contas > Mercado** aceita fotos JPG/PNG/WebP e notas em PDF, todas em italiano. A leitura usa o modelo `gemini-3.5-flash` diretamente no navegador e funciona com a cota gratuita da Gemini API, sem Cloud Functions ou plano Blaze.
