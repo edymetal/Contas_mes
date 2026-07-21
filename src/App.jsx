@@ -343,7 +343,7 @@ function areExpenseSharesSettled(expense) {
   return shares.length > 0 && shares.every((share) => isSettledStatus(share.status));
 }
 
-function getInstallmentSeriesKey(expense, installmentInfo) {
+function getLegacyInstallmentSeriesKey(expense, installmentInfo) {
   return [
     (expense.title || "").trim().toLowerCase(),
     expense.payerId || "",
@@ -351,6 +351,44 @@ function getInstallmentSeriesKey(expense, installmentInfo) {
     String(expense.totalValue || ""),
     (expense.participants || []).slice().sort().join(","),
   ].join("|");
+}
+
+function getInstallmentSeriesKey(expense, installmentInfo) {
+  if (expense?.installmentSeriesId) return `series:${expense.installmentSeriesId}`;
+  return `legacy:${getLegacyInstallmentSeriesKey(expense, installmentInfo)}`;
+}
+
+function isSameInstallmentSeries(referenceExpense, candidateExpense) {
+  const referenceInfo = getInstallmentInfo(referenceExpense);
+  const candidateInfo = getInstallmentInfo(candidateExpense);
+  if (!referenceInfo || !candidateInfo) return false;
+
+  if (referenceExpense.installmentSeriesId && candidateExpense.installmentSeriesId) {
+    return referenceExpense.installmentSeriesId === candidateExpense.installmentSeriesId;
+  }
+
+  return (
+    getLegacyInstallmentSeriesKey(referenceExpense, referenceInfo) ===
+    getLegacyInstallmentSeriesKey(candidateExpense, candidateInfo)
+  );
+}
+
+async function commitFirestoreMutations(mutations) {
+  const batchSize = 450;
+
+  for (let index = 0; index < mutations.length; index += batchSize) {
+    const batch = writeBatch(db);
+    mutations.slice(index, index + batchSize).forEach((mutation) => {
+      if (mutation.operation === "delete") {
+        batch.delete(mutation.reference);
+      } else if (mutation.operation === "set") {
+        batch.set(mutation.reference, mutation.data);
+      } else {
+        batch.update(mutation.reference, mutation.data);
+      }
+    });
+    await batch.commit();
+  }
 }
 
 function getExpenseSettlementDate(expense) {
@@ -1174,6 +1212,7 @@ function App() {
 
     const batch = writeBatch(db);
     const finalInstallmentDueDate = type === "installment" ? addMonths(computedDueDate, runs - 1) : "";
+    const installmentSeriesId = type === "installment" ? doc(collection(db, "expenses")).id : null;
 
     for (let index = 0; index < runs; index += 1) {
       const currentDueDate = addMonths(computedDueDate, index);
@@ -1227,6 +1266,7 @@ function App() {
         participants: form.participants,
         installment: label,
         installmentMeta,
+        installmentSeriesId,
         shares,
         createdBy: profile.id,
         createdAt: serverTimestamp(),
@@ -1482,12 +1522,52 @@ function App() {
     setActionMessage("Pagamento de acerto apagado.");
   }
 
-  async function handleDeleteExpense(expenseId) {
+  async function handleDeleteExpense(expense) {
     if (!ensureCanManageData()) return;
-    if (!window.confirm("Tem certeza que deseja excluir esta conta?")) return;
+    const expenseId = typeof expense === "string" ? expense : expense?.id;
+    const selectedExpense =
+      (typeof expense === "object" ? expense : null) ||
+      allExpenses.find((item) => item.id === expenseId) ||
+      expenses.find((item) => item.id === expenseId);
+    const installmentInfo = getInstallmentInfo(selectedExpense);
+    const confirmationMessage = installmentInfo
+      ? `Tem certeza que deseja excluir a parcela ${installmentInfo.current} e todas as parcelas seguintes desta conta?`
+      : "Tem certeza que deseja excluir esta conta?";
+
+    if (!expenseId || !window.confirm(confirmationMessage)) return;
+
     try {
-      await deleteDoc(doc(db, "expenses", expenseId));
-      setActionMessage("Conta excluída com sucesso.");
+      if (!installmentInfo) {
+        await deleteDoc(doc(db, "expenses", expenseId));
+        setActionMessage("Conta excluída com sucesso.");
+        return;
+      }
+
+      const snapshot = await getDocs(collection(db, "expenses"));
+      const persistedExpenses = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      const referenceExpense = persistedExpenses.find((item) => item.id === expenseId);
+      const referenceInfo = getInstallmentInfo(referenceExpense);
+      if (!referenceExpense || !referenceInfo) throw new Error("A conta selecionada não foi encontrada.");
+
+      const deletionTargets = persistedExpenses
+        .filter((item) => {
+          const itemInfo = getInstallmentInfo(item);
+          return (
+            itemInfo &&
+            itemInfo.current >= referenceInfo.current &&
+            isSameInstallmentSeries(referenceExpense, item)
+          );
+        });
+
+      await commitFirestoreMutations(
+        deletionTargets.map((item) => ({
+          operation: "delete",
+          reference: doc(db, "expenses", item.id),
+        })),
+      );
+      setActionMessage(
+        `${deletionTargets.length} ${deletionTargets.length === 1 ? "parcela excluída" : "parcelas excluídas"} com sucesso.`,
+      );
     } catch (error) {
       console.error("Erro ao excluir conta:", error);
       setActionMessage(`Erro ao excluir a conta: ${error.message || error}`);
@@ -1510,19 +1590,21 @@ function App() {
       throw new Error("Selecione pelo menos uma pessoa no rateio.");
     }
 
-    const shareAmount = roundMoney(rawValue / updatedData.participants.length);
-    const oldExpense = expenses.find((e) => e.id === expenseId);
-    const oldShares = oldExpense?.shares || {};
+    const snapshot = await getDocs(collection(db, "expenses"));
+    const persistedExpenses = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const oldExpense = persistedExpenses.find((expense) => expense.id === expenseId);
+    if (!oldExpense) throw new Error("A conta selecionada não foi encontrada.");
 
-    const shares = updatedData.participants.reduce((acc, personId) => {
-      const oldShare = oldShares[personId];
+    const shareAmount = roundMoney(rawValue / updatedData.participants.length);
+    const buildShares = (oldShares, dueDate) => updatedData.participants.reduce((acc, personId) => {
+      const oldShare = oldShares?.[personId];
       const wasPayer = personId === updatedData.payerId;
 
       if (wasPayer) {
         acc[personId] = {
           amount: shareAmount,
           status: "self",
-          payment: { type: "Pago", paidAt: updatedData.dueDate },
+          payment: { type: "Pago", paidAt: dueDate },
         };
       } else {
         const currentStatus = (oldShare?.status === "self" || !oldShare?.status) ? "pending" : oldShare.status;
@@ -1535,6 +1617,104 @@ function App() {
       }
       return acc;
     }, {});
+
+    const oldInstallmentInfo = getInstallmentInfo(oldExpense);
+    const updatedInstallmentInfo = getInstallmentInfo({ installment: updatedData.installment });
+
+    if (oldInstallmentInfo && updatedInstallmentInfo) {
+      const seriesExpenses = persistedExpenses.filter((item) => isSameInstallmentSeries(oldExpense, item));
+      const seriesId = oldExpense.installmentSeriesId || doc(collection(db, "expenses")).id;
+      const finalDueDate = addMonths(
+        updatedData.dueDate,
+        updatedInstallmentInfo.total - updatedInstallmentInfo.current,
+      );
+      const mutations = [];
+      const futureByCurrent = new Map();
+
+      seriesExpenses.forEach((item) => {
+        const itemInfo = getInstallmentInfo(item);
+        if (!itemInfo) return;
+
+        if (itemInfo.current < oldInstallmentInfo.current) {
+          if (item.installmentSeriesId !== seriesId) {
+            mutations.push({
+              operation: "update",
+              reference: doc(db, "expenses", item.id),
+              data: { installmentSeriesId: seriesId, updatedAt: serverTimestamp() },
+            });
+          }
+          return;
+        }
+
+        const existingItem = futureByCurrent.get(itemInfo.current);
+        if (!existingItem || item.id === expenseId) {
+          if (existingItem) {
+            mutations.push({ operation: "delete", reference: doc(db, "expenses", existingItem.id) });
+          }
+          futureByCurrent.set(itemInfo.current, item);
+        } else {
+          mutations.push({ operation: "delete", reference: doc(db, "expenses", item.id) });
+        }
+      });
+
+      const remainingInstallments = updatedInstallmentInfo.total - updatedInstallmentInfo.current + 1;
+      for (let offset = 0; offset < remainingInstallments; offset += 1) {
+        const oldCurrent = oldInstallmentInfo.current + offset;
+        const current = updatedInstallmentInfo.current + offset;
+        const dueDate = addMonths(updatedData.dueDate, offset);
+        const existingExpense = futureByCurrent.get(oldCurrent);
+        const expenseData = {
+          title: updatedData.title.trim(),
+          totalValue: rawValue,
+          dueDate,
+          monthKey: getExpenseMonthKey({ dueDate, expenseDate: "", type: "installment" }),
+          category: updatedData.category,
+          payerId: updatedData.payerId,
+          participants: updatedData.participants,
+          shares: buildShares(existingExpense?.shares, dueDate),
+          installment: `Parcela ${current} de ${updatedInstallmentInfo.total}`,
+          installmentMeta: {
+            current,
+            total: updatedInstallmentInfo.total,
+            finalDueDate,
+          },
+          installmentSeriesId: seriesId,
+          updatedAt: serverTimestamp(),
+        };
+
+        if (existingExpense) {
+          mutations.push({
+            operation: "update",
+            reference: doc(db, "expenses", existingExpense.id),
+            data: expenseData,
+          });
+          futureByCurrent.delete(oldCurrent);
+        } else {
+          mutations.push({
+            operation: "set",
+            reference: doc(collection(db, "expenses")),
+            data: {
+              ...expenseData,
+              expenseDate: "",
+              expensePaymentMethod: "",
+              createdBy: profile.id,
+              createdAt: serverTimestamp(),
+            },
+          });
+        }
+      }
+
+      futureByCurrent.forEach((item) => {
+        mutations.push({ operation: "delete", reference: doc(db, "expenses", item.id) });
+      });
+
+      await commitFirestoreMutations(mutations);
+      setActionMessage("Parcela e meses seguintes atualizados com sucesso.");
+      setEditingExpense(null);
+      return;
+    }
+
+    const shares = buildShares(oldExpense.shares, updatedData.dueDate);
 
     const updateFields = {
       title: updatedData.title.trim(),
@@ -4664,8 +4844,8 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
                     <button
                       className="icon-button"
                       style={{ color: "var(--danger)" }}
-                      onClick={() => onDelete(expense.id)}
-                      title="Excluir despesa"
+                      onClick={() => onDelete(expense)}
+                      title={getInstallmentInfo(expense) ? "Excluir esta parcela e as seguintes" : "Excluir despesa"}
                       type="button"
                     >
                       <Trash2 size={16} />
@@ -4995,7 +5175,11 @@ function EditExpenseModal({ expense, onClose, onSave }) {
         <div className="section-heading">
           <div>
             <h2 id="edit-title">Editar despesa</h2>
-            <span>Ajuste os detalhes e o rateio</span>
+            <span>
+              {isInstallment
+                ? "As alterações serão aplicadas a esta parcela e às seguintes"
+                : "Ajuste os detalhes e o rateio"}
+            </span>
           </div>
           <button className="icon-button" onClick={onClose} type="button">
             <X size={20} />
