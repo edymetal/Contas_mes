@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test settlement rules
+      - name: Test application and security policies
         run: npm test
 
       - name: Build

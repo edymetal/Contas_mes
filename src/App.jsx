@@ -66,6 +66,7 @@ import {
   restoreFirestoreTimestamps,
   validateAndNormalizeBackupPayload,
 } from "./domain/backup";
+import { getAuthErrorMessage, getFirebaseActionError } from "./domain/errors";
 import packageInfo from "../package.json";
 
 const appVersion = import.meta.env.VITE_APP_VERSION || packageInfo.version;
@@ -199,13 +200,6 @@ function getPlaceSuggestions(payments) {
   return Array.from(uniquePlaces.values()).sort((first, second) => (
     first.localeCompare(second, "pt-BR", { sensitivity: "base" })
   ));
-}
-
-function getFirebaseActionError(error, action) {
-  if (error?.code === "permission-denied") {
-    return `Sem permissão para ${action}. Publique as regras do Firestore atualizadas para liberar Mercado e Outros pagamentos.`;
-  }
-  return `Não foi possível ${action}: ${error?.message || error}`;
 }
 
 function todayInputValue() {
@@ -677,48 +671,84 @@ function App() {
       return undefined;
     }
 
-    return onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
+    return onAuthStateChanged(
+      auth,
+      async (user) => {
+        setFirebaseUser(user);
 
-      if (!user) {
-        setProfile(null);
-        setActiveView("dashboard");
-        setAuthLoading(false);
-        return;
-      }
-
-      setAuthError("");
-      const matchedProfile = getProfileByEmail(user.email);
-      if (!matchedProfile) {
-        setProfile(null);
-        setAuthError(`A conta ${user.email} nao tem acesso ao sistema. Entre com uma conta autorizada ou solicite a liberacao.`);
-        await signOut(auth);
-        setAuthLoading(false);
-        return;
-      }
-
-      if (db) {
-        try {
-          await setDoc(
-            doc(db, "userProfiles", matchedProfile.id),
-            {
-              personId: matchedProfile.id,
-              name: matchedProfile.name,
-              email: formatEmail(user.email),
-              photoURL: user.photoURL || "",
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-          );
-        } catch {
-          setActionMessage("Não foi possível atualizar a foto do usuário.");
+        if (!user) {
+          setProfile(null);
+          setActiveView("dashboard");
+          setMonthlyExpenses([]);
+          setAllExpenses([]);
+          setSettlementPayments([]);
+          setMarketItems([]);
+          setOtherPayments([]);
+          setUserProfiles({});
+          setPaymentTarget(null);
+          setEditingExpense(null);
+          setEditingResourceItem(null);
+          setActionMessage("");
+          setAuthLoading(false);
+          return;
         }
-      }
 
-      setProfile(matchedProfile);
-      setActiveView(matchedProfile.id);
-      setAuthLoading(false);
-    });
+        setAuthError("");
+        if (!user.emailVerified) {
+          setProfile(null);
+          setAuthError("Confirme o endereço de e-mail da conta Google antes de acessar o sistema.");
+          try {
+            await signOut(auth);
+          } catch (error) {
+            setAuthError(getFirebaseActionError(error, "encerrar a sessão não verificada"));
+          } finally {
+            setAuthLoading(false);
+          }
+          return;
+        }
+
+        const matchedProfile = getProfileByEmail(user.email);
+        if (!matchedProfile) {
+          setProfile(null);
+          setAuthError(`A conta ${user.email} não tem acesso ao sistema. Entre com uma conta autorizada ou solicite a liberação.`);
+          try {
+            await signOut(auth);
+          } catch (error) {
+            setAuthError(getFirebaseActionError(error, "encerrar a sessão não autorizada"));
+          } finally {
+            setAuthLoading(false);
+          }
+          return;
+        }
+
+        if (db) {
+          try {
+            await setDoc(
+              doc(db, "userProfiles", matchedProfile.id),
+              {
+                personId: matchedProfile.id,
+                name: matchedProfile.name,
+                email: formatEmail(user.email),
+                photoURL: user.photoURL || "",
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+          } catch (error) {
+            setActionMessage(getFirebaseActionError(error, "atualizar o perfil do usuário"));
+          }
+        }
+
+        setProfile(matchedProfile);
+        setActiveView(matchedProfile.id);
+        setAuthLoading(false);
+      },
+      (error) => {
+        setProfile(null);
+        setAuthError(getAuthErrorMessage(error));
+        setAuthLoading(false);
+      },
+    );
   }, []);
 
   useEffect(() => {
@@ -733,9 +763,7 @@ function App() {
         });
         setUserProfiles(nextProfiles);
       },
-      () => {
-        setActionMessage("Não foi possível carregar as fotos dos usuários.");
-      },
+      (error) => setActionMessage(getFirebaseActionError(error, "carregar os perfis dos usuários")),
     );
   }, [profile]);
 
@@ -788,9 +816,9 @@ function App() {
         setMonthlyExpenses(nextExpenses);
         setDataLoading(false);
       },
-      () => {
+      (error) => {
         setDataLoading(false);
-        setActionMessage("Não foi possível carregar as contas do mês.");
+        setActionMessage(getFirebaseActionError(error, "carregar as contas do mês"));
       },
     );
   }, [profile, selectedMonth]);
@@ -800,14 +828,18 @@ function App() {
 
     const expensesQuery = query(collection(db, "expenses"));
 
-    return onSnapshot(expensesQuery, (snapshot) => {
-      const nextExpenses = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .filter(isValidInstallmentExpense)
-        .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+    return onSnapshot(
+      expensesQuery,
+      (snapshot) => {
+        const nextExpenses = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .filter(isValidInstallmentExpense)
+          .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
 
-      setAllExpenses(nextExpenses);
-    });
+        setAllExpenses(nextExpenses);
+      },
+      (error) => setActionMessage(getFirebaseActionError(error, "carregar o histórico de contas")),
+    );
   }, [profile]);
 
   useEffect(() => {
@@ -926,14 +958,18 @@ function App() {
 
     const settlementsQuery = query(collection(db, "settlements"));
 
-    return onSnapshot(settlementsQuery, (snapshot) => {
-      const nextPayments = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => item.kind === "payment")
-        .sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || ""));
+    return onSnapshot(
+      settlementsQuery,
+      (snapshot) => {
+        const nextPayments = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .filter((item) => item.kind === "payment")
+          .sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || ""));
 
-      setSettlementPayments(nextPayments);
-    });
+        setSettlementPayments(nextPayments);
+      },
+      (error) => setActionMessage(getFirebaseActionError(error, "carregar os pagamentos de acerto")),
+    );
   }, [profile]);
 
   const expenses = useMemo(() => {
@@ -1054,18 +1090,22 @@ function App() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
-      setAuthError(error.message || "Não foi possível entrar com o Google.");
+      setAuthError(getAuthErrorMessage(error));
     }
   }
 
   async function handleLogout() {
     setAuthError("");
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "encerrar a sessão"));
+    }
   }
 
   function ensureCanManageData() {
     if (canManageData) return true;
-    setActionMessage("Seu acesso e somente leitura. Esta conta nao pode alterar dados.");
+    setActionMessage("Seu acesso é somente leitura. Esta conta não pode alterar dados.");
     return false;
   }
 
@@ -1315,10 +1355,14 @@ function App() {
       fields.paidAt = date;
     }
 
-    await updateDoc(doc(db, collectionName, item.id), fields);
-    setSelectedMonth(monthFromDate(date));
-    setEditingResourceItem(null);
-    setActionMessage("Lançamento atualizado com sucesso.");
+    try {
+      await updateDoc(doc(db, collectionName, item.id), fields);
+      setSelectedMonth(monthFromDate(date));
+      setEditingResourceItem(null);
+      setActionMessage("Lançamento atualizado com sucesso.");
+    } catch (error) {
+      throw new Error(getFirebaseActionError(error, "atualizar o lançamento"));
+    }
   }
 
   function toggleParticipant(personId) {
@@ -1480,7 +1524,12 @@ function App() {
       batch.set(docRef, expenseData);
     }
 
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (error) {
+      setFormError(getFirebaseActionError(error, "cadastrar a conta"));
+      return;
+    }
 
     setSelectedMonth(
       getExpenseMonthKey({
@@ -1516,22 +1565,29 @@ function App() {
     if (!ensureCanManageData()) return;
 
     const { expense, personId } = paymentTarget;
-    if (personId !== profile.id) return;
+    if (personId !== profile.id) {
+      setActionMessage("Só é possível registrar o pagamento do próprio perfil.");
+      return;
+    }
 
-    await updateDoc(doc(db, "expenses", expense.id), {
-      [`shares.${personId}.status`]: "paid",
-      [`shares.${personId}.payment`]: {
-        paidAt: paymentForm.paidAt,
-        type: paymentForm.type,
-        description: paymentForm.description.trim(),
-        registeredBy: profile.id,
-        registeredAt: new Date().toISOString(),
-      },
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await updateDoc(doc(db, "expenses", expense.id), {
+        [`shares.${personId}.status`]: "paid",
+        [`shares.${personId}.payment`]: {
+          paidAt: paymentForm.paidAt,
+          type: paymentForm.type,
+          description: paymentForm.description.trim(),
+          registeredBy: profile.id,
+          registeredAt: new Date().toISOString(),
+        },
+        updatedAt: serverTimestamp(),
+      });
 
-    setPaymentTarget(null);
-    setActionMessage("Pagamento registrado.");
+      setPaymentTarget(null);
+      setActionMessage("Pagamento registrado.");
+    } catch (error) {
+      setActionMessage(getFirebaseActionError(error, "registrar o pagamento"));
+    }
   }
 
   function queueAffectedShareUpdates(
@@ -1887,13 +1943,13 @@ function App() {
       );
     } catch (error) {
       console.error("Erro ao excluir conta:", error);
-      setActionMessage(`Erro ao excluir a conta: ${error.message || error}`);
+      setActionMessage(getFirebaseActionError(error, "excluir a conta"));
     }
   }
 
   async function handleUpdateExpense(expenseId, updatedData) {
     if (!canManageData) {
-      throw new Error("Seu acesso e somente leitura. Esta conta nao pode alterar dados.");
+      throw new Error("Seu acesso é somente leitura. Esta conta não pode alterar dados.");
     }
 
     const rawValue = Number(String(updatedData.totalValue).replace(",", "."));
@@ -3765,7 +3821,10 @@ function SettingsPanel({ theme, setTheme }) {
       });
     } catch (error) {
       console.error("Erro ao exportar backup:", error);
-      setBackupMessage({ type: "error", text: `Erro ao exportar backup: ${error.message || error}` });
+      setBackupMessage({
+        type: "error",
+        text: getFirebaseActionError(error, "exportar o backup"),
+      });
     } finally {
       setIsExporting(false);
     }
@@ -3825,7 +3884,10 @@ function SettingsPanel({ theme, setTheme }) {
         });
       } catch (error) {
         console.error("Erro ao importar backup:", error);
-        setBackupMessage({ type: "error", text: `Erro ao importar backup: ${error.message || error}` });
+        const errorMessage = error instanceof SyntaxError
+          ? "O arquivo selecionado não contém um JSON válido."
+          : getFirebaseActionError(error, "importar o backup");
+        setBackupMessage({ type: "error", text: errorMessage });
       } finally {
         setIsImporting(false);
         input.value = "";
@@ -5440,7 +5502,7 @@ function EditExpenseModal({ expense, onClose, onSave }) {
         installment: isInstallment ? `Parcela ${currentInstallment} de ${totalInstallments}` : null,
       });
     } catch (err) {
-      setError(err.message || "Erro ao salvar despesa.");
+      setError(getFirebaseActionError(err, "atualizar a conta"));
     }
   }
 

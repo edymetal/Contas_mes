@@ -21,6 +21,10 @@ VITE_FIREBASE_APP_ID=COLOCAR_APP_ID_AQUI
 5. Edite `src/config/people.js` e troque os e-mails de exemplo pelos e-mails reais de cada conta Google.
 6. No console do Firebase, publique as regras de `firestore.rules`.
 
+As regras exigem uma conta com e-mail verificado. Somente os e-mails administrativos podem alterar os dados
+financeiros; os demais acessos autorizados são somente leitura e podem atualizar apenas os campos públicos do
+próprio perfil. Alterar o arquivo local de regras não atualiza o Firebase até que ele seja publicado.
+
 ## Rodar localmente
 
 ```bash
