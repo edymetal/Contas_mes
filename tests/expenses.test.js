@@ -9,6 +9,7 @@ import {
   getExpensesForMonth,
   getFixedExpenseMonthGroups,
   getInstallmentInfo,
+  getInstallmentSeriesExpenses,
   getInstallmentSeriesMissingHistory,
   getInstallmentSeriesSummaries,
   getMonthDistance,
@@ -134,6 +135,24 @@ test("identifica séries explícitas e séries legadas equivalentes", () => {
   };
   assert.equal(isSameFixedSeries(fixedReference, { ...fixedReference }), true);
   assert.equal(isSameFixedSeries(fixedReference, { ...fixedReference, fixedSeriesId: "fixed-2" }), false);
+});
+
+test("seleciona todas as parcelas da série ao excluir uma conta parcelada", () => {
+  const first = installment({ current: 1, dueDate: "2026-01-10", seriesId: "target" });
+  const selected = installment({ current: 2, dueDate: "2026-02-10", seriesId: "target" });
+  const third = installment({ current: 3, dueDate: "2026-03-10", seriesId: "target" });
+  const anotherSeries = installment({
+    current: 2,
+    dueDate: "2026-02-10",
+    id: "another-series",
+    seriesId: "other",
+  });
+
+  assert.deepEqual(
+    getInstallmentSeriesExpenses([first, selected, third, anotherSeries], selected)
+      .map((expense) => expense.id),
+    ["installment-1", "installment-2", "installment-3"],
+  );
 });
 
 test("normaliza o mês das parcelas a partir da primeira parcela rastreada", () => {

@@ -138,6 +138,11 @@ export function isSameInstallmentSeries(referenceExpense, candidateExpense) {
   );
 }
 
+export function getInstallmentSeriesExpenses(expenses, referenceExpense) {
+  if (!getInstallmentInfo(referenceExpense)) return [];
+  return expenses.filter((expense) => isSameInstallmentSeries(referenceExpense, expense));
+}
+
 function getFirestoreTimestampKey(value) {
   if (!value) return "";
   const seconds = value.seconds ?? value._seconds;

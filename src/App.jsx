@@ -77,6 +77,7 @@ import {
   getExpensesForMonth,
   getFixedExpenseMonthGroups,
   getInstallmentInfo,
+  getInstallmentSeriesExpenses,
   getInstallmentSeriesKey,
   getInstallmentSeriesMissingHistory,
   getInstallmentSeriesSummaries,
@@ -1543,7 +1544,7 @@ function App() {
     const installmentInfo = getInstallmentInfo(selectedExpense);
     const fixedExpense = isFixedExpense(selectedExpense);
     const confirmationMessage = installmentInfo
-      ? `Tem certeza que deseja excluir a parcela ${installmentInfo.current} e todas as parcelas seguintes desta conta?`
+      ? "Tem certeza que deseja excluir toda esta conta parcelada, incluindo as parcelas dos meses anteriores e seguintes?"
       : fixedExpense
         ? "Tem certeza que deseja excluir esta conta fixa deste mês e de todos os meses seguintes?"
         : "Tem certeza que deseja excluir esta conta?";
@@ -1587,15 +1588,7 @@ function App() {
       const referenceInfo = getInstallmentInfo(referenceExpense);
       if (!referenceExpense || !referenceInfo) throw new Error("A conta selecionada não foi encontrada.");
 
-      const deletionTargets = persistedExpenses
-        .filter((item) => {
-          const itemInfo = getInstallmentInfo(item);
-          return (
-            itemInfo &&
-            itemInfo.current >= referenceInfo.current &&
-            isSameInstallmentSeries(referenceExpense, item)
-          );
-        });
+      const deletionTargets = getInstallmentSeriesExpenses(persistedExpenses, referenceExpense);
 
       await commitFirestoreMutations(
         deletionTargets.map((item) => ({
@@ -4843,7 +4836,7 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
                       onClick={() => onDelete(expense)}
                       title={
                         getInstallmentInfo(expense)
-                          ? "Excluir esta parcela e as seguintes"
+                          ? "Excluir toda a conta parcelada"
                           : isFixedExpense(expense)
                             ? "Excluir esta conta fixa e os meses seguintes"
                             : "Excluir despesa"
