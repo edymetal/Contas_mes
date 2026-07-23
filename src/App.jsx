@@ -2833,6 +2833,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
             person,
             originalAmount,
             paidAmount,
+            abatedAmount,
             amount,
             receivableAmount,
           }) => {
@@ -2857,6 +2858,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
                 <div className="person-debt-breakdown">
                   <small className="debt-total">Dívida: {formatSignedCurrency(originalAmount, "negative")}</small>
                   <small className="debt-paid">Pago: {formatCurrency(paidAmount)}</small>
+                  <small className="debt-abated">Abatido: {formatCurrency(abatedAmount)}</small>
                   <small className="debt-receivable">Receber {person.name}: {formatSignedCurrency(receivableAmount, "positive")}</small>
                 </div>
               </div>
