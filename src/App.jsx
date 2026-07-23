@@ -2639,12 +2639,16 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
         group = {
           payerId: expense.payerId,
           expenses: [],
+          totalAmount: 0,
         };
         groupByPayerId.set(expense.payerId, group);
         groups.push(group);
       }
 
       group.expenses.push(expense);
+      group.totalAmount = roundMoney(
+        group.totalAmount + Number(getShare(expense, personId)?.amount || 0),
+      );
     });
 
     return groups;
@@ -2891,7 +2895,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
         <div className="empty-state">Nenhuma conta para este mês.</div>
       ) : (
         <div className="expense-list">
-          {expensesByPayer.map(({ payerId, expenses: payerExpenses }) => {
+          {expensesByPayer.map(({ payerId, expenses: payerExpenses, totalAmount }) => {
             const payer = getPersonById(payerId);
             const payerPhotoUrl = getPersonPhotoUrl(payer, firebaseUser, userProfiles);
 
@@ -2903,7 +2907,8 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
                     <strong>{personName(payerId)}</strong>
                   </div>
                   <small>
-                    {payerExpenses.length} {payerExpenses.length === 1 ? "conta" : "contas"}
+                    {payerExpenses.length} {payerExpenses.length === 1 ? "conta" : "contas"} · Total:{" "}
+                    {formatCurrency(totalAmount)}
                   </small>
                 </div>
 
