@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Calendar,
   Camera,
+  CarFront,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -16,8 +17,10 @@ import {
   LoaderCircle,
   Pencil,
   Plus,
+  Plane,
   ReceiptText,
   Settings,
+  Shapes,
   ShoppingCart,
   Sparkles,
   SlidersHorizontal,
@@ -163,6 +166,13 @@ const navItems = [
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
+const CATEGORY_ICONS = {
+  Casa: Home,
+  Carro: CarFront,
+  Viagem: Plane,
+  Outros: Shapes,
+};
+
 function isAdminProfile(profile) {
   return profile?.role === "admin";
 }
@@ -176,6 +186,20 @@ function formatSignedCurrency(value, sign) {
   if (!amount) return formatCurrency(0);
 
   return `${sign === "negative" ? "-" : "+"}${formatCurrency(amount)}`;
+}
+
+function CategoryIcon({ category, size = 14 }) {
+  const Icon = CATEGORY_ICONS[category] || Shapes;
+  return <Icon aria-hidden="true" size={size} strokeWidth={2.2} />;
+}
+
+function CategoryTag({ category }) {
+  return (
+    <span className="tag category-tag">
+      <CategoryIcon category={category} />
+      <span>{category}</span>
+    </span>
+  );
 }
 
 function getPlaceSuggestions(payments) {
@@ -2252,7 +2276,10 @@ function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics, 
             {categoryRows.map((item) => (
               <article className="dashboard-category-row" key={item.category}>
                 <div>
-                  <span>{item.category}</span>
+                  <span className="category-label">
+                    <CategoryIcon category={item.category} size={16} />
+                    {item.category}
+                  </span>
                   <strong>{formatCurrency(item.total)}</strong>
                 </div>
                 <div className="dashboard-track">
@@ -2359,7 +2386,7 @@ function ExpensesTable({ expenses }) {
               <td>{formatCurrency(expense.totalValue)}</td>
               <td>{formatDate(expense.dueDate)}</td>
               <td>
-                <span className="tag">{expense.category}</span>
+                <CategoryTag category={expense.category} />
               </td>
               <td>{personName(expense.payerId)}</td>
               <td>{expense.participants?.map(personName).join(", ")}</td>
@@ -2941,7 +2968,7 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
                           <div className="expense-main">
                             <h3>{expense.title}</h3>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                              <span className="tag">{expense.category}</span>
+                              <CategoryTag category={expense.category} />
                               {expense.installment && (
                                 <span className="tag" style={{ background: "var(--panel-muted)", color: "var(--muted)", borderColor: "var(--line)" }}>
                                   {formatInstallmentLabel(expense.installment)}
@@ -4835,7 +4862,7 @@ function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDele
                 <td>{formatCurrency(expense.totalValue)}</td>
                 <td>{formatDate(expense.dueDate)}</td>
                 <td>
-                  <span className="tag">{expense.category}</span>
+                  <CategoryTag category={expense.category} />
                 </td>
                 <td>{personName(expense.payerId)}</td>
                 <td>{expense.participants?.map(personName).join(", ")}</td>

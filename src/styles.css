@@ -1720,6 +1720,18 @@ td small {
   border: 1px solid rgba(15, 118, 110, 0.1);
 }
 
+.category-tag,
+.category-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-tag svg,
+.category-label svg {
+  flex: 0 0 auto;
+}
+
 .empty-state {
   display: grid;
   place-items: center;
