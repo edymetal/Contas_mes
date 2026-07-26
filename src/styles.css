@@ -597,8 +597,7 @@ button {
   }
 
   .dashboard-hero,
-  .dashboard-layout,
-  .dashboard-layout-compact {
+  .dashboard-layout {
     grid-template-columns: 1fr;
   }
 
@@ -718,9 +717,7 @@ button {
 .dashboard-eyebrow,
 .dashboard-overview-card span,
 .dashboard-type-item span,
-.dashboard-category-row span,
-.dashboard-rateio-meter span,
-.dashboard-highlight span {
+.dashboard-category-row span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
@@ -749,8 +746,7 @@ button {
   border-left: 1px solid var(--line);
 }
 
-.dashboard-hero-stack div,
-.dashboard-rateio-meter div:not(.dashboard-track) {
+.dashboard-hero-stack div {
   display: grid;
   gap: 5px;
 }
@@ -912,10 +908,6 @@ button {
   align-items: start;
 }
 
-.dashboard-layout-compact {
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-}
-
 .dashboard-panel {
   min-width: 0;
 }
@@ -959,9 +951,7 @@ button {
 
 .dashboard-type-head strong,
 .dashboard-category-row strong,
-.dashboard-due-row > div:last-child strong,
-.dashboard-rateio-meter strong,
-.dashboard-highlight strong {
+.dashboard-due-row > div:last-child strong {
   color: var(--text);
   font-size: 1rem;
 }
@@ -969,8 +959,7 @@ button {
 .dashboard-type-head small,
 .dashboard-type-item > small,
 .dashboard-category-row small,
-.dashboard-due-row small,
-.dashboard-highlight small {
+.dashboard-due-row small {
   display: block;
   margin-top: 5px;
   color: var(--muted);
@@ -1008,31 +997,6 @@ button {
   display: grid;
   gap: 5px;
   text-align: right;
-}
-
-.dashboard-rateio-panel {
-  display: grid;
-  gap: 18px;
-}
-
-.dashboard-rateio-meter {
-  display: grid;
-  gap: 14px;
-}
-
-.dashboard-rateio-meter .dashboard-track {
-  margin-top: 0;
-}
-
-.dashboard-rateio-meter .dashboard-fill {
-  background: linear-gradient(90deg, var(--success), var(--primary));
-}
-
-.dashboard-highlight {
-  display: grid;
-  gap: 5px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
 }
 
 .section-heading {
@@ -3939,8 +3903,7 @@ textarea:focus {
   }
 
   .dashboard-hero,
-  .dashboard-layout,
-  .dashboard-layout-compact {
+  .dashboard-layout {
     grid-template-columns: 1fr;
   }
 

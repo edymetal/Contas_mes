@@ -2143,10 +2143,6 @@ function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics, 
     }))
     .sort((a, b) => b.total - a.total);
   const topCategory = categoryRows.find((item) => item.total > 0);
-  const largestExpense = expenses.reduce((largest, expense) => {
-    if (!largest) return expense;
-    return Number(expense.totalValue || 0) > Number(largest.totalValue || 0) ? expense : largest;
-  }, null);
   const nextExpenses = [...expenses]
     .filter((expense) => expense.dueDate)
     .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
@@ -2294,62 +2290,31 @@ function Dashboard({ breakdown, categoryTotals, dataLoading, expenses, metrics, 
         </section>
       </div>
 
-      <div className="dashboard-layout dashboard-layout-compact">
-        <section className="panel dashboard-panel">
-          <div className="section-heading">
-            <h2>Próximos vencimentos</h2>
-            <span>{nextExpensesLabel}</span>
+      <section className="panel dashboard-panel">
+        <div className="section-heading">
+          <h2>Próximos vencimentos</h2>
+          <span>{nextExpensesLabel}</span>
+        </div>
+
+        {nextExpenses.length ? (
+          <div className="dashboard-due-list">
+            {nextExpenses.map((expense) => (
+              <article className="dashboard-due-row" key={expense.id}>
+                <div>
+                  <strong>{expense.title}</strong>
+                  <small>{expense.category} • {personName(expense.payerId)}</small>
+                </div>
+                <div>
+                  <span>{formatDate(expense.dueDate)}</span>
+                  <strong>{formatCurrency(expense.totalValue)}</strong>
+                </div>
+              </article>
+            ))}
           </div>
-
-          {nextExpenses.length ? (
-            <div className="dashboard-due-list">
-              {nextExpenses.map((expense) => (
-                <article className="dashboard-due-row" key={expense.id}>
-                  <div>
-                    <strong>{expense.title}</strong>
-                    <small>{expense.category} • {personName(expense.payerId)}</small>
-                  </div>
-                  <div>
-                    <span>{formatDate(expense.dueDate)}</span>
-                    <strong>{formatCurrency(expense.totalValue)}</strong>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">Nenhum vencimento para listar.</div>
-          )}
-        </section>
-
-        <section className="panel dashboard-panel dashboard-rateio-panel">
-          <div className="section-heading">
-            <h2>Rateio</h2>
-            <span>{formatCurrency(rateioTotal)}</span>
-          </div>
-
-          <div className="dashboard-rateio-meter">
-            <div className="dashboard-track">
-              <div className="dashboard-fill" style={{ width: `${paidPercent}%` }} />
-            </div>
-            <div>
-              <span>Pago/liquidado</span>
-              <strong>{formatCurrency(metrics.paid)}</strong>
-            </div>
-            <div>
-              <span>Pendente</span>
-              <strong>{formatCurrency(metrics.pending)}</strong>
-            </div>
-          </div>
-
-          {largestExpense && (
-            <div className="dashboard-highlight">
-              <span>Maior conta</span>
-              <strong>{largestExpense.title}</strong>
-              <small>{formatCurrency(largestExpense.totalValue)}</small>
-            </div>
-          )}
-        </section>
-      </div>
+        ) : (
+          <div className="empty-state">Nenhum vencimento para listar.</div>
+        )}
+      </section>
     </div>
   );
 }
