@@ -2034,8 +2034,10 @@ function App() {
 
         {canManageData && activeView === "settlement" && (
           <SettlementPanel
+            firebaseUser={firebaseUser}
             rows={settlementRows}
             settlementPayments={settlementPayments}
+            userProfiles={userProfiles}
             onDeletePayment={deleteSettlementPayment}
             onRegisterPayment={registerSettlementPayment}
             onUpdatePayment={updateSettlementPayment}
@@ -2996,21 +2998,25 @@ function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMon
   );
 }
 
-function PersonAvatar({ person, photoUrl, size = "default" }) {
-  const className = `person-avatar ${size === "large" ? "large" : ""}`.trim();
+function PersonAvatar({ decorative = false, person, photoUrl, size = "default" }) {
+  const className = `person-avatar ${size === "large" ? "large" : size === "small" ? "small" : ""}`.trim();
 
   if (photoUrl) {
     return (
       <img
         src={photoUrl}
-        alt={person.name}
+        alt={decorative ? "" : person.name}
         className={className}
         referrerPolicy="no-referrer"
       />
     );
   }
 
-  return <div className={`${className} placeholder`}>{getPersonInitials(person)}</div>;
+  return (
+    <div aria-hidden={decorative || undefined} className={`${className} placeholder`}>
+      {getPersonInitials(person)}
+    </div>
+  );
 }
 
 function StatusBadge({ status }) {
@@ -3085,7 +3091,15 @@ function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
   );
 }
 
-function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, rows, settlementPayments = [] }) {
+function SettlementPanel({
+  firebaseUser,
+  onDeletePayment,
+  onRegisterPayment,
+  onUpdatePayment,
+  rows,
+  settlementPayments = [],
+  userProfiles = {},
+}) {
   const [paymentForms, setPaymentForms] = useState({});
   const [activeSettlementKey, setActiveSettlementKey] = useState(null);
   const [historyMonth, setHistoryMonth] = useState(() => monthFromDate(todayInputValue()));
@@ -3367,6 +3381,14 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                   {group.payments.map((payment) => {
                     const isEditing = editingPaymentId === payment.id;
                     const hasLaterPayment = hasLaterSettlementPayment(payment, settlementPayments);
+                    const fromPerson = getPersonById(payment.fromId) || {
+                      id: payment.fromId,
+                      name: personName(payment.fromId),
+                    };
+                    const toPerson = getPersonById(payment.toId) || {
+                      id: payment.toId,
+                      name: personName(payment.toId),
+                    };
 
                     return (
                       <article className="settlement-history-item" key={payment.id}>
@@ -3444,9 +3466,27 @@ function SettlementPanel({ onDeletePayment, onRegisterPayment, onUpdatePayment, 
                     <>
                       <div className="settlement-history-main">
                         <strong>{formatCurrency(payment.amount)}</strong>
-                        <span>
-                          {personName(payment.fromId)} pagou {personName(payment.toId)}
-                        </span>
+                        <div className="settlement-history-people">
+                          <div className="settlement-history-person">
+                            <PersonAvatar
+                              decorative
+                              person={fromPerson}
+                              photoUrl={getPersonPhotoUrl(fromPerson, firebaseUser, userProfiles)}
+                              size="small"
+                            />
+                            <span>{fromPerson.name}</span>
+                          </div>
+                          <span className="settlement-history-verb">pagou</span>
+                          <div className="settlement-history-person">
+                            <PersonAvatar
+                              decorative
+                              person={toPerson}
+                              photoUrl={getPersonPhotoUrl(toPerson, firebaseUser, userProfiles)}
+                              size="small"
+                            />
+                            <span>{toPerson.name}</span>
+                          </div>
+                        </div>
                         <small>
                           {formatDate(payment.paidAt)} - {payment.type || "PIX"}
                           {payment.description ? ` - ${payment.description}` : ""}
