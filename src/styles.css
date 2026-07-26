@@ -1822,18 +1822,54 @@ textarea:focus {
   padding: 12px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--input-bg);
+  background: color-mix(in srgb, var(--input-bg) 72%, var(--panel-muted));
+  cursor: pointer;
+  opacity: 0.58;
+}
+
+.checkbox-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  opacity: 0.8;
+}
+
+.checkbox-card:focus-within {
+  border-color: var(--primary);
+  outline: 3px solid var(--primary-soft);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+.checkbox-card:has(input:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 16%, var(--input-bg));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent),
+    0 0 22px color-mix(in srgb, var(--primary) 22%, transparent);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.checkbox-card:has(input:checked):hover {
+  background: color-mix(in srgb, var(--primary) 22%, var(--input-bg));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 70%, transparent),
+    0 0 26px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .checkbox-card input {
   width: 20px;
   min-height: 20px;
   accent-color: var(--primary);
+  cursor: pointer;
 }
 
 .checkbox-card span {
-  color: var(--text);
+  color: var(--muted);
   font-weight: 650;
+}
+
+.checkbox-card:has(input:checked) span {
+  color: var(--text);
 }
 
 .split-preview {
