@@ -38,3 +38,25 @@ test("fixa GitHub Actions em commits imutáveis", () => {
     assert.match(reference, /^[0-9a-f]{40}$/, `${reference} deve ser um commit SHA completo`);
   }
 });
+
+test("aceita Variables ou Secrets legados na configuração de deploy", () => {
+  const deployWorkflow = readFileSync(
+    new URL("../.github/workflows/deploy.yml", import.meta.url),
+    "utf8",
+  );
+  const firebaseVariables = [
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_PROJECT_ID",
+    "VITE_FIREBASE_STORAGE_BUCKET",
+    "VITE_FIREBASE_MESSAGING_SENDER_ID",
+    "VITE_FIREBASE_APP_ID",
+  ];
+
+  for (const name of firebaseVariables) {
+    assert.ok(
+      deployWorkflow.includes(`\${{ vars.${name} || secrets.${name} }}`),
+      `${name} deve aceitar Variable ou Secret`,
+    );
+  }
+});

@@ -72,13 +72,14 @@ O projeto esta preparado para build estatico com Vite. No GitHub:
 
 1. Va em **Settings > Pages**.
 2. Em **Build and deployment**, selecione **GitHub Actions**.
-3. Cadastre as seis variáveis `VITE_FIREBASE_*` de `.env.example` em
-   **Settings > Secrets and variables > Actions > Variables**.
+3. Cadastre as seis configurações `VITE_FIREBASE_*` de `.env.example` em
+   **Settings > Secrets and variables > Actions > Variables**. O workflow também aceita os Secrets legados com
+   os mesmos nomes durante a migração.
 4. Faca push para a branch `main`.
 
-O workflow `.github/workflows/deploy.yml` lê esses valores pelo contexto `vars`, valida a configuração, gera a
-pasta `dist` e publica no GitHub Pages. Valores ausentes ou que ainda começam com `COLOCAR_` interrompem o deploy
-antes do build.
+O workflow `.github/workflows/deploy.yml` prioriza o contexto `vars` e usa `secrets` como fallback, valida a
+configuração, gera a pasta `dist` e publica no GitHub Pages. Valores ausentes ou que ainda começam com `COLOCAR_`
+interrompem o deploy antes do build.
 
 O deploy do GitHub Pages publica apenas o frontend. Quando houver alterações em `firestore.rules`, publique as regras separadamente:
 
