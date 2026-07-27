@@ -28,9 +28,15 @@ próprio perfil. Alterar o arquivo local de regras não atualiza o Firebase até
 ## Rodar localmente
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
+
+As dependências diretas usam versões exatas para que instalações futuras não adotem versões novas sem revisão.
+O comando `npm ci` reproduz exatamente o conteúdo de `package-lock.json` no desenvolvimento, na integração e na
+implantação. As GitHub Actions também ficam fixadas por commit. O Dependabot verifica os dois ecossistemas
+semanalmente, agrupa as atualizações relacionadas e abre pull requests que passam pelos testes e pelo build antes
+da integração.
 
 ## Validar alterações
 

@@ -1,21 +1,20 @@
-name: Deploy GitHub Pages
+name: Validate pull request
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: pages
+  group: ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Deploy frontend
+  validate:
+    name: Test and build
     runs-on: ubuntu-latest
     env:
       VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
@@ -34,10 +33,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install locked dependencies
         run: npm ci
 
-      - name: Test application and security policies
+      - name: Test application and project policies
         run: npm test
 
       - name: Validate Firebase configuration
@@ -45,9 +44,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Publish to gh-pages
-        uses: peaceiris/actions-gh-pages@329bcc8f12caed2cefe5a5b80781499a6f3b361b # v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
