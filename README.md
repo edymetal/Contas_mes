@@ -47,6 +47,10 @@ npm run build
 ```
 
 As regras financeiras puras ficam em `src/domain` e possuem testes de regressão independentes da interface.
+Os componentes principais ficam em `src/components` e são renderizados nos testes pelo pipeline SSR do
+Vite/React, cobrindo login, dashboard, criação de conta e o resumo de Outras Contas. Testes arquiteturais também
+impedem que esses componentes retornem ao arquivo principal ou que a ordem das camadas de CSS seja alterada.
+
 A validação do Firebase lê o arquivo `.env` local e falha sem revelar valores quando alguma variável estiver
 ausente, vazia ou ainda contiver um valor de exemplo. O build também falha automaticamente se algum chunk
 JavaScript ultrapassar 400 KB.

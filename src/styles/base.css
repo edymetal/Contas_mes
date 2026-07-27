@@ -1,0 +1,100 @@
+:root {
+  color-scheme: light;
+  font-family:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Color Palette - Premium Slate & Teal */
+  --bg: #f8fafc;
+  --panel: #ffffff;
+  --panel-muted: #f1f5f9;
+  --text: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --primary: #0f766e;
+  --primary-dark: #0f172a;
+  --primary-soft: #f0fdfa;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+
+  /* Shadows & Glassmorphism */
+  --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-hover: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 10px 10px -5px rgba(15, 23, 42, 0.04);
+
+  --sidebar-bg: rgba(255, 255, 255, 0.85);
+  --panel-bg: rgba(255, 255, 255, 0.95);
+  --input-bg: #ffffff;
+  --tag-bg: #e2e8f0;
+  --track-bg: #e2e8f0;
+  --icon-btn-bg: #f1f5f9;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #090d16;
+  --panel: #111827;
+  --panel-muted: #1f2937;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --line: #1e293b;
+  --primary: #2dd4bf;
+  --primary-dark: #14b8a6;
+  --primary-soft: #0d2e2b;
+  --warning: #fbbf24;
+  --warning-soft: #2c1d0f;
+  --success: #34d399;
+  --success-soft: #062d1f;
+  --danger: #f87171;
+  --danger-soft: #3b1212;
+
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+
+  --sidebar-bg: rgba(17, 24, 39, 0.85);
+  --panel-bg: rgba(17, 24, 39, 0.95);
+  --input-bg: #1f2937;
+  --tag-bg: #1f2937;
+  --track-bg: #1f2937;
+  --icon-btn-bg: #1f2937;
+}
+
+* {
+  box-sizing: border-box;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 0% 0%, var(--primary-soft) 0%, transparent 40%),
+    radial-gradient(circle at 100% 100%, var(--primary-soft) 0%, transparent 40%),
+    var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, .brand strong {
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
