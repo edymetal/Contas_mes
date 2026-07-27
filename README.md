@@ -36,11 +36,14 @@ npm run dev
 
 ```bash
 npm test
+npm run check:firebase-env
 npm run build
 ```
 
 As regras financeiras puras ficam em `src/domain` e possuem testes de regressão independentes da interface.
-O build também falha automaticamente se algum chunk JavaScript ultrapassar 400 KB.
+A validação do Firebase lê o arquivo `.env` local e falha sem revelar valores quando alguma variável estiver
+ausente, vazia ou ainda contiver um valor de exemplo. O build também falha automaticamente se algum chunk
+JavaScript ultrapassar 400 KB.
 
 ## Leitura de notas fiscais com Gemini
 
@@ -63,10 +66,13 @@ O projeto esta preparado para build estatico com Vite. No GitHub:
 
 1. Va em **Settings > Pages**.
 2. Em **Build and deployment**, selecione **GitHub Actions**.
-3. Cadastre as variaveis `VITE_FIREBASE_*` em **Settings > Secrets and variables > Actions > Variables**.
+3. Cadastre as seis variáveis `VITE_FIREBASE_*` de `.env.example` em
+   **Settings > Secrets and variables > Actions > Variables**.
 4. Faca push para a branch `main`.
 
-O workflow `.github/workflows/deploy.yml` gera a pasta `dist` e publica no GitHub Pages.
+O workflow `.github/workflows/deploy.yml` lê esses valores pelo contexto `vars`, valida a configuração, gera a
+pasta `dist` e publica no GitHub Pages. Valores ausentes ou que ainda começam com `COLOCAR_` interrompem o deploy
+antes do build.
 
 O deploy do GitHub Pages publica apenas o frontend. Quando houver alterações em `firestore.rules`, publique as regras separadamente:
 
