@@ -8,6 +8,7 @@ import { createServer } from "vite";
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 let viteServer;
 let AuthScreens;
+let AppFeedback;
 let DashboardModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
@@ -26,12 +27,14 @@ before(async () => {
 
   [
     AuthScreens,
+    AppFeedback,
     DashboardModule,
     NewExpenseFormModule,
     OtherAccountsModule,
     FormsModule,
   ] = await Promise.all([
     viteServer.ssrLoadModule("/src/components/AuthScreens.jsx"),
+    viteServer.ssrLoadModule("/src/components/AppFeedback.jsx"),
     viteServer.ssrLoadModule("/src/components/Dashboard.jsx"),
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
@@ -63,6 +66,30 @@ test("tela de login diferencia configuração ausente de autenticação disponí
     }),
   );
   assert.match(loginHtml, /Entrar com o Google/);
+});
+
+test("estados globais oferecem contexto para leitores de tela e recuperação", () => {
+  const loadingHtml = renderToStaticMarkup(
+    createElement(AuthScreens.LoadingScreen),
+  );
+  assert.match(loadingHtml, /aria-busy="true"/);
+  assert.match(loadingHtml, /role="status"/);
+  assert.match(loadingHtml, /Carregando o sistema/);
+
+  const boundaryHtml = renderToStaticMarkup(
+    createElement(
+      AppFeedback.AppErrorBoundary,
+      null,
+      createElement("p", null, "Aplicação disponível"),
+    ),
+  );
+  assert.match(boundaryHtml, /Aplicação disponível/);
+
+  const diagnosticsHtml = renderToStaticMarkup(
+    createElement(AppFeedback.DiagnosticsPanel),
+  );
+  assert.match(diagnosticsHtml, /Nenhuma falha inesperada registrada/);
+  assert.match(diagnosticsHtml, /não inclui coleções, documentos, chaves ou e-mails/);
 });
 
 test("dashboard renderiza indicadores, categoria e próximo vencimento", () => {

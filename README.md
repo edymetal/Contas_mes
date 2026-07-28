@@ -51,6 +51,11 @@ Os componentes principais ficam em `src/components` e são renderizados nos test
 Vite/React, cobrindo login, dashboard, criação de conta e o resumo de Outras Contas. Testes arquiteturais também
 impedem que esses componentes retornem ao arquivo principal ou que a ordem das camadas de CSS seja alterada.
 
+A interface inclui atalho para o conteúdo principal, foco controlado nos diálogos, navegação por teclado,
+mensagens para leitores de tela, suporte a movimento reduzido e aviso de conexão. Falhas inesperadas são
+registradas de forma sanitizada apenas na sessão atual; o diagnóstico local pode ser baixado ou apagado em
+**Configurações**, sem incluir coleções financeiras, chaves, e-mails ou pilhas de execução.
+
 A validação do Firebase lê o arquivo `.env` local e falha sem revelar valores quando alguma variável estiver
 ausente, vazia ou ainda contiver um valor de exemplo. O build também falha automaticamente se algum chunk
 JavaScript ultrapassar 400 KB.

@@ -2,8 +2,9 @@ import { CircleDollarSign, Home } from "lucide-react";
 
 export function LoadingScreen() {
   return (
-    <main className="login-screen">
-      <div className="loader" />
+    <main aria-busy="true" className="login-screen">
+      <div aria-hidden="true" className="loader" />
+      <span className="sr-only" role="status" aria-live="polite">Carregando o sistema</span>
     </main>
   );
 }
@@ -14,7 +15,7 @@ export function LoginScreen({ error, missingConfig, onLogin }) {
       <section className="login-panel">
         <div className="brand large">
           <div className="brand-mark">
-            <Home size={28} />
+            <Home aria-hidden="true" size={28} />
           </div>
           <div>
             <strong>Contas</strong>
@@ -26,15 +27,15 @@ export function LoginScreen({ error, missingConfig, onLogin }) {
         <p>Entre com uma conta Google autorizada para acessar as despesas compartilhadas.</p>
 
         {missingConfig ? (
-          <div className="error-box">Preencha o arquivo .env com as credenciais do Firebase.</div>
+          <div className="error-box" role="alert">Preencha o arquivo .env com as credenciais do Firebase.</div>
         ) : (
           <button className="google-button" onClick={onLogin} type="button">
-            <CircleDollarSign size={20} />
+            <CircleDollarSign aria-hidden="true" size={20} />
             Entrar com o Google
           </button>
         )}
 
-        {error && <div className="error-box">{error}</div>}
+        {error && <div className="error-box" role="alert">{error}</div>}
       </section>
     </main>
   );

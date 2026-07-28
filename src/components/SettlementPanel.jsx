@@ -5,6 +5,7 @@ import { PersonAvatar } from "./PersonExpenses";
 import { PAYMENT_TYPES, getPersonById } from "../config/people";
 import { monthFromDate, roundMoney } from "../domain/expenses";
 import { hasLaterSettlementPayment } from "../domain/settlements";
+import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import {
   formatCurrency,
   formatDate,
@@ -19,10 +20,18 @@ import {
 export function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
   const { expense, personId } = target;
   const share = getShare(expense, personId);
+  const dialogRef = useDialogAccessibility(onClose);
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+      <section
+        aria-labelledby="payment-title"
+        aria-modal="true"
+        className="modal"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="section-heading">
           <div>
             <h2 id="payment-title">Registrar pagamento</h2>
@@ -30,8 +39,8 @@ export function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
               {expense.title} • {formatCurrency(share?.amount)}
             </span>
           </div>
-          <button className="icon-button" onClick={onClose} type="button">
-            ×
+          <button aria-label="Fechar" className="icon-button" onClick={onClose} type="button">
+            <span aria-hidden="true">×</span>
           </button>
         </div>
 

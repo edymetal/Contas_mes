@@ -15,6 +15,8 @@ import {
   validateAndNormalizeBackupPayload,
 } from "../domain/backup";
 import { getFirebaseActionError } from "../domain/errors";
+import { DiagnosticsPanel } from "./AppFeedback";
+import { reportClientError } from "../services/observability";
 
 const MAX_BACKUP_FILE_SIZE = 25 * 1024 * 1024;
 
@@ -55,7 +57,7 @@ export function SettingsPanel({ theme, setTheme }) {
         text: `Backup completo exportado: ${formatBackupSummary(exportObj)}.`,
       });
     } catch (error) {
-      console.error("Erro ao exportar backup:", error);
+      reportClientError(error, "backup:export");
       setBackupMessage({
         type: "error",
         text: getFirebaseActionError(error, "exportar o backup"),
@@ -118,7 +120,7 @@ export function SettingsPanel({ theme, setTheme }) {
           text: `Backup versão ${data.version} importado com sucesso: ${summary}.`,
         });
       } catch (error) {
-        console.error("Erro ao importar backup:", error);
+        reportClientError(error, "backup:import");
         const errorMessage = error instanceof SyntaxError
           ? "O arquivo selecionado não contém um JSON válido."
           : getFirebaseActionError(error, "importar o backup");
@@ -130,6 +132,7 @@ export function SettingsPanel({ theme, setTheme }) {
     };
 
     reader.onerror = () => {
+      reportClientError(reader.error, "backup:read-file");
       setBackupMessage({ type: "error", text: "Erro ao ler o arquivo selecionado." });
       setIsImporting(false);
       input.value = "";
@@ -238,6 +241,10 @@ export function SettingsPanel({ theme, setTheme }) {
             </div>
           )}
         </div>
+
+        <hr style={{ border: "0", borderTop: "1px solid var(--line)", margin: "8px 0" }} />
+
+        <DiagnosticsPanel />
       </div>
     </section>
   );

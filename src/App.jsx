@@ -28,6 +28,7 @@ import {
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
 import { commitFirestoreMutations } from "./services/firestoreMutations";
+import { reportClientError } from "./services/observability";
 import { PEOPLE, getProfileByEmail } from "./config/people";
 import {
   emptyExpenseForm as emptyForm,
@@ -35,6 +36,7 @@ import {
   emptyOtherPaymentForm,
 } from "./config/forms";
 import { LoadingScreen, LoginScreen } from "./components/AuthScreens";
+import { ConnectionStatus } from "./components/AppFeedback";
 import { Dashboard } from "./components/Dashboard";
 import {
   EditExpenseModal,
@@ -107,6 +109,16 @@ function isAdminProfile(profile) {
   return profile?.role === "admin";
 }
 
+function getObservedActionError(error, action) {
+  reportClientError(error, `firebase:${action}`);
+  return getFirebaseActionError(error, action);
+}
+
+function getObservedAuthError(error) {
+  reportClientError(error, "firebase:authentication");
+  return getAuthErrorMessage(error);
+}
+
 function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("contas_mes_theme") || "dark";
@@ -147,8 +159,30 @@ function App() {
   const [marketFormError, setMarketFormError] = useState("");
   const [otherPaymentFormError, setOtherPaymentFormError] = useState("");
   const installmentHistoryRepairInProgress = useRef(false);
+  const menuToggleRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const viewTitleRef = useRef(null);
   const canManageData = isAdminProfile(profile);
   const otherPaymentPlaceSuggestions = useMemo(() => getPlaceSuggestions(otherPayments), [otherPayments]);
+
+  useEffect(() => {
+    if (!isDrawerOpen) return undefined;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      sidebarRef.current?.querySelector(".nav-item.active")?.focus();
+    });
+    const handleEscape = (event) => {
+      if (event.key !== "Escape") return;
+      setIsDrawerOpen(false);
+      window.requestAnimationFrame(() => menuToggleRef.current?.focus());
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isDrawerOpen]);
 
   useEffect(() => {
     if (!hasFirebaseConfig) {
@@ -187,7 +221,7 @@ function App() {
           try {
             await signOut(auth);
           } catch (error) {
-            setAuthError(getFirebaseActionError(error, "encerrar a sessão não verificada"));
+            setAuthError(getObservedActionError(error, "encerrar a sessão não verificada"));
           } finally {
             setAuthLoading(false);
           }
@@ -201,7 +235,7 @@ function App() {
           try {
             await signOut(auth);
           } catch (error) {
-            setAuthError(getFirebaseActionError(error, "encerrar a sessão não autorizada"));
+            setAuthError(getObservedActionError(error, "encerrar a sessão não autorizada"));
           } finally {
             setAuthLoading(false);
           }
@@ -222,7 +256,7 @@ function App() {
               { merge: true },
             );
           } catch (error) {
-            setActionMessage(getFirebaseActionError(error, "atualizar o perfil do usuário"));
+            setActionMessage(getObservedActionError(error, "atualizar o perfil do usuário"));
           }
         }
 
@@ -232,7 +266,7 @@ function App() {
       },
       (error) => {
         setProfile(null);
-        setAuthError(getAuthErrorMessage(error));
+        setAuthError(getObservedAuthError(error));
         setAuthLoading(false);
       },
     );
@@ -250,7 +284,7 @@ function App() {
         });
         setUserProfiles(nextProfiles);
       },
-      (error) => setActionMessage(getFirebaseActionError(error, "carregar os perfis dos usuários")),
+      (error) => setActionMessage(getObservedActionError(error, "carregar os perfis dos usuários")),
     );
   }, [profile]);
 
@@ -270,7 +304,7 @@ function App() {
       },
       (error) => {
         setMarketItemsLoading(false);
-        setActionMessage(getFirebaseActionError(error, "carregar os itens de mercado"));
+        setActionMessage(getObservedActionError(error, "carregar os itens de mercado"));
       },
     );
   }, [activeView, canManageData, profile]);
@@ -291,7 +325,7 @@ function App() {
       },
       (error) => {
         setOtherPaymentsLoading(false);
-        setActionMessage(getFirebaseActionError(error, "carregar os outros pagamentos"));
+        setActionMessage(getObservedActionError(error, "carregar os outros pagamentos"));
       },
     );
   }, [activeView, canManageData, profile]);
@@ -315,7 +349,7 @@ function App() {
       },
       (error) => {
         setDataLoading(false);
-        setActionMessage(getFirebaseActionError(error, "carregar o histórico de contas"));
+        setActionMessage(getObservedActionError(error, "carregar o histórico de contas"));
       },
     );
   }, [profile]);
@@ -422,7 +456,7 @@ function App() {
         await commitFirestoreMutations(mutations);
         setActionMessage(`${restoredCount} parcela(s) anterior(es) recuperada(s) com sucesso.`);
       } catch (error) {
-        setActionMessage(getFirebaseActionError(error, "recuperar as parcelas anteriores"));
+        setActionMessage(getObservedActionError(error, "recuperar as parcelas anteriores"));
       } finally {
         installmentHistoryRepairInProgress.current = false;
       }
@@ -446,7 +480,7 @@ function App() {
 
         setSettlementPayments(nextPayments);
       },
-      (error) => setActionMessage(getFirebaseActionError(error, "carregar os pagamentos de acerto")),
+      (error) => setActionMessage(getObservedActionError(error, "carregar os pagamentos de acerto")),
     );
   }, [profile]);
 
@@ -489,7 +523,7 @@ function App() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
-      setAuthError(getAuthErrorMessage(error));
+      setAuthError(getObservedAuthError(error));
     }
   }
 
@@ -498,7 +532,7 @@ function App() {
     try {
       await signOut(auth);
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "encerrar a sessão"));
+      setActionMessage(getObservedActionError(error, "encerrar a sessão"));
     }
   }
 
@@ -546,7 +580,7 @@ function App() {
       setMarketForm({ ...emptyMarketForm, purchasedAt: marketForm.purchasedAt });
       setActionMessage("Item de mercado adicionado com sucesso.");
     } catch (error) {
-      setMarketFormError(getFirebaseActionError(error, "salvar o item"));
+      setMarketFormError(getObservedActionError(error, "salvar o item"));
     }
   }
 
@@ -634,7 +668,7 @@ function App() {
       setSelectedMonth(monthFromDate(purchasedAt));
       setActionMessage(`Nota conferida e ${normalizedItems.length} ${normalizedItems.length === 1 ? "item adicionado" : "itens adicionados"} com sucesso.`);
     } catch (error) {
-      throw new Error(getFirebaseActionError(error, "salvar os itens da nota"));
+      throw new Error(getObservedActionError(error, "salvar os itens da nota"));
     }
   }
 
@@ -672,7 +706,7 @@ function App() {
       setOtherPaymentForm({ ...emptyOtherPaymentForm, paidAt: otherPaymentForm.paidAt });
       setActionMessage("Pagamento adicionado com sucesso.");
     } catch (error) {
-      setOtherPaymentFormError(getFirebaseActionError(error, "salvar o pagamento"));
+      setOtherPaymentFormError(getObservedActionError(error, "salvar o pagamento"));
     }
   }
 
@@ -683,7 +717,7 @@ function App() {
       await deleteDoc(doc(db, collectionName, itemId));
       setActionMessage(`${label.charAt(0).toUpperCase()}${label.slice(1)} excluído com sucesso.`);
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "excluir o lançamento"));
+      setActionMessage(getObservedActionError(error, "excluir o lançamento"));
     }
   }
 
@@ -713,7 +747,7 @@ function App() {
       setActionMessage(`${items.length} ${itemLabel} de ${monthLabel} excluído${items.length === 1 ? "" : "s"} com sucesso.`);
       return true;
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "apagar a lista do mês"));
+      setActionMessage(getObservedActionError(error, "apagar a lista do mês"));
       return false;
     }
   }
@@ -760,7 +794,7 @@ function App() {
       setEditingResourceItem(null);
       setActionMessage("Lançamento atualizado com sucesso.");
     } catch (error) {
-      throw new Error(getFirebaseActionError(error, "atualizar o lançamento"));
+      throw new Error(getObservedActionError(error, "atualizar o lançamento"));
     }
   }
 
@@ -926,7 +960,7 @@ function App() {
     try {
       await batch.commit();
     } catch (error) {
-      setFormError(getFirebaseActionError(error, "cadastrar a conta"));
+      setFormError(getObservedActionError(error, "cadastrar a conta"));
       return;
     }
 
@@ -985,7 +1019,7 @@ function App() {
       setPaymentTarget(null);
       setActionMessage("Pagamento registrado.");
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "registrar o pagamento"));
+      setActionMessage(getObservedActionError(error, "registrar o pagamento"));
     }
   }
 
@@ -1150,7 +1184,7 @@ function App() {
       setActionMessage(isFullPayment ? "Dívida quitada com sucesso." : "Pagamento parcial registrado.");
       return true;
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "registrar o pagamento de acerto"));
+      setActionMessage(getObservedActionError(error, "registrar o pagamento de acerto"));
       return false;
     }
   }
@@ -1228,7 +1262,7 @@ function App() {
       setActionMessage("Pagamento de acerto atualizado.");
       return true;
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "atualizar o pagamento de acerto"));
+      setActionMessage(getObservedActionError(error, "atualizar o pagamento de acerto"));
       return false;
     }
   }
@@ -1263,7 +1297,7 @@ function App() {
       await batch.commit();
       setActionMessage("Pagamento de acerto apagado.");
     } catch (error) {
-      setActionMessage(getFirebaseActionError(error, "apagar o pagamento de acerto"));
+      setActionMessage(getObservedActionError(error, "apagar o pagamento de acerto"));
     }
   }
 
@@ -1333,8 +1367,7 @@ function App() {
         `${deletionTargets.length} ${deletionTargets.length === 1 ? "parcela excluída" : "parcelas excluídas"} com sucesso.`,
       );
     } catch (error) {
-      console.error("Erro ao excluir conta:", error);
-      setActionMessage(getFirebaseActionError(error, "excluir a conta"));
+      setActionMessage(getObservedActionError(error, "excluir a conta"));
     }
   }
 
@@ -1577,17 +1610,34 @@ function App() {
     : navItems.filter((item) => item.id === "dashboard" || PEOPLE.some((person) => person.id === item.id));
   const visiblePeople = PEOPLE;
 
-  return (
-    <main className="app-shell">
-      {isDrawerOpen && (
-        <div className="drawer-backdrop" onClick={() => setIsDrawerOpen(false)} />
-      )}
+  function navigateToView(viewId) {
+    setActiveView(viewId);
+    setIsDrawerOpen(false);
+    window.requestAnimationFrame(() => viewTitleRef.current?.focus());
+  }
 
-      <aside className={`sidebar ${isDrawerOpen ? "open" : ""}`}>
+  return (
+    <>
+      <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
+      <div className="app-shell">
+        {isDrawerOpen && (
+          <div
+            aria-hidden="true"
+            className="drawer-backdrop"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+        )}
+
+      <aside
+        aria-label="Menu lateral"
+        className={`sidebar ${isDrawerOpen ? "open" : ""}`}
+        id="primary-navigation"
+        ref={sidebarRef}
+      >
         <div className="sidebar-header">
           <div className="brand">
             <div className="brand-mark">
-              <Home size={24} />
+              <Home aria-hidden="true" size={24} />
             </div>
             <div className="brand-copy">
               <div className="brand-title-row">
@@ -1606,15 +1656,13 @@ function App() {
             const Icon = item.icon;
             return (
               <button
+                aria-current={activeView === item.id ? "page" : undefined}
                 className={activeView === item.id ? "nav-item active" : "nav-item"}
                 key={item.id}
-                onClick={() => {
-                  setActiveView(item.id);
-                  setIsDrawerOpen(false);
-                }}
+                onClick={() => navigateToView(item.id)}
                 type="button"
               >
-                <Icon size={18} />
+                <Icon aria-hidden="true" size={18} />
                 <span>{item.label}</span>
               </button>
             );
@@ -1642,8 +1690,8 @@ function App() {
                 <small>{formatEmail(firebaseUser?.email)}</small>
               </div>
             </div>
-            <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
-              <LogOut size={18} />
+            <button aria-label="Sair" className="icon-button" onClick={handleLogout} title="Sair" type="button">
+              <LogOut aria-hidden="true" size={18} />
             </button>
           </div>
         </div>
@@ -1651,15 +1699,24 @@ function App() {
 
       <div className="content-wrapper">
         <header className="mobile-header">
-          <button className="icon-button menu-toggle" onClick={() => setIsDrawerOpen(true)} type="button">
-            <Menu size={22} />
+          <button
+            aria-controls="primary-navigation"
+            aria-expanded={isDrawerOpen}
+            aria-label="Abrir menu principal"
+            className="icon-button menu-toggle"
+            onClick={() => setIsDrawerOpen(true)}
+            ref={menuToggleRef}
+            type="button"
+          >
+            <Menu aria-hidden="true" size={22} />
           </button>
           <div className="mobile-user-tabs">
             {visiblePeople.map((person) => (
               <button
+                aria-pressed={activeView === person.id}
                 key={person.id}
                 className={`mobile-user-tab ${activeView === person.id ? "active" : ""}`}
-                onClick={() => setActiveView(person.id)}
+                onClick={() => navigateToView(person.id)}
                 type="button"
               >
                 {person.name}
@@ -1668,17 +1725,23 @@ function App() {
           </div>
         </header>
 
-        <section className="content">
+        <main
+          aria-busy={dataLoading}
+          className="content"
+          id="main-content"
+          tabIndex={-1}
+        >
           <header className="topbar">
             <div>
               <span className="eyebrow">{selectedMonth}</span>
-              <h1>{getViewTitle(activeView)}</h1>
+              <h1 ref={viewTitleRef} tabIndex={-1}>{getViewTitle(activeView)}</h1>
             </div>
             {activeView === "manage" && (
               <ResourceMonthSwitcher selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
             )}
           </header>
 
+        <ConnectionStatus />
         {actionMessage && <div className="notice" role="status" aria-live="polite">{actionMessage}</div>}
 
         {activeView === "dashboard" && (
@@ -1767,7 +1830,7 @@ function App() {
             dataLoading={dataLoading}
           />
         )}
-      </section>
+      </main>
     </div>
 
       {canManageData && paymentTarget && (
@@ -1796,7 +1859,8 @@ function App() {
           onSave={handleUpdateResourceItem}
         />
       )}
-    </main>
+      </div>
+    </>
   );
 }
 

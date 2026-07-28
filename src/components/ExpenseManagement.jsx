@@ -4,6 +4,8 @@ import { CategoryTag } from "./CategoryTag";
 import { PlaceAutocomplete } from "./ResourceListView";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE } from "../config/people";
 import { getFirebaseActionError } from "../domain/errors";
+import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
+import { reportClientError } from "../services/observability";
 import {
   formatInstallmentLabel,
   getExpenseKind,
@@ -146,15 +148,16 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
       ) : (
       <div className="table-wrap">
         <table>
+          <caption className="sr-only">Contas exibidas para gerenciamento</caption>
           <thead>
             <tr>
-              <th>Despesa</th>
-              <th>Valor</th>
-              <th>Vencimento</th>
-              <th>Categoria</th>
-              <th>Quem pagou</th>
-              <th>Rateio</th>
-              <th style={{ textAlign: "right" }}>Ações</th>
+              <th scope="col">Despesa</th>
+              <th scope="col">Valor</th>
+              <th scope="col">Vencimento</th>
+              <th scope="col">Categoria</th>
+              <th scope="col">Quem pagou</th>
+              <th scope="col">Rateio</th>
+              <th scope="col" style={{ textAlign: "right" }}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -357,6 +360,7 @@ function FixedExpensesView({ groups, selectedMonth }) {
 
 export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave }) {
   const isMarket = item.kind === "market";
+  const dialogRef = useDialogAccessibility(onClose);
   const [form, setForm] = useState({
     market: item.market || "",
     place: item.place || "",
@@ -380,19 +384,27 @@ export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave 
     try {
       await onSave(item, form);
     } catch (saveError) {
+      reportClientError(saveError, "resource:update");
       setError(saveError.message || "Não foi possível atualizar o lançamento.");
     }
   }
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="resource-edit-title">
+      <section
+        aria-labelledby="resource-edit-title"
+        aria-modal="true"
+        className="modal"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="section-heading">
           <div>
             <h2 id="resource-edit-title">Editar {isMarket ? "item de mercado" : "pagamento"}</h2>
             <span>Altere os dados do lançamento</span>
           </div>
-          <button className="icon-button" onClick={onClose} type="button" title="Fechar">
+          <button aria-label="Fechar" className="icon-button" onClick={onClose} type="button">
             <X size={20} />
           </button>
         </div>
@@ -448,7 +460,7 @@ export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave 
               <input type="number" min="0.01" step="0.01" value={form.unitValue} onChange={(event) => updateField("unitValue", event.target.value)} required />
             </label>
           </div>
-          {error && <p className="form-error">{error}</p>}
+          {error && <p className="form-error" role="alert">{error}</p>}
           <div className="modal-actions">
             <button className="secondary-button" type="button" onClick={onClose}>Cancelar</button>
             <button className="primary-button" type="submit"><Check size={18} /> Salvar alterações</button>
@@ -460,6 +472,7 @@ export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave 
 }
 
 export function EditExpenseModal({ expense, onClose, onSave }) {
+  const dialogRef = useDialogAccessibility(onClose);
   const [title, setTitle] = useState(expense.title);
   const [totalValue, setTotalValue] = useState(expense.totalValue);
   const [dueDate, setDueDate] = useState(expense.dueDate || "");
@@ -518,13 +531,22 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
         installment: isInstallment ? `Parcela ${currentInstallment} de ${totalInstallments}` : null,
       });
     } catch (err) {
+      reportClientError(err, "expense:update");
       setError(getFirebaseActionError(err, "atualizar a conta"));
     }
   }
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="modal" style={{ maxWidth: "600px" }} role="dialog" aria-modal="true" aria-labelledby="edit-title">
+      <section
+        aria-labelledby="edit-title"
+        aria-modal="true"
+        className="modal"
+        ref={dialogRef}
+        role="dialog"
+        style={{ maxWidth: "600px" }}
+        tabIndex={-1}
+      >
         <div className="section-heading">
           <div>
             <h2 id="edit-title">Editar despesa</h2>
@@ -536,7 +558,7 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
                   : "Ajuste os detalhes e o rateio"}
             </span>
           </div>
-          <button className="icon-button" onClick={onClose} type="button">
+          <button aria-label="Fechar" className="icon-button" onClick={onClose} type="button">
             <X size={20} />
           </button>
         </div>
@@ -645,7 +667,7 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
             <strong>{formatCurrency(splitPreview)}</strong>
           </div>
 
-          {error && <div className="error-box">{error}</div>}
+          {error && <div className="error-box" role="alert">{error}</div>}
 
           <div className="modal-actions">
             <button className="secondary-button" onClick={onClose} type="button">

@@ -114,7 +114,7 @@ export function ResourceListView({
             Valor unitário (€)
             <input type="number" min="0.01" step="0.01" value={form.unitValue} onChange={(event) => onChange("unitValue", event.target.value)} />
           </label>
-          {formError && <p className="form-error resource-form-error">{formError}</p>}
+          {formError && <p className="form-error resource-form-error" role="alert">{formError}</p>}
           <div className="resource-form-action">
             <button className="primary-button" type="submit"><Plus size={18} /> Adicionar à lista</button>
           </div>
@@ -149,16 +149,19 @@ export function ResourceListView({
 
         <div className="resource-table-wrap">
           <table className="resource-table">
+            <caption className="sr-only">
+              {isMarket ? "Itens de mercado" : "Outros pagamentos"} de {formatMonthLabel(selectedMonth)}
+            </caption>
             <thead>
               <tr>
-                <th>{isMarket ? "Mercado" : "Local"}</th>
-                <th>Data</th>
-                <th>Produto</th>
-                <th>{isMarket ? "Descrição" : "Pagamento"}</th>
-                <th>Qtd</th>
-                <th>Valor</th>
-                <th>Total</th>
-                <th aria-label="Ações" />
+                <th scope="col">{isMarket ? "Mercado" : "Local"}</th>
+                <th scope="col">Data</th>
+                <th scope="col">Produto</th>
+                <th scope="col">{isMarket ? "Descrição" : "Pagamento"}</th>
+                <th scope="col">Qtd</th>
+                <th scope="col">Valor</th>
+                <th scope="col">Total</th>
+                <th aria-label="Ações" scope="col" />
               </tr>
             </thead>
             <tbody>

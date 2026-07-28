@@ -232,7 +232,7 @@ export function NewExpenseForm({
           <strong>{formatCurrency(splitPreview)}</strong>
         </div>
 
-        {formError && <div className="error-box">{formError}</div>}
+        {formError && <div className="error-box" role="alert">{formError}</div>}
 
         <button className="primary-button" type="submit">
           <Check size={18} />

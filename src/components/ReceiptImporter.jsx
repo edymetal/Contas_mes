@@ -18,6 +18,8 @@ import {
   saveStoredGeminiApiKey,
   validateGeminiApiKey,
 } from "../services/receiptAnalysis";
+import { reportClientError } from "../services/observability";
+import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import { formatCurrency, todayInputValue } from "../utils/presentation";
 
 export function MarketReceiptImporter({ onConfirm }) {
@@ -66,6 +68,7 @@ export function MarketReceiptImporter({ onConfirm }) {
         currency: result.currency || "EUR",
       });
     } catch (analysisError) {
+      reportClientError(analysisError, "receipt:analyze");
       setError(analysisError?.message || "Não foi possível analisar a nota fiscal.");
     } finally {
       setIsAnalyzing(false);
@@ -122,7 +125,7 @@ export function MarketReceiptImporter({ onConfirm }) {
             <div><strong>Lendo a nota em italiano…</strong><span>Identificando dados fiscais, valores e produtos.</span></div>
           </div>
         )}
-        {error && <p className="form-error receipt-import-error">{error}</p>}
+        {error && <p className="form-error receipt-import-error" role="alert">{error}</p>}
       </section>
 
       {draft && (
@@ -160,6 +163,7 @@ export function MarketReceiptImporter({ onConfirm }) {
   );
 }
 function GeminiApiKeyModal({ hasStoredKey, onClose, onSaved, onRemove }) {
+  const dialogRef = useDialogAccessibility(onClose);
   const [apiKey, setApiKey] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState("");
@@ -172,6 +176,7 @@ function GeminiApiKeyModal({ hasStoredKey, onClose, onSaved, onRemove }) {
       const validKey = await validateGeminiApiKey(apiKey);
       onSaved(validKey);
     } catch (keyError) {
+      reportClientError(keyError, "receipt:validate-key");
       setValidationError(keyError?.message || "Não foi possível validar a chave.");
     } finally {
       setIsValidating(false);
@@ -180,7 +185,14 @@ function GeminiApiKeyModal({ hasStoredKey, onClose, onSaved, onRemove }) {
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="modal gemini-key-modal" role="dialog" aria-modal="true" aria-labelledby="gemini-key-title">
+      <section
+        aria-labelledby="gemini-key-title"
+        aria-modal="true"
+        className="modal gemini-key-modal"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="section-heading gemini-key-heading">
           <div>
             <span className="eyebrow">Configuração gratuita</span>
@@ -209,7 +221,7 @@ function GeminiApiKeyModal({ hasStoredKey, onClose, onSaved, onRemove }) {
           <p className="gemini-key-help">
             Use uma chave exclusiva e restrita à Gemini API. Você pode criá-la no <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>.
           </p>
-          {validationError && <p className="form-error">{validationError}</p>}
+          {validationError && <p className="form-error" role="alert">{validationError}</p>}
           <div className="modal-actions gemini-key-actions">
             {hasStoredKey && (
               <button className="danger-link-button" type="button" disabled={isValidating} onClick={onRemove}>
@@ -228,6 +240,7 @@ function GeminiApiKeyModal({ hasStoredKey, onClose, onSaved, onRemove }) {
 }
 
 function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
+  const dialogRef = useDialogAccessibility(onClose);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const itemsTotal = useMemo(
@@ -259,6 +272,7 @@ function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
     try {
       await onConfirm(draft);
     } catch (error) {
+      reportClientError(error, "receipt:save");
       setSaveError(error?.message || "Não foi possível adicionar os itens.");
     } finally {
       setIsSaving(false);
@@ -267,14 +281,21 @@ function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
 
   return (
     <div className="modal-backdrop receipt-review-backdrop" role="presentation">
-      <section className="modal receipt-review-modal" role="dialog" aria-modal="true" aria-labelledby="receipt-review-title">
+      <section
+        aria-labelledby="receipt-review-title"
+        aria-modal="true"
+        className="modal receipt-review-modal"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="section-heading receipt-review-heading">
           <div>
             <span className="eyebrow">Conferência obrigatória</span>
             <h2 id="receipt-review-title">Confira os dados da nota</h2>
             <span>Edite qualquer informação que não corresponda ao documento.</span>
           </div>
-          <button className="icon-button" onClick={onClose} type="button" title="Fechar"><X size={20} /></button>
+          <button aria-label="Fechar" className="icon-button" onClick={onClose} type="button"><X size={20} /></button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -323,7 +344,8 @@ function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
 
           <div className="receipt-review-table-wrap">
             <table className="receipt-review-table">
-              <thead><tr><th>Produto (italiano)</th><th>Descrição</th><th>Qtd.</th><th>Un.</th><th>Unitário</th><th>Desconto</th><th>Total</th><th /></tr></thead>
+              <caption className="sr-only">Produtos identificados na nota fiscal</caption>
+              <thead><tr><th scope="col">Produto (italiano)</th><th scope="col">Descrição</th><th scope="col">Qtd.</th><th scope="col">Un.</th><th scope="col">Unitário</th><th scope="col">Desconto</th><th scope="col">Total</th><th aria-label="Ações" scope="col" /></tr></thead>
               <tbody>
                 {draft.items.map((item, index) => (
                   <tr key={index}>
@@ -342,7 +364,7 @@ function ReceiptReviewModal({ draft, preview, onChange, onClose, onConfirm }) {
             {!draft.items.length && <div className="empty-state">Todos os itens foram removidos. Analise a nota novamente.</div>}
           </div>
 
-          {saveError && <p className="form-error">{saveError}</p>}
+          {saveError && <p className="form-error" role="alert">{saveError}</p>}
           <div className="modal-actions receipt-review-actions">
             <button className="secondary-button" type="button" onClick={onClose} disabled={isSaving}>Cancelar</button>
             <button className="primary-button" type="submit" disabled={isSaving || !draft.items.length}>

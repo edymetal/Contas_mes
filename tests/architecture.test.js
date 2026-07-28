@@ -37,3 +37,36 @@ test("carrega estilos base, de componentes e responsivos nessa ordem", () => {
   assert.ok(componentsIndex > baseIndex, "estilos de componentes devem vir após a base");
   assert.ok(responsiveIndex > componentsIndex, "estilos responsivos devem ser carregados por último");
 });
+
+test("mantém os recursos estruturais de acessibilidade e recuperação de falhas", () => {
+  const appSource = readProjectFile("src/App.jsx");
+  const mainSource = readProjectFile("src/main.jsx");
+  const baseStyles = readProjectFile("src/styles/base.css");
+  const modalSources = [
+    readProjectFile("src/components/ExpenseManagement.jsx"),
+    readProjectFile("src/components/ReceiptImporter.jsx"),
+    readProjectFile("src/components/SettlementPanel.jsx"),
+  ].join("\n");
+  const tableSources = [
+    readProjectFile("src/components/ExpenseManagement.jsx"),
+    readProjectFile("src/components/OtherAccounts.jsx"),
+    readProjectFile("src/components/ReceiptImporter.jsx"),
+    readProjectFile("src/components/ResourceListView.jsx"),
+  ].join("\n");
+
+  assert.match(appSource, /className="skip-link"/);
+  assert.match(appSource, /id="main-content"/);
+  assert.match(appSource, /aria-current=/);
+  assert.match(mainSource, /<AppErrorBoundary>/);
+  assert.match(mainSource, /installGlobalErrorMonitoring/);
+  assert.ok(
+    (modalSources.match(/useDialogAccessibility\(onClose\)/g) || []).length >= 5,
+    "os diálogos críticos devem controlar foco, Tab e Escape",
+  );
+  assert.equal(
+    (tableSources.match(/<caption className="sr-only">/g) || []).length,
+    4,
+    "as tabelas de dados devem manter descrições para leitores de tela",
+  );
+  assert.match(baseStyles, /prefers-reduced-motion:\s*reduce/);
+});

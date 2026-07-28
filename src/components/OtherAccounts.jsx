@@ -223,12 +223,13 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth }) {
         </div>
         <div className="other-dashboard-month-table-wrap">
           <table className="other-dashboard-month-table">
+            <caption className="sr-only">Totais mensais de outras contas em {selectedYear}</caption>
             <thead>
               <tr>
-                <th>Mês</th>
-                <th>Mercado</th>
-                <th>Outros pagamentos</th>
-                <th>Total combinado</th>
+                <th scope="col">Mês</th>
+                <th scope="col">Mercado</th>
+                <th scope="col">Outros pagamentos</th>
+                <th scope="col">Total combinado</th>
               </tr>
             </thead>
             <tbody>
@@ -243,7 +244,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth }) {
             </tbody>
             <tfoot>
               <tr>
-                <th>Total de {selectedYear}</th>
+                <th scope="row">Total de {selectedYear}</th>
                 <td>{formatCurrency(dashboard.market.total)}</td>
                 <td>{formatCurrency(dashboard.other.total)}</td>
                 <td><strong>{formatCurrency(dashboard.total)}</strong></td>
