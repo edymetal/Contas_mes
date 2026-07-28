@@ -1824,8 +1824,9 @@ textarea:focus {
 
 .participant-list {
   display: grid;
-  gap: 6px;
-  width: min(100%, 320px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
   margin-top: 12px;
 }
 
@@ -1842,15 +1843,6 @@ textarea:focus {
   cursor: pointer;
 }
 
-.participant-option::before {
-  position: absolute;
-  inset: 14px auto 14px 0;
-  width: 4px;
-  border-radius: 0 999px 999px 0;
-  background: transparent;
-  content: "";
-}
-
 .participant-option:hover {
   background: color-mix(in srgb, var(--primary) 7%, transparent);
   color: color-mix(in srgb, var(--primary) 45%, var(--muted));
@@ -1864,10 +1856,6 @@ textarea:focus {
 .participant-option:has(input:checked) {
   background: color-mix(in srgb, var(--primary) 16%, var(--panel));
   color: var(--primary);
-}
-
-.participant-option:has(input:checked)::before {
-  background: var(--primary);
 }
 
 .participant-option input {

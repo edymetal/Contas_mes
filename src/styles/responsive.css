@@ -611,7 +611,8 @@
   }
 
   .form-grid,
-  .checkbox-grid {
+  .checkbox-grid,
+  .participant-list {
     grid-template-columns: 1fr;
   }
 
