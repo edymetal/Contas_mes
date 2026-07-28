@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Check } from "lucide-react";
+import { Check, UserRound } from "lucide-react";
 import { CATEGORIES, PEOPLE } from "../config/people";
 import { roundMoney } from "../domain/expenses";
 import { formatCurrency } from "../utils/presentation";
@@ -213,14 +213,15 @@ export function NewExpenseForm({
 
         <fieldset className="people-fieldset">
           <legend>Quem deve participar do rateio?</legend>
-          <div className="checkbox-grid">
+          <div className="participant-list">
             {PEOPLE.map((person) => (
-              <label className="checkbox-card" key={person.id}>
+              <label className="participant-option" key={person.id}>
                 <input
                   checked={form.participants.includes(person.id)}
                   onChange={() => onToggleParticipant(person.id)}
                   type="checkbox"
                 />
+                <UserRound aria-hidden="true" size={21} strokeWidth={1.8} />
                 <span>{person.name}</span>
               </label>
             ))}

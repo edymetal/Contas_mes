@@ -1822,6 +1822,74 @@ textarea:focus {
   color: var(--text);
 }
 
+.participant-list {
+  display: grid;
+  gap: 6px;
+  width: min(100%, 320px);
+  margin-top: 12px;
+}
+
+.participant-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 12px 20px;
+  overflow: hidden;
+  border-radius: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.participant-option::before {
+  position: absolute;
+  inset: 14px auto 14px 0;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  background: transparent;
+  content: "";
+}
+
+.participant-option:hover {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  color: color-mix(in srgb, var(--primary) 45%, var(--muted));
+}
+
+.participant-option:focus-within {
+  outline: 3px solid var(--primary-soft);
+  outline-offset: 2px;
+}
+
+.participant-option:has(input:checked) {
+  background: color-mix(in srgb, var(--primary) 16%, var(--panel));
+  color: var(--primary);
+}
+
+.participant-option:has(input:checked)::before {
+  background: var(--primary);
+}
+
+.participant-option input {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.participant-option svg {
+  flex: 0 0 auto;
+}
+
+.participant-option span {
+  color: currentColor;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 .split-preview {
   display: flex;
   align-items: center;

@@ -146,6 +146,7 @@ test("formulário de conta preserva participantes e ação principal", () => {
   assert.match(html, /Nome da despesa/);
   assert.match(html, /Quem deve participar do rateio/);
   assert.equal((html.match(/type="checkbox"/g) || []).length, 3);
+  assert.equal((html.match(/class="participant-option"/g) || []).length, 3);
   assert.match(html, /30,00/);
   assert.match(html, /Salvar conta/);
 });
