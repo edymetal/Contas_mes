@@ -182,6 +182,8 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   assert.match(html, /Digite o valor que deseja buscar/);
   assert.match(html, /Todas as colunas/);
   assert.match(html, /Toda a base de dados/);
+  assert.match(html, /Situação/);
+  assert.match(html, /Não paga/);
   assert.match(html, /<option value="month"[^>]*>Julho<\/option>/);
   assert.doesNotMatch(html, /<option value="month"[^>]*>Julho 2026<\/option>/);
   assert.match(html, /Ver histórico de Conta de energia/);
@@ -192,6 +194,22 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "10/07/2026", "dueDate"), true);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "casa", "category"), true);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "energia", "category"), false);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "não paga", "status"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "paga", "status"), false);
+  assert.equal(
+    ExpenseManagementModule.expenseMatchesSearch(
+      {
+        ...expense,
+        shares: {
+          edney: { amount: 75, status: "self" },
+          sonia: { amount: 75, status: "settled" },
+        },
+      },
+      "paga",
+      "status",
+    ),
+    true,
+  );
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Rodney"), false);
 
   const expenses = [

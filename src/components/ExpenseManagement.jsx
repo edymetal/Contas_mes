@@ -17,6 +17,7 @@ import {
   getInstallmentSeriesKey,
   getInstallmentSeriesSummaries,
   getNormalizedExpenses,
+  isExpenseFullySettled,
   isFixedExpense,
   roundMoney,
   shiftMonth,
@@ -41,6 +42,7 @@ const SEARCH_COLUMN_OPTIONS = [
   { value: "category", label: "Categoria" },
   { value: "payer", label: "Quem pagou" },
   { value: "participants", label: "Rateio" },
+  { value: "status", label: "Situação" },
 ];
 
 function getFormattedSearchValues(values) {
@@ -60,6 +62,11 @@ function getCurrencySearchValues(values) {
 export function expenseMatchesSearch(expense, searchTerm, searchColumn = "all") {
   const normalizedSearchTerm = normalizeSearchText(searchTerm).trim();
   if (!normalizedSearchTerm) return true;
+
+  const isPaid = isExpenseFullySettled(expense);
+  if (searchColumn === "status" && normalizedSearchTerm === "nao paga") {
+    return !isPaid;
+  }
 
   const installmentExpenses = expense.installments instanceof Map
     ? Array.from(expense.installments.values())
@@ -86,6 +93,7 @@ export function expenseMatchesSearch(expense, searchTerm, searchColumn = "all") 
     category: [expense.category],
     payer: [personName(expense.payerId)],
     participants: (expense.participants || []).map(personName),
+    status: [isPaid ? "paga quitada" : "não pendente"],
   };
   const searchableValues = searchColumn === "all"
     ? Object.values(searchValuesByColumn).flat()
@@ -357,6 +365,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
               <th scope="col">Categoria</th>
               <th scope="col">Quem pagou</th>
               <th scope="col">Rateio</th>
+              <th scope="col">Situação</th>
               <th scope="col" style={{ textAlign: "right" }}>Ações</th>
             </tr>
           </thead>
@@ -388,6 +397,11 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
                 </td>
                 <td>{personName(expense.payerId)}</td>
                 <td>{expense.participants?.map(personName).join(", ")}</td>
+                <td>
+                  <span className={`tag expense-payment-status ${isExpenseFullySettled(expense) ? "paid" : "pending"}`}>
+                    {isExpenseFullySettled(expense) ? "Paga" : "Não paga"}
+                  </span>
+                </td>
                 <td style={{ textAlign: "right" }}>
                   <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                     <button

@@ -1330,6 +1330,18 @@
   color: var(--success);
 }
 
+.expense-payment-status.paid {
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.expense-payment-status.pending {
+  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .theme-switch-control {
   display: grid;
   grid-template-columns: auto auto auto;
