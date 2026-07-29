@@ -50,7 +50,7 @@ import { PersonExpenses } from "./components/PersonExpenses";
 import { PaymentModal, SettlementPanel } from "./components/SettlementPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import {
-  calculateSettlementRows,
+  calculateSettlementSummaries,
   collectPendingSettlementShares,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
@@ -507,8 +507,8 @@ function App() {
     [selectedMonth, settlementPayments],
   );
 
-  const settlementRows = useMemo(
-    () => calculateSettlementRows(expenses, selectedMonthSettlementPayments),
+  const settlementSummaries = useMemo(
+    () => calculateSettlementSummaries(expenses, selectedMonthSettlementPayments),
     [expenses, selectedMonthSettlementPayments],
   );
 
@@ -1797,7 +1797,7 @@ function App() {
             expenses={expenses}
             firebaseUser={firebaseUser}
             personId={activeView}
-            settlementRows={settlementRows}
+            settlementPayments={selectedMonthSettlementPayments}
             selectedMonth={selectedMonth}
             userProfiles={userProfiles}
             onMonthChange={setSelectedMonth}
@@ -1807,7 +1807,7 @@ function App() {
         {canManageData && activeView === "settlement" && (
           <SettlementPanel
             firebaseUser={firebaseUser}
-            rows={settlementRows}
+            rows={settlementSummaries}
             settlementPayments={settlementPayments}
             userProfiles={userProfiles}
             onDeletePayment={deleteSettlementPayment}

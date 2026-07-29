@@ -14,6 +14,7 @@ let ExpenseManagementModule;
 let ExpenseHistoryModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
+let SettlementModule;
 let FormsModule;
 
 before(async () => {
@@ -35,6 +36,7 @@ before(async () => {
     ExpenseHistoryModule,
     NewExpenseFormModule,
     OtherAccountsModule,
+    SettlementModule,
     FormsModule,
   ] = await Promise.all([
     viteServer.ssrLoadModule("/src/components/AuthScreens.jsx"),
@@ -44,6 +46,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/ExpenseHistoryModal.jsx"),
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
+    viteServer.ssrLoadModule("/src/components/SettlementPanel.jsx"),
     viteServer.ssrLoadModule("/src/config/forms.js"),
   ]);
 });
@@ -136,6 +139,38 @@ test("dashboard renderiza indicadores, categoria e próximo vencimento", () => {
   assert.match(html, /Casa/);
   assert.match(html, /10\/07\/2026/);
   assert.match(html, /150,00/);
+});
+
+test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", () => {
+  const html = renderToStaticMarkup(
+    createElement(SettlementModule.SettlementPanel, {
+      firebaseUser: null,
+      onDeletePayment() {},
+      onRegisterPayment() {},
+      onUpdatePayment() {},
+      rows: [
+        {
+          fromId: "sonia",
+          toId: "edney",
+          originalAmount: 336.48,
+          paidAmount: 59.23,
+          crossPaidAmount: 277.25,
+          amount: 0,
+        },
+      ],
+      settlementPayments: [],
+      userProfiles: {},
+    }),
+  );
+
+  assert.match(html, /Acertos calculados/);
+  assert.match(html, /Quitado/);
+  assert.match(html, /Total da dívida/);
+  assert.match(html, /336,48/);
+  assert.match(html, /277,25/);
+  assert.match(html, /59,23/);
+  assert.match(html, /Acerto concluído/);
+  assert.doesNotMatch(html, /Registrar pagamento/);
 });
 
 test("formulário de conta preserva participantes e ação principal", () => {

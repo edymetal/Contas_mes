@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  calculatePersonSettlementSummary,
   calculateSettlementRows,
+  calculateSettlementSummaries,
   collectPendingSettlementShares,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
@@ -51,6 +53,116 @@ test("calcula o saldo líquido entre duas pessoas e desconta pagamentos parciais
       amount: 20,
     },
   ]);
+});
+
+test("preserva dívida, abatimento e pagamento após a quitação de três usuários", () => {
+  const expenses = [
+    expense({
+      id: "sonia-owes-edney",
+      payerId: "edney",
+      shares: {
+        edney: { amount: 336.48, status: "self" },
+        sonia: { amount: 336.48, status: "settled" },
+      },
+    }),
+    expense({
+      id: "edney-owes-sonia",
+      payerId: "sonia",
+      shares: {
+        edney: { amount: 277.25, status: "settled" },
+        sonia: { amount: 277.25, status: "self" },
+      },
+    }),
+    expense({
+      id: "rodney-owes-edney",
+      payerId: "edney",
+      shares: {
+        edney: { amount: 195.33, status: "self" },
+        rodney: { amount: 195.33, status: "settled" },
+      },
+    }),
+    expense({
+      id: "sonia-paid-directly",
+      payerId: "edney",
+      shares: {
+        edney: { amount: 33.33, status: "self" },
+        sonia: { amount: 33.33, status: "paid" },
+      },
+    }),
+    expense({
+      id: "rodney-paid-directly",
+      payerId: "edney",
+      shares: {
+        edney: { amount: 33.33, status: "self" },
+        rodney: { amount: 33.33, status: "paid" },
+      },
+    }),
+  ];
+  const payments = [
+    { fromId: "sonia", toId: "edney", amount: 59.23 },
+    { fromId: "rodney", toId: "edney", amount: 195.33 },
+  ];
+
+  assert.deepEqual(calculateSettlementRows(expenses, payments), []);
+  assert.deepEqual(calculateSettlementSummaries(expenses, payments), [
+    {
+      fromId: "sonia",
+      toId: "edney",
+      originalAmount: 336.48,
+      paidAmount: 59.23,
+      crossPaidAmount: 277.25,
+      amount: 0,
+    },
+    {
+      fromId: "rodney",
+      toId: "edney",
+      originalAmount: 195.33,
+      paidAmount: 195.33,
+      crossPaidAmount: 0,
+      amount: 0,
+    },
+  ]);
+
+  const soniaSummary = calculatePersonSettlementSummary(expenses, payments, "sonia");
+  assert.deepEqual(soniaSummary.totalsByPayer[0], {
+    person: {
+      id: "edney",
+      name: "Edney",
+      email: "edneypugleise@gmail.com",
+      emails: ["edneypugleise@gmail.com", "edneypugliese.dev@gmail.com"],
+      role: "admin",
+    },
+    originalAmount: 369.81,
+    paidAmount: 92.56,
+    abatedAmount: 277.25,
+    amount: 0,
+    receivableAmount: 0,
+  });
+  assert.deepEqual(soniaSummary.totals, {
+    originalAmount: 369.81,
+    paidAmount: 92.56,
+    abatedAmount: 277.25,
+    amount: 0,
+    receivableAmount: 0,
+  });
+
+  const edneySummary = calculatePersonSettlementSummary(expenses, payments, "edney");
+  assert.deepEqual(edneySummary.totals, {
+    originalAmount: 277.25,
+    paidAmount: 0,
+    abatedAmount: 277.25,
+    amount: 0,
+    receivableAmount: 0,
+  });
+
+  const rodneySummary = calculatePersonSettlementSummary(expenses, payments, "rodney");
+  assert.deepEqual(rodneySummary.totals, {
+    originalAmount: 228.66,
+    paidAmount: 228.66,
+    abatedAmount: 0,
+    amount: 0,
+    receivableAmount: 0,
+  });
 });
 
 test("seleciona somente os rateios pendentes envolvidos na quitação", () => {

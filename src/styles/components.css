@@ -3804,6 +3804,25 @@ textarea:focus {
   background: rgba(148, 163, 184, 0.06);
 }
 
+.settlement-complete-state {
+  display: grid;
+  gap: 6px;
+  width: min(100%, 520px);
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--success) 35%, var(--line));
+  border-radius: var(--radius-md);
+  background: var(--success-soft);
+  text-align: center;
+}
+
+.settlement-complete-state strong {
+  color: var(--success);
+}
+
+.settlement-complete-state span {
+  color: var(--text);
+}
+
 .settlement-form-title {
   grid-column: 1 / -1;
   display: grid;

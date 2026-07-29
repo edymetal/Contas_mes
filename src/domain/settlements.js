@@ -170,7 +170,7 @@ export function resolveLegacyAffectedShares(expenses = [], payment = {}) {
   };
 }
 
-export function calculateSettlementRows(expenses, settlementPayments = []) {
+function calculateSettlementPairs(expenses = [], settlementPayments = []) {
   const balances = new Map();
   const paidBalances = new Map();
 
@@ -187,7 +187,7 @@ export function calculateSettlementRows(expenses, settlementPayments = []) {
     paidBalances.set(key, roundMoney((paidBalances.get(key) || 0) + Number(payment.amount || 0)));
   });
 
-  const rows = [];
+  const pairs = [];
   for (let index = 0; index < PEOPLE.length; index += 1) {
     for (let nextIndex = index + 1; nextIndex < PEOPLE.length; nextIndex += 1) {
       const first = PEOPLE[index].id;
@@ -196,43 +196,134 @@ export function calculateSettlementRows(expenses, settlementPayments = []) {
       const secondOwesFirst = roundMoney(balances.get(`${second}->${first}`) || 0);
       const firstPaidSecond = roundMoney(paidBalances.get(`${first}->${second}`) || 0);
       const secondPaidFirst = roundMoney(paidBalances.get(`${second}->${first}`) || 0);
-      const firstOpenDebt = roundMoney(Math.max(firstOwesSecond - firstPaidSecond, 0));
-      const secondOpenDebt = roundMoney(Math.max(secondOwesFirst - secondPaidFirst, 0));
-      const net = roundMoney(firstOpenDebt - secondOpenDebt);
+      if (firstOwesSecond <= 0 && secondOwesFirst <= 0) continue;
 
-      if (net > 0) {
-        const paidAmount = Math.min(firstPaidSecond, firstOwesSecond);
-        const crossPaidAmount = Math.min(secondOpenDebt, firstOwesSecond - paidAmount);
-        const remainingAmount = roundMoney(firstOwesSecond - paidAmount - crossPaidAmount);
-        if (remainingAmount > 0) {
-          rows.push({
-            fromId: first,
-            toId: second,
-            originalAmount: firstOwesSecond,
-            paidAmount,
-            crossPaidAmount,
-            amount: remainingAmount,
-          });
-        }
-      }
+      const firstPaidAmount = roundMoney(Math.min(firstPaidSecond, firstOwesSecond));
+      const secondPaidAmount = roundMoney(Math.min(secondPaidFirst, secondOwesFirst));
+      const firstAfterPayment = roundMoney(Math.max(firstOwesSecond - firstPaidAmount, 0));
+      const secondAfterPayment = roundMoney(Math.max(secondOwesFirst - secondPaidAmount, 0));
+      const crossPaidAmount = roundMoney(Math.min(firstAfterPayment, secondAfterPayment));
 
-      if (net < 0) {
-        const paidAmount = Math.min(secondPaidFirst, secondOwesFirst);
-        const crossPaidAmount = Math.min(firstOpenDebt, secondOwesFirst - paidAmount);
-        const remainingAmount = roundMoney(secondOwesFirst - paidAmount - crossPaidAmount);
-        if (remainingAmount > 0) {
-          rows.push({
-            fromId: second,
-            toId: first,
-            originalAmount: secondOwesFirst,
-            paidAmount,
-            crossPaidAmount,
-            amount: remainingAmount,
-          });
-        }
-      }
+      pairs.push({
+        first: {
+          fromId: first,
+          toId: second,
+          originalAmount: firstOwesSecond,
+          paidAmount: firstPaidAmount,
+          crossPaidAmount,
+          amount: roundMoney(Math.max(firstAfterPayment - crossPaidAmount, 0)),
+        },
+        second: {
+          fromId: second,
+          toId: first,
+          originalAmount: secondOwesFirst,
+          paidAmount: secondPaidAmount,
+          crossPaidAmount,
+          amount: roundMoney(Math.max(secondAfterPayment - crossPaidAmount, 0)),
+        },
+      });
     }
   }
 
-  return rows;
+  return pairs;
+}
+
+export function calculateSettlementRows(expenses, settlementPayments = []) {
+  return calculateSettlementPairs(expenses, settlementPayments)
+    .flatMap(({ first, second }) => [first, second])
+    .filter((row) => row.amount > 0);
+}
+
+export function calculateSettlementSummaries(expenses, settlementPayments = []) {
+  return calculateSettlementPairs(expenses, settlementPayments).map(({ first, second }) => {
+    if (first.amount > 0) return first;
+    if (second.amount > 0) return second;
+
+    const originalNet = roundMoney(first.originalAmount - second.originalAmount);
+    if (originalNet > 0) return first;
+    if (originalNet < 0) return second;
+
+    const paidNet = roundMoney(first.paidAmount - second.paidAmount);
+    if (paidNet > 0) return first;
+    if (paidNet < 0) return second;
+
+    return first.originalAmount > 0 ? first : second;
+  });
+}
+
+export function calculatePersonSettlementSummary(
+  expenses = [],
+  settlementPayments = [],
+  personId,
+) {
+  const directPaidBalances = new Map();
+
+  expenses.forEach((expense) => {
+    const share = expense?.shares?.[personId];
+    if (
+      !share ||
+      expense?.payerId === personId ||
+      share.status !== "paid"
+    ) {
+      return;
+    }
+
+    const key = `${personId}->${expense.payerId}`;
+    directPaidBalances.set(
+      key,
+      roundMoney((directPaidBalances.get(key) || 0) + Number(share.amount || 0)),
+    );
+  });
+
+  const pairs = calculateSettlementPairs(expenses, settlementPayments);
+  const totalsByPayer = PEOPLE
+    .filter((person) => person.id !== personId)
+    .map((person) => {
+      const pair = pairs.find(({ first, second }) => (
+        first.fromId === personId && first.toId === person.id
+      ) || (
+        second.fromId === personId && second.toId === person.id
+      ));
+      const direction = pair
+        ? pair.first.fromId === personId
+          ? pair.first
+          : pair.second
+        : null;
+      const reverseDirection = pair
+        ? pair.first.fromId === personId
+          ? pair.second
+          : pair.first
+        : null;
+      const directPaidAmount = roundMoney(
+        directPaidBalances.get(`${personId}->${person.id}`) || 0,
+      );
+
+      return {
+        person,
+        originalAmount: roundMoney(directPaidAmount + Number(direction?.originalAmount || 0)),
+        paidAmount: roundMoney(directPaidAmount + Number(direction?.paidAmount || 0)),
+        abatedAmount: roundMoney(direction?.crossPaidAmount || 0),
+        amount: roundMoney(direction?.amount || 0),
+        receivableAmount: roundMoney(reverseDirection?.amount || 0),
+      };
+    });
+
+  const totals = totalsByPayer.reduce(
+    (acc, row) => ({
+      originalAmount: roundMoney(acc.originalAmount + row.originalAmount),
+      paidAmount: roundMoney(acc.paidAmount + row.paidAmount),
+      abatedAmount: roundMoney(acc.abatedAmount + row.abatedAmount),
+      amount: roundMoney(acc.amount + row.amount),
+      receivableAmount: roundMoney(acc.receivableAmount + row.receivableAmount),
+    }),
+    {
+      originalAmount: 0,
+      paidAmount: 0,
+      abatedAmount: 0,
+      amount: 0,
+      receivableAmount: 0,
+    },
+  );
+
+  return { totalsByPayer, totals };
 }

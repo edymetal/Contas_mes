@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { CategoryTag } from "./CategoryTag";
 import { MONTHS_PT } from "../config/forms";
-import { PEOPLE, getPersonById } from "../config/people";
+import { getPersonById } from "../config/people";
 import {
   formatInstallmentLabel,
   isSettledStatus,
   roundMoney,
   shiftMonth,
 } from "../domain/expenses";
+import { calculatePersonSettlementSummary } from "../domain/settlements";
 import {
   formatCurrency,
   formatDate,
@@ -21,7 +22,15 @@ import {
   personName,
 } from "../utils/presentation";
 
-export function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth, onMonthChange, settlementRows = [], userProfiles = {} }) {
+export function PersonExpenses({
+  expenses,
+  firebaseUser,
+  personId,
+  selectedMonth,
+  onMonthChange,
+  settlementPayments = [],
+  userProfiles = {},
+}) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(2026);
   const containerRef = useRef(null);
@@ -91,80 +100,14 @@ export function PersonExpenses({ expenses, firebaseUser, personId, selectedMonth
   }, [personExpenses]);
   const selectedPerson = getPersonById(personId);
   const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser, userProfiles);
-  const paymentSummary = useMemo(() => {
-    let listPaidAmount = 0;
-    let listDebtAmount = 0;
-    const totalsByPayer = PEOPLE
-      .filter((person) => person.id !== personId)
-      .map((person) => ({
-        person,
-        originalAmount: 0,
-        paidAmount: 0,
-        abatedAmount: 0,
-        amount: 0,
-        receivableAmount: 0,
-      }));
-
-    personExpenses.forEach((expense) => {
-      const share = getShare(expense, personId);
-      if (!share) return;
-
-      listDebtAmount = roundMoney(listDebtAmount + Number(share.amount || 0));
-
-      const displayStatus = expense.payerId === personId ? "self" : share.status;
-
-      if (displayStatus === "paid" || displayStatus === "self") {
-        listPaidAmount = roundMoney(listPaidAmount + Number(share.amount || 0));
-      }
-
-      if (expense.payerId === personId) return;
-
-      const payerRow = totalsByPayer.find((item) => item.person.id === expense.payerId);
-      if (payerRow) {
-        payerRow.originalAmount = roundMoney(payerRow.originalAmount + Number(share.amount || 0));
-        if (isSettledStatus(share.status)) {
-          payerRow.paidAmount = roundMoney(payerRow.paidAmount + Number(share.amount || 0));
-        }
-      }
-    });
-
-    settlementRows.forEach((row) => {
-      if (row.fromId === personId) {
-        const payerRow = totalsByPayer.find((item) => item.person.id === row.toId);
-        if (payerRow) {
-          payerRow.amount = roundMoney(payerRow.amount + Number(row.amount || 0));
-        }
-      }
-
-      if (row.toId === personId) {
-        const payerRow = totalsByPayer.find((item) => item.person.id === row.fromId);
-        if (payerRow) {
-          payerRow.receivableAmount = roundMoney(payerRow.receivableAmount + Number(row.amount || 0));
-        }
-      }
-    });
-
-    totalsByPayer.forEach((row) => {
-      const paidAmount = Math.min(row.paidAmount, row.originalAmount);
-      row.paidAmount = roundMoney(paidAmount);
-      row.abatedAmount = roundMoney(Math.max(row.originalAmount - row.amount - paidAmount, 0));
-    });
-
-    const totals = totalsByPayer.reduce(
-      (acc, row) => ({
-        originalAmount: roundMoney(acc.originalAmount + row.originalAmount),
-        paidAmount: roundMoney(acc.paidAmount + row.paidAmount),
-        abatedAmount: roundMoney(acc.abatedAmount + row.abatedAmount),
-        amount: roundMoney(acc.amount + row.amount),
-        receivableAmount: roundMoney(acc.receivableAmount + row.receivableAmount),
-      }),
-      { originalAmount: 0, paidAmount: 0, abatedAmount: 0, amount: 0, receivableAmount: 0 },
-    );
-    totals.originalAmount = roundMoney(listDebtAmount);
-    totals.paidAmount = roundMoney(listPaidAmount);
-
-    return { totalsByPayer, totals };
-  }, [personExpenses, settlementRows, personId]);
+  const paymentSummary = useMemo(
+    () => calculatePersonSettlementSummary(
+      personExpenses,
+      settlementPayments,
+      personId,
+    ),
+    [personExpenses, settlementPayments, personId],
+  );
 
   const formattedMonthName = useMemo(() => {
     if (!selectedMonth) return "";

@@ -90,12 +90,14 @@ export function SettlementPanel({
   onDeletePayment,
   onRegisterPayment,
   onUpdatePayment,
-  rows,
+  rows = [],
   settlementPayments = [],
   userProfiles = {},
 }) {
   const [paymentForms, setPaymentForms] = useState({});
-  const [activeSettlementKey, setActiveSettlementKey] = useState(null);
+  const [activeSettlementKey, setActiveSettlementKey] = useState(
+    () => rows[0] ? getRowKey(rows[0]) : null,
+  );
   const [historyMonth, setHistoryMonth] = useState(() => monthFromDate(todayInputValue()));
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [editingPaymentForm, setEditingPaymentForm] = useState({
@@ -140,8 +142,14 @@ export function SettlementPanel({
   }
 
   useEffect(() => {
-    if (activeSettlementKey && !rows.some((row) => getRowKey(row) === activeSettlementKey)) {
+    if (!rows.length) {
       setActiveSettlementKey(null);
+      return;
+    }
+
+    if (!activeSettlementKey || !rows.some((row) => getRowKey(row) === activeSettlementKey)) {
+      const preferredRow = rows.find((row) => row.amount > 0) || rows[0];
+      setActiveSettlementKey(getRowKey(preferredRow));
     }
   }, [activeSettlementKey, rows]);
 
@@ -213,12 +221,12 @@ export function SettlementPanel({
   return (
     <section className="panel">
       <div className="section-heading">
-        <h2>Saldos cruzados</h2>
-        <span>{rows.length} saldo(s)</span>
+        <h2>Acertos calculados</h2>
+        <span>{rows.length} acerto(s)</span>
       </div>
 
       {!rows.length ? (
-        <div className="empty-state">Nenhum saldo pendente neste mês.</div>
+        <div className="empty-state">Nenhuma dívida ou compensação encontrada neste mês.</div>
       ) : (
         <>
           <div className="settlement-selector" aria-label="Escolha o saldo para visualizar">
@@ -235,7 +243,7 @@ export function SettlementPanel({
                   aria-expanded={isActive}
                 >
                   <span>{personName(row.fromId)}</span>
-                  <small>{formatCurrency(row.amount)}</small>
+                  <small>{row.amount > 0 ? formatCurrency(row.amount) : "Quitado"}</small>
                 </button>
               );
             })}
@@ -281,66 +289,73 @@ export function SettlementPanel({
                   </div>
                 </div>
 
-                <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
-                  <div className="settlement-form-title">
-                    <strong>Registrar pagamento</strong>
-                    <span>Informe um valor parcial ou quite o restante da dívida.</span>
+                {row.amount > 0 ? (
+                  <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
+                    <div className="settlement-form-title">
+                      <strong>Registrar pagamento</strong>
+                      <span>Informe um valor parcial ou quite o restante da dívida.</span>
+                    </div>
+
+                    <label>
+                      <span>Valor do pagamento</span>
+                      <input
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        type="number"
+                        value={form.amount}
+                        onChange={(event) => updatePaymentForm(row, "amount", event.target.value)}
+                        placeholder={String(row.amount).replace(".", ",")}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      <span>Data</span>
+                      <input
+                        type="date"
+                        value={form.paidAt}
+                        onChange={(event) => updatePaymentForm(row, "paidAt", event.target.value)}
+                      />
+                    </label>
+
+                    <label>
+                      <span>Tipo</span>
+                      <select value={form.type} onChange={(event) => updatePaymentForm(row, "type", event.target.value)}>
+                        {PAYMENT_TYPES.map((type) => (
+                          <option key={type}>{type}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="settlement-description-field">
+                      <span>Descrição opcional</span>
+                      <input
+                        value={form.description}
+                        onChange={(event) => updatePaymentForm(row, "description", event.target.value)}
+                        placeholder="Ex: transferência recebida"
+                      />
+                    </label>
+
+                    <div className="settlement-payment-actions">
+                      <button className="primary-button" type="submit">
+                        Pagamento
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={(event) => submitPayment(event, row, row.amount)}
+                        type="button"
+                      >
+                        Pagar Tudo
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="settlement-complete-state" role="status">
+                    <strong>Acerto concluído</strong>
+                    <span>A dívida foi totalmente coberta pelos pagamentos e abatimentos acima.</span>
                   </div>
-
-                  <label>
-                    <span>Valor do pagamento</span>
-                    <input
-                      inputMode="decimal"
-                      min="0.01"
-                      step="0.01"
-                      type="number"
-                      value={form.amount}
-                      onChange={(event) => updatePaymentForm(row, "amount", event.target.value)}
-                      placeholder={String(row.amount).replace(".", ",")}
-                      required
-                    />
-                  </label>
-
-                  <label>
-                    <span>Data</span>
-                    <input
-                      type="date"
-                      value={form.paidAt}
-                      onChange={(event) => updatePaymentForm(row, "paidAt", event.target.value)}
-                    />
-                  </label>
-
-                  <label>
-                    <span>Tipo</span>
-                    <select value={form.type} onChange={(event) => updatePaymentForm(row, "type", event.target.value)}>
-                      {PAYMENT_TYPES.map((type) => (
-                        <option key={type}>{type}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="settlement-description-field">
-                    <span>Descrição opcional</span>
-                    <input
-                      value={form.description}
-                      onChange={(event) => updatePaymentForm(row, "description", event.target.value)}
-                      placeholder="Ex: transferência recebida"
-                    />
-                  </label>
-
-                  <div className="settlement-payment-actions">
-                    <button className="primary-button" type="submit">
-                      Pagamento
-                    </button>
-                    <button
-                      className="secondary-button"
-                      onClick={(event) => submitPayment(event, row, row.amount)}
-                      type="button"
-                    >
-                      Pagar Tudo
-                    </button>
-                  </div>
-                </form>
+                )}
               </article>
             );
               })}
