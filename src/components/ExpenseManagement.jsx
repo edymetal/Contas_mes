@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Pencil, Trash2, X } from "lucide-react";
+import { Check, Pencil, Search, Trash2, X } from "lucide-react";
 import { CategoryTag } from "./CategoryTag";
 import { PlaceAutocomplete } from "./ResourceListView";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE } from "../config/people";
@@ -25,12 +25,37 @@ import {
   formatDateMonth,
   formatInstallmentPeriod,
   formatMonthLabel,
+  normalizeSearchText,
   personName,
 } from "../utils/presentation";
 
+export function expenseMatchesSearch(expense, searchTerm) {
+  const normalizedSearchTerm = normalizeSearchText(searchTerm).trim();
+  if (!normalizedSearchTerm) return true;
+
+  const searchableText = [
+    expense.title,
+    expense.category,
+    personName(expense.payerId),
+    ...(expense.participants || []).map(personName),
+  ].join(" ");
+
+  return normalizeSearchText(searchableText).includes(normalizedSearchTerm);
+}
+
 export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
+  const [searchTerm, setSearchTerm] = useState("");
+  const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
   const expenseSource = allExpenses.length ? allExpenses : expenses;
+  const filteredExpenseSource = useMemo(
+    () => expenseSource.filter((expense) => expenseMatchesSearch(expense, searchTerm)),
+    [expenseSource, searchTerm],
+  );
+  const filteredExpenses = useMemo(
+    () => expenses.filter((expense) => expenseMatchesSearch(expense, searchTerm)),
+    [expenses, searchTerm],
+  );
   const monthlyInstallmentKeys = useMemo(() => {
     return new Set(
       expenses
@@ -41,10 +66,14 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
         .filter(Boolean),
     );
   }, [expenses]);
-  const installmentSummaries = useMemo(
+  const allInstallmentSummaries = useMemo(
     () => getInstallmentSeriesSummaries(expenseSource)
       .filter((item) => monthlyInstallmentKeys.has(item.key)),
     [expenseSource, monthlyInstallmentKeys],
+  );
+  const installmentSummaries = useMemo(
+    () => allInstallmentSummaries.filter((item) => expenseMatchesSearch(item, searchTerm)),
+    [allInstallmentSummaries, searchTerm],
   );
   const activeInstallments = installmentSummaries.filter((item) => !item.completed);
   const finishedInstallments = installmentSummaries
@@ -54,25 +83,34 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
     const nextMonth = shiftMonth(selectedMonth, 1);
 
     return {
-      currentMonth: sumInstallmentExpenses(getExpensesForMonth(expenseSource, selectedMonth)),
-      nextMonth: sumInstallmentExpenses(getExpensesForMonth(expenseSource, nextMonth)),
+      currentMonth: sumInstallmentExpenses(getExpensesForMonth(filteredExpenseSource, selectedMonth)),
+      nextMonth: sumInstallmentExpenses(getExpensesForMonth(filteredExpenseSource, nextMonth)),
       nextMonthKey: nextMonth,
       remaining: installmentSummaries.reduce(
         (sum, installment) => roundMoney(sum + Number(installment.remainingValue || 0)),
         0,
       ),
     };
-  }, [expenseSource, installmentSummaries, selectedMonth]);
-  const fixedExpenseGroups = useMemo(
+  }, [filteredExpenseSource, installmentSummaries, selectedMonth]);
+  const allFixedExpenseGroups = useMemo(
     () => getFixedExpenseMonthGroups(expenses),
     [expenses],
   );
+  const fixedExpenseGroups = useMemo(
+    () => getFixedExpenseMonthGroups(filteredExpenses),
+    [filteredExpenses],
+  );
+  const allFixedExpensesCount = allFixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
   const fixedExpensesCount = fixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
-  const singleExpenses = useMemo(
+  const allSingleExpenses = useMemo(
     () => expenses.filter((expense) => getExpenseKind(expense) === "normal"),
     [expenses],
   );
-  const listedExpenses = manageView === "single" ? singleExpenses : expenses;
+  const singleExpenses = useMemo(
+    () => filteredExpenses.filter((expense) => getExpenseKind(expense) === "normal"),
+    [filteredExpenses],
+  );
+  const listedExpenses = manageView === "single" ? singleExpenses : filteredExpenses;
 
   const viewTitle = {
     month: "Contas do Mês",
@@ -80,19 +118,34 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
     installments: "Contas Parceladas",
     fixed: "Contas Fixas",
   }[manageView];
+  const viewResultCount = {
+    month: filteredExpenses.length,
+    single: singleExpenses.length,
+    installments: installmentSummaries.length,
+    fixed: fixedExpensesCount,
+  }[manageView];
+  const viewTotalCount = {
+    month: expenses.length,
+    single: allSingleExpenses.length,
+    installments: allInstallmentSummaries.length,
+    fixed: allFixedExpensesCount,
+  }[manageView];
   const viewCount = {
     month: `${expenses.length} registro(s)`,
-    single: `${singleExpenses.length} conta(s) única(s)`,
-    installments: `${installmentSummaries.length} parcelamento(s)`,
-    fixed: `${fixedExpensesCount} conta(s) fixa(s)`,
+    single: `${allSingleExpenses.length} conta(s) única(s)`,
+    installments: `${allInstallmentSummaries.length} parcelamento(s)`,
+    fixed: `${allFixedExpensesCount} conta(s) fixa(s)`,
   }[manageView];
+  const displayedViewCount = hasSearchTerm
+    ? `${viewResultCount} de ${viewTotalCount} resultado(s)`
+    : viewCount;
 
   return (
     <section className="panel">
       <div className="section-heading manage-heading">
         <div>
           <h2>{viewTitle}</h2>
-          <span>{viewCount}</span>
+          <span aria-live="polite">{displayedViewCount}</span>
         </div>
         <div className="manage-actions">
           <button
@@ -109,7 +162,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
             onClick={() => setManageView("single")}
             type="button"
           >
-            Contas Únicas ({singleExpenses.length})
+            Contas Únicas ({allSingleExpenses.length})
           </button>
           <button
             aria-pressed={manageView === "installments"}
@@ -117,7 +170,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
             onClick={() => setManageView("installments")}
             type="button"
           >
-            Contas Parceladas ({installmentSummaries.length})
+            Contas Parceladas ({allInstallmentSummaries.length})
           </button>
           <button
             aria-pressed={manageView === "fixed"}
@@ -125,13 +178,39 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
             onClick={() => setManageView("fixed")}
             type="button"
           >
-            Contas Fixas ({fixedExpensesCount})
+            Contas Fixas ({allFixedExpensesCount})
           </button>
         </div>
       </div>
 
+      <div className="manage-search">
+        <Search aria-hidden="true" size={19} />
+        <label className="sr-only" htmlFor="manage-account-search">Buscar contas</label>
+        <input
+          id="manage-account-search"
+          type="search"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Buscar por nome, categoria ou pessoa"
+          autoComplete="off"
+        />
+        {searchTerm && (
+          <button
+            aria-label="Limpar busca"
+            className="manage-search-clear"
+            onClick={() => setSearchTerm("")}
+            title="Limpar busca"
+            type="button"
+          >
+            <X size={17} />
+          </button>
+        )}
+      </div>
+
       {dataLoading ? (
         <div className="empty-state">Carregando...</div>
+      ) : hasSearchTerm && !viewResultCount ? (
+        <div className="empty-state">Nenhuma conta encontrada para “{searchTerm.trim()}”.</div>
       ) : manageView === "installments" ? (
         <InstallmentSeriesView
           activeInstallments={activeInstallments}

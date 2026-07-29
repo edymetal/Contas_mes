@@ -342,6 +342,10 @@
     width: 100%;
   }
 
+  .manage-search {
+    max-width: none;
+  }
+
   .manage-actions > .primary-button,
   .manage-actions > .secondary-button {
     width: 100%;

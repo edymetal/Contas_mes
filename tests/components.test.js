@@ -10,6 +10,7 @@ let viteServer;
 let AuthScreens;
 let AppFeedback;
 let DashboardModule;
+let ExpenseManagementModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
 let FormsModule;
@@ -29,6 +30,7 @@ before(async () => {
     AuthScreens,
     AppFeedback,
     DashboardModule,
+    ExpenseManagementModule,
     NewExpenseFormModule,
     OtherAccountsModule,
     FormsModule,
@@ -36,6 +38,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/AuthScreens.jsx"),
     viteServer.ssrLoadModule("/src/components/AppFeedback.jsx"),
     viteServer.ssrLoadModule("/src/components/Dashboard.jsx"),
+    viteServer.ssrLoadModule("/src/components/ExpenseManagement.jsx"),
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
     viteServer.ssrLoadModule("/src/config/forms.js"),
@@ -149,6 +152,35 @@ test("formulário de conta preserva participantes e ação principal", () => {
   assert.equal((html.match(/class="participant-option"/g) || []).length, 3);
   assert.match(html, /30,00/);
   assert.match(html, /Salvar conta/);
+});
+
+test("gerenciamento oferece busca de contas por dados relevantes", () => {
+  const expense = {
+    id: "expense-1",
+    category: "Casa",
+    dueDate: "2026-07-10",
+    payerId: "edney",
+    participants: ["sonia"],
+    title: "Conta de energia",
+    totalValue: 150,
+  };
+  const html = renderToStaticMarkup(
+    createElement(ExpenseManagementModule.ManagePanel, {
+      allExpenses: [expense],
+      dataLoading: false,
+      expenses: [expense],
+      onDelete() {},
+      onEdit() {},
+      selectedMonth: "2026-07",
+    }),
+  );
+
+  assert.match(html, /type="search"/);
+  assert.match(html, /Buscar por nome, categoria ou pessoa/);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "energia"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Sônia"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "casa"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Rodney"), false);
 });
 
 test("Outras Contas integra mercado e pagamentos no resumo anual", () => {
