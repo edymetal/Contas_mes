@@ -365,7 +365,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
               <th scope="col">Categoria</th>
               <th scope="col">Quem pagou</th>
               <th scope="col">Rateio</th>
-              <th scope="col">Situação</th>
+              <th className="expense-payment-column" scope="col">Situação</th>
               <th scope="col" style={{ textAlign: "right" }}>Ações</th>
             </tr>
           </thead>
@@ -397,7 +397,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
                 </td>
                 <td>{personName(expense.payerId)}</td>
                 <td>{expense.participants?.map(personName).join(", ")}</td>
-                <td>
+                <td className="expense-payment-column">
                   <span className={`tag expense-payment-status ${isExpenseFullySettled(expense) ? "paid" : "pending"}`}>
                     {isExpenseFullySettled(expense) ? "Paga" : "Não paga"}
                   </span>

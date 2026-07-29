@@ -184,6 +184,8 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   assert.match(html, /Toda a base de dados/);
   assert.match(html, /Situação/);
   assert.match(html, /Não paga/);
+  assert.match(html, /class="expense-payment-column"/);
+  assert.match(html, /expense-payment-status pending/);
   assert.match(html, /<option value="month"[^>]*>Julho<\/option>/);
   assert.doesNotMatch(html, /<option value="month"[^>]*>Julho 2026<\/option>/);
   assert.match(html, /Ver histórico de Conta de energia/);
