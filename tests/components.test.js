@@ -186,6 +186,8 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   assert.match(html, /Não paga/);
   assert.match(html, /class="expense-payment-column"/);
   assert.match(html, /expense-payment-status pending/);
+  assert.equal((html.match(/class="table-sort-button"/g) || []).length, 7);
+  assert.equal((html.match(/aria-sort="none"/g) || []).length, 7);
   assert.match(html, /<option value="month"[^>]*>Julho<\/option>/);
   assert.doesNotMatch(html, /<option value="month"[^>]*>Julho 2026<\/option>/);
   assert.match(html, /Ver histórico de Conta de energia/);
@@ -213,6 +215,23 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
     true,
   );
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Rodney"), false);
+
+  const sortableExpenses = [
+    { ...expense, id: "expense-b", title: "Zebra", totalValue: 10 },
+    { ...expense, id: "expense-a", title: "Água", totalValue: 20 },
+  ];
+  assert.deepEqual(
+    ExpenseManagementModule.sortExpenses(sortableExpenses, "title", "asc").map((item) => item.id),
+    ["expense-a", "expense-b"],
+  );
+  assert.deepEqual(
+    ExpenseManagementModule.sortExpenses(sortableExpenses, "title", "desc").map((item) => item.id),
+    ["expense-b", "expense-a"],
+  );
+  assert.deepEqual(
+    ExpenseManagementModule.sortExpenses(sortableExpenses, "value", "asc").map((item) => item.id),
+    ["expense-b", "expense-a"],
+  );
 
   const expenses = [
     expense,

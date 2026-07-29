@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { Check, Pencil, Search, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronsUpDown,
+  Pencil,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { CategoryTag } from "./CategoryTag";
 import { ExpenseHistoryModal } from "./ExpenseHistoryModal";
 import { PlaceAutocomplete } from "./ResourceListView";
@@ -44,6 +53,8 @@ const SEARCH_COLUMN_OPTIONS = [
   { value: "participants", label: "Rateio" },
   { value: "status", label: "Situação" },
 ];
+
+const SORTABLE_COLUMNS = SEARCH_COLUMN_OPTIONS.filter((option) => option.value !== "all");
 
 function getFormattedSearchValues(values) {
   return values.flatMap((value) => {
@@ -117,12 +128,49 @@ export function getExpensesForSearchScope(allExpenses, monthlyExpenses, selected
   return normalizedExpenses;
 }
 
+function getExpenseSortValue(expense, sortKey) {
+  const sortValues = {
+    title: expense.title,
+    value: Number(expense.totalValue || 0),
+    dueDate: expense.dueDate || "",
+    category: expense.category,
+    payer: personName(expense.payerId),
+    participants: (expense.participants || []).map(personName).join(", "),
+    status: isExpenseFullySettled(expense) ? "paga" : "não paga",
+  };
+
+  return sortValues[sortKey];
+}
+
+export function sortExpenses(expenses, sortKey, sortDirection = "asc") {
+  if (!sortKey) return expenses;
+
+  return expenses
+    .map((expense, index) => ({ expense, index }))
+    .sort((first, second) => {
+      const firstValue = getExpenseSortValue(first.expense, sortKey);
+      const secondValue = getExpenseSortValue(second.expense, sortKey);
+      const comparison = typeof firstValue === "number" && typeof secondValue === "number"
+        ? firstValue - secondValue
+        : normalizeSearchText(firstValue).localeCompare(
+          normalizeSearchText(secondValue),
+          "pt-BR",
+          { numeric: true },
+        );
+
+      if (comparison === 0) return first.index - second.index;
+      return sortDirection === "desc" ? -comparison : comparison;
+    })
+    .map(({ expense }) => expense);
+}
+
 export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("all");
   const [searchScope, setSearchScope] = useState("month");
   const [historyExpense, setHistoryExpense] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
   const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
   const expenseSource = allExpenses.length ? allExpenses : expenses;
   const scopedExpenses = useMemo(
@@ -202,6 +250,10 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
     [filteredScopedExpenses],
   );
   const listedExpenses = manageView === "single" ? singleExpenses : filteredScopedExpenses;
+  const sortedListedExpenses = useMemo(
+    () => sortExpenses(listedExpenses, sortConfig.key, sortConfig.direction),
+    [listedExpenses, sortConfig],
+  );
   const selectedYear = selectedMonth.slice(0, 4);
   const scopeDescription = {
     month: `em ${formatMonthLabel(selectedMonth)}`,
@@ -240,6 +292,13 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
   const displayedViewCount = hasSearchTerm
     ? `${viewResultCount} de ${viewTotalCount} resultado(s)`
     : viewCount;
+
+  function handleSort(sortKey) {
+    setSortConfig((current) => ({
+      key: sortKey,
+      direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc",
+    }));
+  }
 
   return (
     <section className="panel">
@@ -359,18 +418,39 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
           <caption className="sr-only">Contas exibidas para gerenciamento</caption>
           <thead>
             <tr>
-              <th scope="col">Despesa</th>
-              <th scope="col">Valor</th>
-              <th scope="col">Vencimento</th>
-              <th scope="col">Categoria</th>
-              <th scope="col">Quem pagou</th>
-              <th scope="col">Rateio</th>
-              <th className="expense-payment-column" scope="col">Situação</th>
+              {SORTABLE_COLUMNS.map((column) => {
+                const isActive = sortConfig.key === column.value;
+                const nextDirection = isActive && sortConfig.direction === "asc" ? "decrescente" : "crescente";
+
+                return (
+                  <th
+                    aria-sort={isActive ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+                    className={column.value === "status" ? "expense-payment-column" : undefined}
+                    key={column.value}
+                    scope="col"
+                  >
+                    <button
+                      aria-label={`Ordenar por ${column.label} em ordem ${nextDirection}`}
+                      className="table-sort-button"
+                      onClick={() => handleSort(column.value)}
+                      title={`Ordenar por ${column.label}`}
+                      type="button"
+                    >
+                      <span>{column.label}</span>
+                      {isActive
+                        ? sortConfig.direction === "asc"
+                          ? <ArrowUp aria-hidden="true" size={15} />
+                          : <ArrowDown aria-hidden="true" size={15} />
+                        : <ChevronsUpDown aria-hidden="true" size={15} />}
+                    </button>
+                  </th>
+                );
+              })}
               <th scope="col" style={{ textAlign: "right" }}>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {listedExpenses.map((expense) => (
+            {sortedListedExpenses.map((expense) => (
               <tr key={expense.id}>
                 <td>
                   <div style={{ display: "flex", flexDirection: "column" }}>

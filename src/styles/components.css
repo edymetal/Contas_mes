@@ -1994,6 +1994,35 @@ th {
   letter-spacing: 0.05em;
 }
 
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+.table-sort-button:hover {
+  color: var(--primary);
+}
+
+.table-sort-button svg {
+  flex: 0 0 auto;
+}
+
+.expense-payment-column .table-sort-button {
+  justify-content: center;
+  width: 100%;
+}
+
 td strong {
   font-size: 0.95rem;
   color: var(--text);
