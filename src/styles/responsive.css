@@ -350,6 +350,16 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .expense-history-list-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .expense-history-year-navigation {
+    grid-template-columns: 40px minmax(80px, 1fr) 40px;
+    width: 100%;
+  }
+
   .expense-history-row {
     grid-template-columns: 1fr;
   }

@@ -1,4 +1,5 @@
-import { X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   formatInstallmentLabel,
   getExpenseHistorySummary,
@@ -24,7 +25,30 @@ export function ExpenseHistoryModal({
   selectedMonth,
 }) {
   const dialogRef = useDialogAccessibility(onClose);
-  const summary = getExpenseHistorySummary(allExpenses, expense, selectedMonth);
+  const summary = useMemo(
+    () => getExpenseHistorySummary(allExpenses, expense, selectedMonth),
+    [allExpenses, expense, selectedMonth],
+  );
+  const [visibleYear, setVisibleYear] = useState(() => selectedMonth.slice(0, 4));
+  const availableYears = useMemo(() => (
+    Array.from(new Set(summary.expenses.map((item) => item.historyMonthKey.slice(0, 4))))
+      .sort((first, second) => second.localeCompare(first))
+  ), [summary.expenses]);
+  const olderYear = availableYears.find((year) => year < visibleYear);
+  const newerYear = [...availableYears].reverse().find((year) => year > visibleYear);
+  const visibleYearExpenses = summary.expenses.filter((item) => (
+    item.historyMonthKey.startsWith(`${visibleYear}-`)
+  ));
+  const visibleMonthGroups = Array.from(
+    visibleYearExpenses.reduce((groups, item) => {
+      const group = groups.get(item.historyMonthKey) || [];
+      group.push(item);
+      groups.set(item.historyMonthKey, group);
+      return groups;
+    }, new Map()),
+  )
+    .map(([monthKey, expenses]) => ({ monthKey, expenses }))
+    .sort((first, second) => second.monthKey.localeCompare(first.monthKey));
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -78,38 +102,76 @@ export function ExpenseHistoryModal({
 
         <div className="expense-history-list" aria-label={`Histórico de ${expense.title}`}>
           <div className="expense-history-list-heading">
-            <h3>Meses encontrados</h3>
-            <span>{summary.totalCount} registro(s)</span>
+            <div>
+              <h3>Meses de {visibleYear}</h3>
+              <span>{visibleYearExpenses.length} registro(s) neste ano</span>
+            </div>
+            <div className="expense-history-year-navigation" aria-label="Navegação entre anos">
+              <button
+                aria-label="Ano anterior"
+                className="icon-button"
+                disabled={!olderYear}
+                onClick={() => setVisibleYear(olderYear)}
+                title={olderYear ? `Ir para ${olderYear}` : "Não há registros em anos anteriores"}
+                type="button"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <strong aria-live="polite">{visibleYear}</strong>
+              <button
+                aria-label="Próximo ano"
+                className="icon-button"
+                disabled={!newerYear}
+                onClick={() => setVisibleYear(newerYear)}
+                title={newerYear ? `Ir para ${newerYear}` : "Não há registros em anos posteriores"}
+                type="button"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
 
-          {!summary.expenses.length ? (
+          {!visibleMonthGroups.length ? (
             <div className="empty-state compact">
-              Nenhum registro encontrado até {formatMonthLabel(selectedMonth)}.
+              Nenhum registro encontrado em {visibleYear}.
             </div>
           ) : (
-            summary.expenses.map((historyExpense) => (
-              <article className="expense-history-row" key={historyExpense.id}>
-                <div className="expense-history-period">
-                  <strong>{formatMonthLabel(historyExpense.historyMonthKey)}</strong>
-                  <small>Vencimento em {formatDate(historyExpense.dueDate)}</small>
-                </div>
-
-                <div className="expense-history-details">
-                  <span>{historyExpense.category || "Sem categoria"}</span>
-                  <small>{personName(historyExpense.payerId)}</small>
-                  {historyExpense.installment && (
-                    <small>{formatInstallmentLabel(historyExpense.installment)}</small>
-                  )}
-                </div>
-
-                <div className="expense-history-payment">
-                  <strong>{formatCurrency(historyExpense.totalValue)}</strong>
-                  <span className={`tag expense-history-status ${historyExpense.historyStatus}`}>
-                    {STATUS_LABELS[historyExpense.historyStatus]}
+            visibleMonthGroups.map((monthGroup) => (
+              <section className="expense-history-month-group" key={monthGroup.monthKey}>
+                <div className="expense-history-month-heading">
+                  <h4>{formatMonthLabel(monthGroup.monthKey)}</h4>
+                  <span>
+                    {monthGroup.expenses.length} {monthGroup.expenses.length === 1 ? "registro" : "registros"}
                   </span>
-                  <small>{formatCurrency(historyExpense.historyPaidValue)} pago</small>
                 </div>
-              </article>
+
+                <div className="expense-history-month-rows">
+                  {monthGroup.expenses.map((historyExpense) => (
+                    <article className="expense-history-row" key={historyExpense.id}>
+                      <div className="expense-history-period">
+                        <strong>Vencimento em {formatDate(historyExpense.dueDate)}</strong>
+                        <small>{historyExpense.title}</small>
+                      </div>
+
+                      <div className="expense-history-details">
+                        <span>{historyExpense.category || "Sem categoria"}</span>
+                        <small>{personName(historyExpense.payerId)}</small>
+                        {historyExpense.installment && (
+                          <small>{formatInstallmentLabel(historyExpense.installment)}</small>
+                        )}
+                      </div>
+
+                      <div className="expense-history-payment">
+                        <strong>{formatCurrency(historyExpense.totalValue)}</strong>
+                        <span className={`tag expense-history-status ${historyExpense.historyStatus}`}>
+                          {STATUS_LABELS[historyExpense.historyStatus]}
+                        </span>
+                        <small>{formatCurrency(historyExpense.historyPaidValue)} pago</small>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
             ))
           )}
         </div>

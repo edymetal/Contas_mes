@@ -235,6 +235,7 @@ test("histórico da despesa mostra totais pagos e omite meses futuros", () => {
     { ...expense, id: "past", dueDate: "2026-06-10", shares: settledShares },
     { ...expense, id: "current", dueDate: "2026-07-10", shares: pendingShares },
     { ...expense, id: "future", dueDate: "2026-08-10", shares: settledShares },
+    { ...expense, id: "past-year", dueDate: "2025-12-10", shares: settledShares },
   ];
   const html = renderToStaticMarkup(
     createElement(ExpenseHistoryModule.ExpenseHistoryModal, {
@@ -249,11 +250,17 @@ test("histórico da despesa mostra totais pagos e omite meses futuros", () => {
   assert.match(html, /Total de registros/);
   assert.match(html, /Registros quitados/);
   assert.match(html, /Valor já pago/);
+  assert.match(html, /Meses de 2026/);
+  assert.match(html, /Ano anterior/);
+  assert.match(html, /Próximo ano/);
+  assert.match(html, /Navegação entre anos/);
+  assert.match(html, /Ir para 2025/);
   assert.match(html, /Julho 2026/);
   assert.match(html, /Junho 2026/);
   assert.doesNotMatch(html, /Agosto 2026/);
-  assert.match(html, /60,00/);
-  assert.match(html, /45,00/);
+  assert.doesNotMatch(html, /Dezembro 2025/);
+  assert.match(html, /90,00/);
+  assert.match(html, /75,00/);
 });
 
 test("Outras Contas integra mercado e pagamentos no resumo anual", () => {
