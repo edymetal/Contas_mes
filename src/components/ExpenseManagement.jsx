@@ -8,12 +8,14 @@ import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import { reportClientError } from "../services/observability";
 import {
   formatInstallmentLabel,
+  getExpenseDisplayMonthKey,
   getExpenseKind,
   getExpensesForMonth,
   getFixedExpenseMonthGroups,
   getInstallmentInfo,
   getInstallmentSeriesKey,
   getInstallmentSeriesSummaries,
+  getNormalizedExpenses,
   isFixedExpense,
   roundMoney,
   shiftMonth,
@@ -29,51 +31,129 @@ import {
   personName,
 } from "../utils/presentation";
 
-export function expenseMatchesSearch(expense, searchTerm) {
+const SEARCH_COLUMN_OPTIONS = [
+  { value: "all", label: "Todas as colunas" },
+  { value: "title", label: "Despesa" },
+  { value: "value", label: "Valor" },
+  { value: "dueDate", label: "Vencimento" },
+  { value: "category", label: "Categoria" },
+  { value: "payer", label: "Quem pagou" },
+  { value: "participants", label: "Rateio" },
+];
+
+function getFormattedSearchValues(values) {
+  return values.flatMap((value) => {
+    if (!value) return [];
+    return [value, formatDate(value)];
+  });
+}
+
+function getCurrencySearchValues(values) {
+  return values.flatMap((value) => {
+    if (value === undefined || value === null || value === "") return [];
+    return [value, formatCurrency(value)];
+  });
+}
+
+export function expenseMatchesSearch(expense, searchTerm, searchColumn = "all") {
   const normalizedSearchTerm = normalizeSearchText(searchTerm).trim();
   if (!normalizedSearchTerm) return true;
 
-  const searchableText = [
-    expense.title,
-    expense.category,
-    personName(expense.payerId),
-    ...(expense.participants || []).map(personName),
-  ].join(" ");
+  const installmentExpenses = expense.installments instanceof Map
+    ? Array.from(expense.installments.values())
+    : [];
+  const searchValuesByColumn = {
+    title: [
+      expense.title,
+      expense.installment ? formatInstallmentLabel(expense.installment) : "",
+    ],
+    value: getCurrencySearchValues([
+      expense.totalValue,
+      expense.installmentValue,
+      expense.paidValue,
+      expense.remainingValue,
+      ...installmentExpenses.map((item) => item.totalValue),
+    ]),
+    dueDate: getFormattedSearchValues([
+      expense.dueDate,
+      expense.firstDueDate,
+      expense.finalDueDate,
+      expense.finalizedDate,
+      ...installmentExpenses.map((item) => item.dueDate),
+    ]),
+    category: [expense.category],
+    payer: [personName(expense.payerId)],
+    participants: (expense.participants || []).map(personName),
+  };
+  const searchableValues = searchColumn === "all"
+    ? Object.values(searchValuesByColumn).flat()
+    : searchValuesByColumn[searchColumn] || [];
 
-  return normalizeSearchText(searchableText).includes(normalizedSearchTerm);
+  return normalizeSearchText(searchableValues.join(" ")).includes(normalizedSearchTerm);
+}
+
+export function getExpensesForSearchScope(allExpenses, monthlyExpenses, selectedMonth, searchScope) {
+  if (searchScope === "month") return monthlyExpenses;
+
+  const expenseSource = allExpenses.length ? allExpenses : monthlyExpenses;
+  const normalizedExpenses = getNormalizedExpenses(expenseSource);
+  if (searchScope === "year") {
+    const selectedYear = selectedMonth.slice(0, 4);
+    return normalizedExpenses.filter((expense) => (
+      getExpenseDisplayMonthKey(expense).startsWith(`${selectedYear}-`)
+    ));
+  }
+
+  return normalizedExpenses;
 }
 
 export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit, onDelete, dataLoading }) {
   const [manageView, setManageView] = useState("month");
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchColumn, setSearchColumn] = useState("all");
+  const [searchScope, setSearchScope] = useState("month");
   const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
   const expenseSource = allExpenses.length ? allExpenses : expenses;
+  const scopedExpenses = useMemo(
+    () => getExpensesForSearchScope(allExpenses, expenses, selectedMonth, searchScope),
+    [allExpenses, expenses, searchScope, selectedMonth],
+  );
   const filteredExpenseSource = useMemo(
-    () => expenseSource.filter((expense) => expenseMatchesSearch(expense, searchTerm)),
-    [expenseSource, searchTerm],
+    () => expenseSource.filter((expense) => expenseMatchesSearch(expense, searchTerm, searchColumn)),
+    [expenseSource, searchColumn, searchTerm],
   );
-  const filteredExpenses = useMemo(
-    () => expenses.filter((expense) => expenseMatchesSearch(expense, searchTerm)),
-    [expenses, searchTerm],
+  const filteredScopedExpenses = useMemo(
+    () => scopedExpenses.filter((expense) => expenseMatchesSearch(expense, searchTerm, searchColumn)),
+    [scopedExpenses, searchColumn, searchTerm],
   );
-  const monthlyInstallmentKeys = useMemo(() => {
+  const scopedInstallmentKeys = useMemo(() => {
     return new Set(
-      expenses
+      scopedExpenses
         .map((expense) => {
           const installmentInfo = getInstallmentInfo(expense);
           return installmentInfo ? getInstallmentSeriesKey(expense, installmentInfo) : "";
         })
         .filter(Boolean),
     );
-  }, [expenses]);
+  }, [scopedExpenses]);
+  const filteredInstallmentKeys = useMemo(() => {
+    return new Set(
+      filteredScopedExpenses
+        .map((expense) => {
+          const installmentInfo = getInstallmentInfo(expense);
+          return installmentInfo ? getInstallmentSeriesKey(expense, installmentInfo) : "";
+        })
+        .filter(Boolean),
+    );
+  }, [filteredScopedExpenses]);
   const allInstallmentSummaries = useMemo(
     () => getInstallmentSeriesSummaries(expenseSource)
-      .filter((item) => monthlyInstallmentKeys.has(item.key)),
-    [expenseSource, monthlyInstallmentKeys],
+      .filter((item) => scopedInstallmentKeys.has(item.key)),
+    [expenseSource, scopedInstallmentKeys],
   );
   const installmentSummaries = useMemo(
-    () => allInstallmentSummaries.filter((item) => expenseMatchesSearch(item, searchTerm)),
-    [allInstallmentSummaries, searchTerm],
+    () => allInstallmentSummaries.filter((item) => filteredInstallmentKeys.has(item.key)),
+    [allInstallmentSummaries, filteredInstallmentKeys],
   );
   const activeInstallments = installmentSummaries.filter((item) => !item.completed);
   const finishedInstallments = installmentSummaries
@@ -93,45 +173,55 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
     };
   }, [filteredExpenseSource, installmentSummaries, selectedMonth]);
   const allFixedExpenseGroups = useMemo(
-    () => getFixedExpenseMonthGroups(expenses),
-    [expenses],
+    () => getFixedExpenseMonthGroups(scopedExpenses),
+    [scopedExpenses],
   );
   const fixedExpenseGroups = useMemo(
-    () => getFixedExpenseMonthGroups(filteredExpenses),
-    [filteredExpenses],
+    () => getFixedExpenseMonthGroups(filteredScopedExpenses),
+    [filteredScopedExpenses],
   );
   const allFixedExpensesCount = allFixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
   const fixedExpensesCount = fixedExpenseGroups.reduce((sum, group) => sum + group.expenses.length, 0);
   const allSingleExpenses = useMemo(
-    () => expenses.filter((expense) => getExpenseKind(expense) === "normal"),
-    [expenses],
+    () => scopedExpenses.filter((expense) => getExpenseKind(expense) === "normal"),
+    [scopedExpenses],
   );
   const singleExpenses = useMemo(
-    () => filteredExpenses.filter((expense) => getExpenseKind(expense) === "normal"),
-    [filteredExpenses],
+    () => filteredScopedExpenses.filter((expense) => getExpenseKind(expense) === "normal"),
+    [filteredScopedExpenses],
   );
-  const listedExpenses = manageView === "single" ? singleExpenses : filteredExpenses;
+  const listedExpenses = manageView === "single" ? singleExpenses : filteredScopedExpenses;
+  const selectedYear = selectedMonth.slice(0, 4);
+  const scopeDescription = {
+    month: `em ${formatMonthLabel(selectedMonth)}`,
+    year: `em ${selectedYear}`,
+    all: "em toda a base",
+  }[searchScope];
 
   const viewTitle = {
-    month: "Contas do Mês",
+    month: {
+      month: "Contas do Mês",
+      year: "Contas do Ano",
+      all: "Todas as Contas",
+    }[searchScope],
     single: "Contas Únicas",
     installments: "Contas Parceladas",
     fixed: "Contas Fixas",
   }[manageView];
   const viewResultCount = {
-    month: filteredExpenses.length,
+    month: filteredScopedExpenses.length,
     single: singleExpenses.length,
     installments: installmentSummaries.length,
     fixed: fixedExpensesCount,
   }[manageView];
   const viewTotalCount = {
-    month: expenses.length,
+    month: scopedExpenses.length,
     single: allSingleExpenses.length,
     installments: allInstallmentSummaries.length,
     fixed: allFixedExpensesCount,
   }[manageView];
   const viewCount = {
-    month: `${expenses.length} registro(s)`,
+    month: `${scopedExpenses.length} registro(s)`,
     single: `${allSingleExpenses.length} conta(s) única(s)`,
     installments: `${allInstallmentSummaries.length} parcelamento(s)`,
     fixed: `${allFixedExpensesCount} conta(s) fixa(s)`,
@@ -154,7 +244,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
             onClick={() => setManageView("month")}
             type="button"
           >
-            Contas ({expenses.length})
+            Contas ({scopedExpenses.length})
           </button>
           <button
             aria-pressed={manageView === "single"}
@@ -183,46 +273,74 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
         </div>
       </div>
 
-      <div className="manage-search">
-        <Search aria-hidden="true" size={19} />
-        <label className="sr-only" htmlFor="manage-account-search">Buscar contas</label>
-        <input
-          id="manage-account-search"
-          type="search"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Buscar por nome, categoria ou pessoa"
-          autoComplete="off"
-        />
-        {searchTerm && (
-          <button
-            aria-label="Limpar busca"
-            className="manage-search-clear"
-            onClick={() => setSearchTerm("")}
-            title="Limpar busca"
-            type="button"
-          >
-            <X size={17} />
-          </button>
-        )}
+      <div className="manage-search-toolbar" role="search" aria-label="Buscar contas">
+        <div className="manage-search-control manage-search-field">
+          <label htmlFor="manage-account-search">Buscar contas</label>
+          <div className="manage-search">
+            <Search aria-hidden="true" size={19} />
+            <input
+              id="manage-account-search"
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Digite o valor que deseja buscar"
+              autoComplete="off"
+            />
+            {searchTerm && (
+              <button
+                aria-label="Limpar busca"
+                className="manage-search-clear"
+                onClick={() => setSearchTerm("")}
+                title="Limpar busca"
+                type="button"
+              >
+                <X size={17} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <label className="manage-search-control">
+          <span>Coluna</span>
+          <select value={searchColumn} onChange={(event) => setSearchColumn(event.target.value)}>
+            {SEARCH_COLUMN_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="manage-search-control">
+          <span>Buscar em</span>
+          <select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}>
+            <option value="month">{formatMonthLabel(selectedMonth)}</option>
+            <option value="year">Ano de {selectedYear}</option>
+            <option value="all">Toda a base de dados</option>
+          </select>
+        </label>
       </div>
 
       {dataLoading ? (
         <div className="empty-state">Carregando...</div>
       ) : hasSearchTerm && !viewResultCount ? (
-        <div className="empty-state">Nenhuma conta encontrada para “{searchTerm.trim()}”.</div>
+        <div className="empty-state">Nenhuma conta encontrada para “{searchTerm.trim()}” {scopeDescription}.</div>
       ) : manageView === "installments" ? (
         <InstallmentSeriesView
           activeInstallments={activeInstallments}
+          emptyText={`Nenhuma conta parcelada ${scopeDescription}.`}
           finishedInstallments={finishedInstallments}
           selectedMonth={selectedMonth}
           summaryTotals={installmentSummaryTotals}
         />
       ) : manageView === "fixed" ? (
-        <FixedExpensesView groups={fixedExpenseGroups} selectedMonth={selectedMonth} />
+        <FixedExpensesView
+          emptyText={`Nenhuma conta fixa ${scopeDescription}.`}
+          groups={fixedExpenseGroups}
+        />
       ) : !listedExpenses.length ? (
         <div className="empty-state">
-          {manageView === "single" ? "Nenhuma conta única cadastrada neste mês." : "Nenhuma conta cadastrada neste mês."}
+          {manageView === "single"
+            ? `Nenhuma conta única cadastrada ${scopeDescription}.`
+            : `Nenhuma conta cadastrada ${scopeDescription}.`}
         </div>
       ) : (
       <div className="table-wrap">
@@ -296,11 +414,11 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
   );
 }
 
-function InstallmentSeriesView({ activeInstallments, finishedInstallments, selectedMonth, summaryTotals }) {
+function InstallmentSeriesView({ activeInstallments, emptyText, finishedInstallments, selectedMonth, summaryTotals }) {
   const installments = [...activeInstallments, ...finishedInstallments];
 
   if (!activeInstallments.length && !finishedInstallments.length) {
-    return <div className="empty-state">Nenhuma conta parcelada cadastrada.</div>;
+    return <div className="empty-state">{emptyText}</div>;
   }
 
   return (
@@ -401,9 +519,9 @@ function InstallmentSeriesGroup({ emptyText, installments, title }) {
   );
 }
 
-function FixedExpensesView({ groups, selectedMonth }) {
+function FixedExpensesView({ emptyText, groups }) {
   if (!groups.length) {
-    return <div className="empty-state">Nenhuma conta fixa em {formatMonthLabel(selectedMonth)}.</div>;
+    return <div className="empty-state">{emptyText}</div>;
   }
 
   return (

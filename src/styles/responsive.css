@@ -342,8 +342,8 @@
     width: 100%;
   }
 
-  .manage-search {
-    max-width: none;
+  .manage-search-toolbar {
+    grid-template-columns: 1fr;
   }
 
   .manage-actions > .primary-button,

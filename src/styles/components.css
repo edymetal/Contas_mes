@@ -1023,12 +1023,36 @@
   gap: 10px;
 }
 
+.manage-search-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(170px, 0.55fr) minmax(190px, 0.65fr);
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+}
+
+.manage-search-control {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.manage-search-control > label,
+.manage-search-control > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
 .manage-search {
   position: relative;
   display: flex;
   align-items: center;
-  max-width: 520px;
-  margin-bottom: 24px;
+  width: 100%;
 }
 
 .manage-search > svg {

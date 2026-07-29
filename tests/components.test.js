@@ -176,11 +176,35 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   );
 
   assert.match(html, /type="search"/);
-  assert.match(html, /Buscar por nome, categoria ou pessoa/);
+  assert.match(html, /Digite o valor que deseja buscar/);
+  assert.match(html, /Todas as colunas/);
+  assert.match(html, /Toda a base de dados/);
+  assert.equal((html.match(/<select/g) || []).length, 2);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "energia"), true);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Sônia"), true);
-  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "casa"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "150,00", "value"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "10/07/2026", "dueDate"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "casa", "category"), true);
+  assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "energia", "category"), false);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Rodney"), false);
+
+  const expenses = [
+    expense,
+    { ...expense, id: "expense-2", dueDate: "2026-01-10", title: "Conta de água" },
+    { ...expense, id: "expense-3", dueDate: "2025-12-10", title: "Conta antiga" },
+  ];
+  assert.equal(
+    ExpenseManagementModule.getExpensesForSearchScope(expenses, [expense], "2026-07", "month").length,
+    1,
+  );
+  assert.equal(
+    ExpenseManagementModule.getExpensesForSearchScope(expenses, [expense], "2026-07", "year").length,
+    2,
+  );
+  assert.equal(
+    ExpenseManagementModule.getExpensesForSearchScope(expenses, [expense], "2026-07", "all").length,
+    3,
+  );
 });
 
 test("Outras Contas integra mercado e pagamentos no resumo anual", () => {
