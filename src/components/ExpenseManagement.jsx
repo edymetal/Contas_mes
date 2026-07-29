@@ -27,6 +27,7 @@ import {
   formatDateMonth,
   formatInstallmentPeriod,
   formatMonthLabel,
+  formatMonthName,
   normalizeSearchText,
   personName,
 } from "../utils/presentation";
@@ -312,7 +313,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
         <label className="manage-search-control">
           <span>Buscar em</span>
           <select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}>
-            <option value="month">{formatMonthLabel(selectedMonth)}</option>
+            <option value="month">{formatMonthName(selectedMonth)}</option>
             <option value="year">Ano de {selectedYear}</option>
             <option value="all">Toda a base de dados</option>
           </select>

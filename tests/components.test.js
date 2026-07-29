@@ -179,6 +179,8 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   assert.match(html, /Digite o valor que deseja buscar/);
   assert.match(html, /Todas as colunas/);
   assert.match(html, /Toda a base de dados/);
+  assert.match(html, /<option value="month"[^>]*>Julho<\/option>/);
+  assert.doesNotMatch(html, /<option value="month"[^>]*>Julho 2026<\/option>/);
   assert.equal((html.match(/<select/g) || []).length, 2);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "energia"), true);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Sônia"), true);
