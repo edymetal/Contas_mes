@@ -102,11 +102,11 @@ export function PersonExpenses({
   const selectedPersonPhotoUrl = getPersonPhotoUrl(selectedPerson, firebaseUser, userProfiles);
   const paymentSummary = useMemo(
     () => calculatePersonSettlementSummary(
-      personExpenses,
+      expenses,
       settlementPayments,
       personId,
     ),
-    [personExpenses, settlementPayments, personId],
+    [expenses, settlementPayments, personId],
   );
 
   const formattedMonthName = useMemo(() => {

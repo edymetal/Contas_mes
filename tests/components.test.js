@@ -14,6 +14,7 @@ let ExpenseManagementModule;
 let ExpenseHistoryModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
+let PersonExpensesModule;
 let SettlementModule;
 let FormsModule;
 
@@ -36,6 +37,7 @@ before(async () => {
     ExpenseHistoryModule,
     NewExpenseFormModule,
     OtherAccountsModule,
+    PersonExpensesModule,
     SettlementModule,
     FormsModule,
   ] = await Promise.all([
@@ -46,6 +48,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/ExpenseHistoryModal.jsx"),
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
+    viteServer.ssrLoadModule("/src/components/PersonExpenses.jsx"),
     viteServer.ssrLoadModule("/src/components/SettlementPanel.jsx"),
     viteServer.ssrLoadModule("/src/config/forms.js"),
   ]);
@@ -171,6 +174,36 @@ test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", (
   assert.match(html, /59,23/);
   assert.match(html, /Acerto concluído/);
   assert.doesNotMatch(html, /Registrar pagamento/);
+});
+
+test("resumo pessoal inclui valores a receber mesmo sem o pagador participar do rateio", () => {
+  const html = renderToStaticMarkup(
+    createElement(PersonExpensesModule.PersonExpenses, {
+      expenses: [
+        {
+          id: "expense-paid-for-another-person",
+          category: "Viagem",
+          dueDate: "2026-07-05",
+          payerId: "edney",
+          participants: ["sonia"],
+          shares: {
+            sonia: { amount: 50, status: "pending" },
+          },
+          title: "Passagem",
+          totalValue: 50,
+        },
+      ],
+      firebaseUser: null,
+      onMonthChange() {},
+      personId: "edney",
+      selectedMonth: "2026-07",
+      settlementPayments: [],
+      userProfiles: {},
+    }),
+  );
+
+  assert.match(html, /Receber Sônia: \+50,00/);
+  assert.match(html, /Nenhuma conta para este mês/);
 });
 
 test("formulário de conta preserva participantes e ação principal", () => {
