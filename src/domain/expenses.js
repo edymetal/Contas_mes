@@ -103,9 +103,19 @@ export function isSettledStatus(status) {
   return status === "paid" || status === "settled" || status === "self";
 }
 
-function areExpenseSharesSettled(expense) {
+export function isExpenseFullySettled(expense) {
   const shares = Object.values(expense.shares || {});
   return shares.length > 0 && shares.every((share) => isSettledStatus(share.status));
+}
+
+export function getExpenseSettledValue(expense) {
+  return roundMoney(
+    Object.values(expense.shares || {}).reduce((total, share) => (
+      isSettledStatus(share.status)
+        ? total + Number(share.amount || 0)
+        : total
+    ), 0),
+  );
 }
 
 function getLegacyInstallmentSeriesKey(expense, installmentInfo) {
@@ -174,6 +184,72 @@ export function isSameFixedSeries(referenceExpense, candidateExpense) {
   return getLegacyFixedSeriesKey(referenceExpense) === getLegacyFixedSeriesKey(candidateExpense);
 }
 
+function normalizeExpenseTitle(title) {
+  return String(title || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isSameExpenseHistory(referenceExpense, candidateExpense) {
+  const referenceKind = getExpenseKind(referenceExpense);
+  if (referenceKind === "installment") {
+    return isSameInstallmentSeries(referenceExpense, candidateExpense);
+  }
+  if (referenceKind === "fixed") {
+    return isSameFixedSeries(referenceExpense, candidateExpense);
+  }
+
+  return (
+    getExpenseKind(candidateExpense) === "normal"
+    && normalizeExpenseTitle(referenceExpense.title) === normalizeExpenseTitle(candidateExpense.title)
+  );
+}
+
+export function getExpenseHistorySummary(expenses, referenceExpense, cutoffMonth) {
+  const historyExpenses = getNormalizedExpenses(expenses)
+    .filter((expense) => isSameExpenseHistory(referenceExpense, expense))
+    .filter((expense) => {
+      const monthKey = getExpenseDisplayMonthKey(expense);
+      return monthKey && (!cutoffMonth || monthKey <= cutoffMonth);
+    })
+    .map((expense) => {
+      const totalValue = Number(expense.totalValue || 0);
+      const settledValue = Math.min(getExpenseSettledValue(expense), totalValue);
+      const isPaid = isExpenseFullySettled(expense);
+
+      return {
+        ...expense,
+        historyMonthKey: getExpenseDisplayMonthKey(expense),
+        historyPaidValue: settledValue,
+        historyStatus: isPaid ? "paid" : settledValue > 0 ? "partial" : "pending",
+      };
+    })
+    .sort((first, second) => (
+      (second.historyMonthKey || second.dueDate || "")
+        .localeCompare(first.historyMonthKey || first.dueDate || "")
+      || (second.dueDate || "").localeCompare(first.dueDate || "")
+    ));
+  const totalValue = historyExpenses.reduce(
+    (total, expense) => roundMoney(total + Number(expense.totalValue || 0)),
+    0,
+  );
+  const paidValue = historyExpenses.reduce(
+    (total, expense) => roundMoney(total + Number(expense.historyPaidValue || 0)),
+    0,
+  );
+
+  return {
+    expenses: historyExpenses,
+    totalCount: historyExpenses.length,
+    paidCount: historyExpenses.filter((expense) => expense.historyStatus === "paid").length,
+    totalValue,
+    paidValue,
+    pendingValue: roundMoney(Math.max(totalValue - paidValue, 0)),
+  };
+}
+
 function getExpenseSettlementDate(expense) {
   return Object.values(expense.shares || {})
     .map((share) => share?.payment?.paidAt)
@@ -225,7 +301,7 @@ export function getInstallmentSeriesSummaries(expenses) {
         group.finalDueDate ||
         group.installments.get(group.total)?.dueDate ||
         (firstDueDate ? addMonths(firstDueDate, group.total - group.first) : lastExpense?.dueDate || "");
-      const paidTrackedCount = installments.filter(areExpenseSharesSettled).length;
+      const paidTrackedCount = installments.filter(isExpenseFullySettled).length;
       const paidInstallments = Math.min(group.total, Math.max(0, group.first - 1) + paidTrackedCount);
       const totalValue = roundMoney(group.installmentValue * group.total);
       const paidValue = roundMoney(group.installmentValue * paidInstallments);

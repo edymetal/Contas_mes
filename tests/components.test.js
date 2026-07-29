@@ -11,6 +11,7 @@ let AuthScreens;
 let AppFeedback;
 let DashboardModule;
 let ExpenseManagementModule;
+let ExpenseHistoryModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
 let FormsModule;
@@ -31,6 +32,7 @@ before(async () => {
     AppFeedback,
     DashboardModule,
     ExpenseManagementModule,
+    ExpenseHistoryModule,
     NewExpenseFormModule,
     OtherAccountsModule,
     FormsModule,
@@ -39,6 +41,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/AppFeedback.jsx"),
     viteServer.ssrLoadModule("/src/components/Dashboard.jsx"),
     viteServer.ssrLoadModule("/src/components/ExpenseManagement.jsx"),
+    viteServer.ssrLoadModule("/src/components/ExpenseHistoryModal.jsx"),
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
     viteServer.ssrLoadModule("/src/config/forms.js"),
@@ -181,6 +184,7 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
   assert.match(html, /Toda a base de dados/);
   assert.match(html, /<option value="month"[^>]*>Julho<\/option>/);
   assert.doesNotMatch(html, /<option value="month"[^>]*>Julho 2026<\/option>/);
+  assert.match(html, /Ver histórico de Conta de energia/);
   assert.equal((html.match(/<select/g) || []).length, 2);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "energia"), true);
   assert.equal(ExpenseManagementModule.expenseMatchesSearch(expense, "Sônia"), true);
@@ -207,6 +211,49 @@ test("gerenciamento oferece busca de contas por dados relevantes", () => {
     ExpenseManagementModule.getExpensesForSearchScope(expenses, [expense], "2026-07", "all").length,
     3,
   );
+});
+
+test("histórico da despesa mostra totais pagos e omite meses futuros", () => {
+  const expense = {
+    title: "Internet",
+    category: "Casa",
+    payerId: "edney",
+    participants: ["edney", "sonia"],
+    installment: "Fixo",
+    fixedSeriesId: "fixed-internet",
+    totalValue: 30,
+  };
+  const settledShares = {
+    edney: { amount: 15, status: "self" },
+    sonia: { amount: 15, status: "settled" },
+  };
+  const pendingShares = {
+    edney: { amount: 15, status: "self" },
+    sonia: { amount: 15, status: "pending" },
+  };
+  const expenses = [
+    { ...expense, id: "past", dueDate: "2026-06-10", shares: settledShares },
+    { ...expense, id: "current", dueDate: "2026-07-10", shares: pendingShares },
+    { ...expense, id: "future", dueDate: "2026-08-10", shares: settledShares },
+  ];
+  const html = renderToStaticMarkup(
+    createElement(ExpenseHistoryModule.ExpenseHistoryModal, {
+      allExpenses: expenses,
+      expense: expenses[1],
+      onClose() {},
+      selectedMonth: "2026-07",
+    }),
+  );
+
+  assert.match(html, /Histórico até Julho 2026/);
+  assert.match(html, /Total de registros/);
+  assert.match(html, /Registros quitados/);
+  assert.match(html, /Valor já pago/);
+  assert.match(html, /Julho 2026/);
+  assert.match(html, /Junho 2026/);
+  assert.doesNotMatch(html, /Agosto 2026/);
+  assert.match(html, /60,00/);
+  assert.match(html, /45,00/);
 });
 
 test("Outras Contas integra mercado e pagamentos no resumo anual", () => {

@@ -44,6 +44,7 @@ test("mantém os recursos estruturais de acessibilidade e recuperação de falha
   const baseStyles = readProjectFile("src/styles/base.css");
   const modalSources = [
     readProjectFile("src/components/ExpenseManagement.jsx"),
+    readProjectFile("src/components/ExpenseHistoryModal.jsx"),
     readProjectFile("src/components/ReceiptImporter.jsx"),
     readProjectFile("src/components/SettlementPanel.jsx"),
   ].join("\n");

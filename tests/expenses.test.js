@@ -5,6 +5,7 @@ import {
   filterExpensesForMonth,
   formatInstallmentLabel,
   getExpenseKind,
+  getExpenseHistorySummary,
   getExpenseMonthKey,
   getExpensesForMonth,
   getFixedExpenseMonthGroups,
@@ -30,6 +31,47 @@ test("identifica os status que representam uma cota liquidada", () => {
   assert.equal(isSettledStatus("self"), true);
   assert.equal(isSettledStatus("pending"), false);
   assert.equal(isSettledStatus(undefined), false);
+});
+
+test("resume o histórico da despesa até o mês selecionado sem incluir meses futuros", () => {
+  const fixedExpense = {
+    title: "Internet",
+    category: "Casa",
+    payerId: "edney",
+    participants: ["edney", "sonia"],
+    installment: "Fixo",
+    fixedSeriesId: "fixed-internet",
+    totalValue: 30,
+  };
+  const settledShares = {
+    edney: { amount: 15, status: "self" },
+    sonia: { amount: 15, status: "settled" },
+  };
+  const pendingShares = {
+    edney: { amount: 15, status: "self" },
+    sonia: { amount: 15, status: "pending" },
+  };
+  const expenses = [
+    { ...fixedExpense, id: "past", dueDate: "2026-06-10", shares: settledShares },
+    { ...fixedExpense, id: "current", dueDate: "2026-07-10", shares: pendingShares },
+    { ...fixedExpense, id: "future", dueDate: "2026-08-10", shares: settledShares },
+    {
+      ...fixedExpense,
+      id: "another-series",
+      dueDate: "2026-05-10",
+      fixedSeriesId: "another-fixed-series",
+      shares: settledShares,
+    },
+  ];
+
+  const summary = getExpenseHistorySummary(expenses, expenses[1], "2026-07");
+
+  assert.deepEqual(summary.expenses.map((expense) => expense.id), ["current", "past"]);
+  assert.equal(summary.totalCount, 2);
+  assert.equal(summary.paidCount, 1);
+  assert.equal(summary.totalValue, 60);
+  assert.equal(summary.paidValue, 45);
+  assert.equal(summary.pendingValue, 15);
 });
 
 function installment({

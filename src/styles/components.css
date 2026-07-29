@@ -1090,6 +1090,181 @@
   color: var(--primary);
 }
 
+.expense-history-trigger {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+
+.expense-history-trigger:hover {
+  color: var(--primary);
+  text-decoration-style: solid;
+}
+
+.modal.expense-history-modal {
+  width: min(900px, 100%);
+}
+
+.expense-history-heading {
+  align-items: flex-start;
+}
+
+.expense-history-heading > div {
+  min-width: 0;
+}
+
+.expense-history-heading p {
+  max-width: 680px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.expense-history-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.expense-history-summary article {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+}
+
+.expense-history-summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.expense-history-summary strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  line-height: 1.1;
+}
+
+.expense-history-summary article.paid {
+  border-color: color-mix(in srgb, var(--success) 28%, var(--line));
+  background: color-mix(in srgb, var(--success) 9%, var(--panel));
+}
+
+.expense-history-summary article.paid strong {
+  color: var(--success);
+}
+
+.expense-history-summary article.pending {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--line));
+  background: color-mix(in srgb, var(--warning) 9%, var(--panel));
+}
+
+.expense-history-summary article.pending strong {
+  color: var(--warning);
+}
+
+.expense-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.expense-history-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.expense-history-list-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.expense-history-list-heading span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.expense-history-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1.25fr) minmax(150px, 0.7fr);
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.expense-history-period,
+.expense-history-details,
+.expense-history-payment {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.expense-history-period strong,
+.expense-history-payment > strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.expense-history-period small,
+.expense-history-details small,
+.expense-history-payment small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.expense-history-details > span {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.expense-history-payment {
+  justify-items: end;
+  text-align: right;
+}
+
+.expense-history-status.partial {
+  border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.expense-history-status.pending {
+  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.expense-history-status.paid {
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
 .theme-switch-control {
   display: grid;
   grid-template-columns: auto auto auto;

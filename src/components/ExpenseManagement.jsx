@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Pencil, Search, Trash2, X } from "lucide-react";
 import { CategoryTag } from "./CategoryTag";
+import { ExpenseHistoryModal } from "./ExpenseHistoryModal";
 import { PlaceAutocomplete } from "./ResourceListView";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE } from "../config/people";
 import { getFirebaseActionError } from "../domain/errors";
@@ -113,6 +114,7 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("all");
   const [searchScope, setSearchScope] = useState("month");
+  const [historyExpense, setHistoryExpense] = useState(null);
   const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
   const expenseSource = allExpenses.length ? allExpenses : expenses;
   const scopedExpenses = useMemo(
@@ -363,7 +365,15 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
               <tr key={expense.id}>
                 <td>
                   <div style={{ display: "flex", flexDirection: "column" }}>
-                    <strong>{expense.title}</strong>
+                    <button
+                      aria-label={`Ver histórico de ${expense.title}`}
+                      className="expense-history-trigger"
+                      onClick={() => setHistoryExpense(expense)}
+                      title="Ver histórico da despesa"
+                      type="button"
+                    >
+                      {expense.title}
+                    </button>
                     {expense.installment && (
                       <small style={{ display: "block", marginTop: "4px" }}>
                         {formatInstallmentLabel(expense.installment)}
@@ -410,6 +420,15 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
           </tbody>
         </table>
       </div>
+      )}
+
+      {historyExpense && (
+        <ExpenseHistoryModal
+          allExpenses={expenseSource}
+          expense={historyExpense}
+          onClose={() => setHistoryExpense(null)}
+          selectedMonth={selectedMonth}
+        />
       )}
     </section>
   );
