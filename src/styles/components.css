@@ -4687,6 +4687,11 @@ textarea:focus {
   border-color: rgba(139, 92, 246, 0.2);
 }
 
+.report-controls select option {
+  background: #fff;
+  color: #0f172a;
+}
+
 .report-controls input:focus,
 .report-controls select:focus {
   border-color: var(--report-violet);
