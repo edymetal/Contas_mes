@@ -878,6 +878,17 @@
     justify-content: flex-start;
   }
 
+  .report-chart-filter-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .report-chart-legend button {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+  }
+
   .report-summary-card {
     gap: 12px;
   }

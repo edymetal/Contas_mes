@@ -4,6 +4,7 @@ import {
   ArrowUp,
   BarChart3,
   CalendarDays,
+  Check,
   Download,
   FileText,
   Home,
@@ -19,7 +20,7 @@ import {
   createReportComparison,
   createReportCsv,
 } from "../domain/reports";
-import { shiftMonth } from "../domain/expenses";
+import { roundMoney, shiftMonth } from "../domain/expenses";
 import {
   formatCurrency,
   formatMonthLabel,
@@ -38,6 +39,29 @@ const DIMENSION_OPTIONS = {
   people: "Pessoas",
   establishments: "Estabelecimentos",
 };
+
+const CHART_SOURCE_OPTIONS = [
+  { key: "shared", label: "Contas compartilhadas" },
+  { key: "market", label: "Mercado" },
+  { key: "other", label: "Outros pagamentos" },
+];
+
+export function getVisibleChartMonthTotal(month, activeSources) {
+  return roundMoney(
+    CHART_SOURCE_OPTIONS.reduce((total, { key }) => (
+      activeSources[key] ? total + Number(month[key] || 0) : total
+    ), 0),
+  );
+}
+
+export function getVisibleChartAnnualTotal(months, activeSources) {
+  return roundMoney(
+    months.reduce(
+      (total, month) => total + getVisibleChartMonthTotal(month, activeSources),
+      0,
+    ),
+  );
+}
 
 function formatChange(change) {
   if (!change.difference) return "Sem alteração";
@@ -68,6 +92,11 @@ export function ReportsPanel({
 }) {
   const [comparisonMonth, setComparisonMonth] = useState(() => shiftMonth(selectedMonth, -1));
   const [dimension, setDimension] = useState("categories");
+  const [activeChartSources, setActiveChartSources] = useState({
+    shared: true,
+    market: true,
+    other: true,
+  });
   const year = selectedMonth.slice(0, 4);
   const comparison = useMemo(
     () => createReportComparison(
@@ -84,7 +113,12 @@ export function ReportsPanel({
     [expenses, marketItems, otherPayments, year],
   );
   const dimensionRows = annualReport.dimensions[dimension];
-  const annualMaximum = Math.max(...annualReport.months.map((month) => month.total), 1);
+  const visibleAnnualTotal = getVisibleChartAnnualTotal(annualReport.months, activeChartSources);
+  const annualMaximum = Math.max(
+    ...annualReport.months.map((month) => getVisibleChartMonthTotal(month, activeChartSources)),
+    1,
+  );
+  const hasActiveChartSource = CHART_SOURCE_OPTIONS.some(({ key }) => activeChartSources[key]);
   const dimensionMaximum = Math.max(
     ...dimensionRows.flatMap((row) => row.months.map((month) => month.value)),
     1,
@@ -97,6 +131,13 @@ export function ReportsPanel({
       `relatorio_contas_${selectedMonth}.csv`,
       "text/csv;charset=utf-8",
     );
+  }
+
+  function toggleChartSource(sourceKey) {
+    setActiveChartSources((current) => ({
+      ...current,
+      [sourceKey]: !current[sourceKey],
+    }));
   }
 
   return (
@@ -250,28 +291,65 @@ export function ReportsPanel({
           </div>
           <div className="report-annual-total">
             <span>Total no ano</span>
-            <strong>{formatCurrency(annualReport.total)}</strong>
+            <strong>{formatCurrency(visibleAnnualTotal)}</strong>
           </div>
         </div>
 
-        <div className="report-chart-legend" aria-label="Legenda do gráfico">
-          <span className="shared">Contas compartilhadas</span>
-          <span className="market">Mercado</span>
-          <span className="other">Outros pagamentos</span>
+        <div className="report-chart-filter-heading">
+          <span>Exibir no gráfico</span>
+          <small>Ative ou desative cada origem</small>
+        </div>
+        <div
+          aria-label="Origens exibidas no gráfico"
+          className="report-chart-legend"
+          role="group"
+        >
+          {CHART_SOURCE_OPTIONS.map(({ key, label }) => {
+            const isActive = activeChartSources[key];
+            return (
+              <button
+                aria-pressed={isActive}
+                className={`${key} ${isActive ? "active" : "inactive"}`}
+                key={key}
+                onClick={() => toggleChartSource(key)}
+                type="button"
+              >
+                <span className="report-chart-filter-dot">
+                  <Check aria-hidden="true" size={10} strokeWidth={3} />
+                </span>
+                {label}
+              </button>
+            );
+          })}
         </div>
 
+        {!hasActiveChartSource && (
+          <div className="report-chart-empty" role="status">
+            Ative pelo menos uma origem para visualizar os valores.
+          </div>
+        )}
+
         <div className="report-annual-chart">
-          {annualReport.months.map((month) => (
-            <article className={month.monthKey === selectedMonth ? "selected" : ""} key={month.monthKey}>
-              <div className="report-annual-bar" aria-hidden="true">
-                <span className="shared" style={{ height: `${month.shared / annualMaximum * 100}%` }} />
-                <span className="market" style={{ height: `${month.market / annualMaximum * 100}%` }} />
-                <span className="other" style={{ height: `${month.other / annualMaximum * 100}%` }} />
-              </div>
-              <strong>{formatCurrency(month.total)}</strong>
-              <span>{formatMonthName(month.monthKey).slice(0, 3)}</span>
-            </article>
-          ))}
+          {annualReport.months.map((month) => {
+            const visibleMonthTotal = getVisibleChartMonthTotal(month, activeChartSources);
+            return (
+              <article className={month.monthKey === selectedMonth ? "selected" : ""} key={month.monthKey}>
+                <div className="report-annual-bar" aria-hidden="true">
+                  {activeChartSources.shared && (
+                    <span className="shared" style={{ height: `${month.shared / annualMaximum * 100}%` }} />
+                  )}
+                  {activeChartSources.market && (
+                    <span className="market" style={{ height: `${month.market / annualMaximum * 100}%` }} />
+                  )}
+                  {activeChartSources.other && (
+                    <span className="other" style={{ height: `${month.other / annualMaximum * 100}%` }} />
+                  )}
+                </div>
+                <strong>{formatCurrency(visibleMonthTotal)}</strong>
+                <span>{formatMonthName(month.monthKey).slice(0, 3)}</span>
+              </article>
+            );
+          })}
         </div>
       </section>
 

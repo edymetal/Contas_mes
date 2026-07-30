@@ -298,10 +298,31 @@ test("relatórios comparam períodos e oferecem as duas exportações", () => {
   assert.match(html, /Evolução anual/);
   assert.match(html, /Evolução por categorias/);
   assert.match(html, /Visão consolidada/);
-  assert.match(html, /Legenda do gráfico/);
+  assert.match(html, /Origens exibidas no gráfico/);
+  assert.match(html, /Ative ou desative cada origem/);
+  assert.equal((html.match(/aria-pressed="true"/g) || []).length, 3);
   assert.equal((html.match(/class="report-summary-icon"/g) || []).length, 4);
   assert.equal((html.match(/class="report-annual-bar"/g) || []).length, 12);
   assert.equal((html.match(/<caption class="sr-only">/g) || []).length, 2);
+
+  const activeSources = { shared: true, market: false, other: true };
+  assert.equal(
+    ReportsModule.getVisibleChartMonthTotal(
+      { shared: 100, market: 40, other: 25 },
+      activeSources,
+    ),
+    125,
+  );
+  assert.equal(
+    ReportsModule.getVisibleChartAnnualTotal(
+      [
+        { shared: 100, market: 40, other: 25 },
+        { shared: 80, market: 20, other: 10 },
+      ],
+      activeSources,
+    ),
+    215,
+  );
 });
 
 test("gerenciamento oferece busca de contas por dados relevantes", () => {

@@ -4981,36 +4981,108 @@ textarea:focus {
   font-size: 1.08rem;
 }
 
+.report-chart-filter-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.report-chart-filter-heading > span {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.report-chart-filter-heading > small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
 .report-chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 9px;
   justify-content: flex-end;
-  margin: 8px 0 -2px;
+  margin: 2px 0 -2px;
 }
 
-.report-chart-legend span {
+.report-chart-legend button {
+  --filter-rgb: 59 130 246;
   align-items: center;
+  background: transparent;
+  border: 1px solid rgb(var(--filter-rgb) / 0.22);
+  border-radius: 999px;
   color: var(--muted);
-  display: inline-flex;
-  font-size: 0.72rem;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.73rem;
+  font-weight: 700;
   gap: 7px;
+  min-height: 34px;
+  padding: 6px 11px 6px 7px;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
 }
 
-.report-chart-legend span::before {
-  background: var(--report-blue);
-  border-radius: 4px;
-  content: "";
-  height: 9px;
-  width: 9px;
+.report-chart-legend button.market {
+  --filter-rgb: 16 185 129;
 }
 
-.report-chart-legend span.market::before {
-  background: var(--report-emerald);
+.report-chart-legend button.other {
+  --filter-rgb: 245 158 11;
 }
 
-.report-chart-legend span.other::before {
-  background: var(--report-amber);
+.report-chart-legend button.active {
+  background: rgb(var(--filter-rgb) / 0.13);
+  border-color: rgb(var(--filter-rgb) / 0.48);
+  color: rgb(var(--filter-rgb));
+  box-shadow: 0 7px 18px rgb(var(--filter-rgb) / 0.1);
+}
+
+.report-chart-legend button.inactive {
+  opacity: 0.52;
+}
+
+.report-chart-legend button:hover {
+  border-color: rgb(var(--filter-rgb) / 0.72);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.report-chart-legend button:focus-visible {
+  outline: 3px solid rgb(var(--filter-rgb) / 0.24);
+  outline-offset: 2px;
+}
+
+.report-chart-filter-dot {
+  align-items: center;
+  background: rgb(var(--filter-rgb));
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  height: 18px;
+  justify-content: center;
+  width: 18px;
+}
+
+.report-chart-legend button.inactive .report-chart-filter-dot {
+  background: transparent;
+  border: 2px solid rgb(var(--filter-rgb));
+  color: transparent;
+}
+
+.report-chart-empty {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px dashed rgba(245, 158, 11, 0.38);
+  border-radius: var(--radius-md);
+  color: var(--warning);
+  font-size: 0.8rem;
+  margin-top: 14px;
+  padding: 12px 14px;
+  text-align: center;
 }
 
 .report-annual-chart {
@@ -5069,6 +5141,7 @@ textarea:focus {
 .report-annual-bar span {
   border-radius: 4px 4px 2px 2px;
   flex: 0 0 auto;
+  transition: height 240ms ease, opacity 160ms ease;
   width: 100%;
 }
 
