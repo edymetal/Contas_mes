@@ -1,15 +1,123 @@
 import { useMemo, useState } from "react";
-import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { PAYMENT_TYPES } from "../config/people";
 import { monthFromDate, roundMoney } from "../domain/expenses";
 import {
   formatCurrency,
   formatDate,
   formatMonthLabel,
+  formatMonthName,
   normalizeSearchText,
 } from "../utils/presentation";
 import { ResourceMonthSwitcher } from "./MonthSwitcher";
 import { MarketReceiptImporter } from "./ReceiptImporter";
+
+const RESOURCE_SEARCH_COLUMNS = [
+  { value: "all", marketLabel: "Todas as colunas", otherLabel: "Todas as colunas" },
+  { value: "location", marketLabel: "Mercado", otherLabel: "Local" },
+  { value: "date", marketLabel: "Data", otherLabel: "Data" },
+  { value: "product", marketLabel: "Produto", otherLabel: "Produto" },
+  { value: "detail", marketLabel: "Descrição", otherLabel: "Pagamento" },
+  { value: "quantity", marketLabel: "Quantidade", otherLabel: "Quantidade" },
+  { value: "unitValue", marketLabel: "Valor", otherLabel: "Valor" },
+  { value: "totalValue", marketLabel: "Total", otherLabel: "Total" },
+];
+
+const RESOURCE_SORTABLE_COLUMNS = RESOURCE_SEARCH_COLUMNS.filter((column) => column.value !== "all");
+
+function getResourceColumnLabel(column, isMarket) {
+  return isMarket ? column.marketLabel : column.otherLabel;
+}
+
+function getResourceValuesByColumn(item, isMarket) {
+  const itemDate = isMarket ? item.purchasedAt : item.paidAt;
+
+  return {
+    location: [isMarket ? item.market : item.place],
+    date: [itemDate, formatDate(itemDate)],
+    product: [item.product],
+    detail: [isMarket ? item.description : item.paymentMethod],
+    quantity: [item.quantity],
+    unitValue: [item.unitValue, formatCurrency(item.unitValue)],
+    totalValue: [item.totalValue, formatCurrency(item.totalValue)],
+  };
+}
+
+export function resourceItemMatchesSearch(item, searchTerm, searchColumn = "all", isMarket = true) {
+  const normalizedSearchTerm = normalizeSearchText(searchTerm).trim();
+  if (!normalizedSearchTerm) return true;
+
+  const valuesByColumn = getResourceValuesByColumn(item, isMarket);
+  const searchableValues = searchColumn === "all"
+    ? Object.values(valuesByColumn).flat()
+    : valuesByColumn[searchColumn] || [];
+
+  return normalizeSearchText(searchableValues.filter((value) => (
+    value !== undefined && value !== null
+  )).join(" ")).includes(normalizedSearchTerm);
+}
+
+export function getResourceItemsForSearchScope(items, selectedMonth, searchScope, isMarket = true) {
+  if (searchScope === "all") return items;
+
+  const selectedYear = selectedMonth.slice(0, 4);
+  return items.filter((item) => {
+    const itemDate = isMarket ? item.purchasedAt : item.paidAt;
+    const itemMonth = item.monthKey || monthFromDate(itemDate);
+
+    return searchScope === "year"
+      ? itemMonth.startsWith(`${selectedYear}-`)
+      : itemMonth === selectedMonth;
+  });
+}
+
+function getResourceSortValue(item, sortKey, isMarket) {
+  const itemDate = isMarket ? item.purchasedAt : item.paidAt;
+  const numericColumns = new Set(["quantity", "unitValue", "totalValue"]);
+  const values = {
+    location: isMarket ? item.market : item.place,
+    date: itemDate,
+    product: item.product,
+    detail: isMarket ? item.description : item.paymentMethod,
+    quantity: item.quantity,
+    unitValue: item.unitValue,
+    totalValue: item.totalValue,
+  };
+
+  return numericColumns.has(sortKey) ? Number(values[sortKey] || 0) : values[sortKey] || "";
+}
+
+export function sortResourceItems(items, sortKey, sortDirection = "asc", isMarket = true) {
+  if (!sortKey) return items;
+
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((first, second) => {
+      const firstValue = getResourceSortValue(first.item, sortKey, isMarket);
+      const secondValue = getResourceSortValue(second.item, sortKey, isMarket);
+      const comparison = typeof firstValue === "number" && typeof secondValue === "number"
+        ? firstValue - secondValue
+        : normalizeSearchText(firstValue).localeCompare(
+          normalizeSearchText(secondValue),
+          "pt-BR",
+          { numeric: true },
+        );
+
+      if (comparison === 0) return first.index - second.index;
+      return sortDirection === "desc" ? -comparison : comparison;
+    })
+    .map(({ item }) => item);
+}
 
 export function ResourceListView({
   form,
@@ -28,21 +136,56 @@ export function ResourceListView({
 }) {
   const isMarket = kind === "market";
   const [isDeletingMonth, setIsDeletingMonth] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchColumn, setSearchColumn] = useState("all");
+  const [searchScope, setSearchScope] = useState("month");
+  const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
+  const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
+  const selectedYear = selectedMonth.slice(0, 4);
   const monthlyItems = useMemo(
-    () => items.filter((item) => {
-      const itemDate = isMarket ? item.purchasedAt : item.paidAt;
-      return (item.monthKey || monthFromDate(itemDate)) === selectedMonth;
-    }),
+    () => getResourceItemsForSearchScope(items, selectedMonth, "month", isMarket),
     [isMarket, items, selectedMonth],
   );
-  const monthlyTotal = useMemo(
-    () => monthlyItems.reduce((total, item) => roundMoney(total + Number(item.totalValue || 0)), 0),
-    [monthlyItems],
+  const scopedItems = useMemo(
+    () => getResourceItemsForSearchScope(items, selectedMonth, searchScope, isMarket),
+    [isMarket, items, searchScope, selectedMonth],
+  );
+  const filteredItems = useMemo(
+    () => scopedItems.filter((item) => (
+      resourceItemMatchesSearch(item, searchTerm, searchColumn, isMarket)
+    )),
+    [isMarket, scopedItems, searchColumn, searchTerm],
+  );
+  const sortedItems = useMemo(
+    () => sortResourceItems(filteredItems, sortConfig.key, sortConfig.direction, isMarket),
+    [filteredItems, isMarket, sortConfig],
+  );
+  const filteredTotal = useMemo(
+    () => filteredItems.reduce((total, item) => roundMoney(total + Number(item.totalValue || 0)), 0),
+    [filteredItems],
   );
   const totalPreview = roundMoney(
     Number(String(form.quantity || 0).replace(",", ".")) * Number(String(form.unitValue || 0).replace(",", ".")),
   );
   const dateField = isMarket ? "purchasedAt" : "paidAt";
+  const scopeTitle = {
+    month: formatMonthLabel(selectedMonth),
+    year: `Ano de ${selectedYear}`,
+    all: "Toda a base de dados",
+  }[searchScope];
+  const scopeDescription = {
+    month: `em ${formatMonthLabel(selectedMonth)}`,
+    year: `no ano de ${selectedYear}`,
+    all: "em toda a base de dados",
+  }[searchScope];
+  const totalLabel = {
+    month: "Total do mês",
+    year: "Total do ano",
+    all: "Total de toda a base",
+  }[searchScope];
+  const displayedCount = hasSearchTerm
+    ? `${filteredItems.length} de ${scopedItems.length} resultado(s)`
+    : `${filteredItems.length} ${filteredItems.length === 1 ? "lançamento" : "lançamentos"}`;
 
   async function handleDeleteMonth() {
     setIsDeletingMonth(true);
@@ -51,6 +194,13 @@ export function ResourceListView({
     } finally {
       setIsDeletingMonth(false);
     }
+  }
+
+  function handleSort(sortKey) {
+    setSortConfig((current) => ({
+      key: sortKey,
+      direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc",
+    }));
   }
 
   return (
@@ -124,8 +274,8 @@ export function ResourceListView({
       <section className="panel resource-list-panel">
         <div className="section-heading resource-list-heading">
           <div>
-            <span className="eyebrow">Controle mensal</span>
-            <h2>{formatMonthLabel(selectedMonth)}</h2>
+            <span className="eyebrow">Consulta de lançamentos</span>
+            <h2>{scopeTitle}</h2>
           </div>
           <div className="resource-list-actions">
             <button
@@ -141,31 +291,106 @@ export function ResourceListView({
           </div>
         </div>
 
+        <div
+          className="manage-search-toolbar resource-search-toolbar"
+          role="search"
+          aria-label={isMarket ? "Buscar itens de mercado" : "Buscar outros pagamentos"}
+        >
+          <div className="manage-search-control manage-search-field">
+            <label htmlFor={`resource-search-${kind}`}>
+              {isMarket ? "Buscar itens de mercado" : "Buscar pagamentos"}
+            </label>
+            <div className="manage-search">
+              <Search aria-hidden="true" size={19} />
+              <input
+                id={`resource-search-${kind}`}
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Digite o valor que deseja buscar"
+                autoComplete="off"
+              />
+              {searchTerm && (
+                <button
+                  aria-label="Limpar busca"
+                  className="manage-search-clear"
+                  onClick={() => setSearchTerm("")}
+                  title="Limpar busca"
+                  type="button"
+                >
+                  <X size={17} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <label className="manage-search-control">
+            <span>Coluna</span>
+            <select value={searchColumn} onChange={(event) => setSearchColumn(event.target.value)}>
+              {RESOURCE_SEARCH_COLUMNS.map((column) => (
+                <option key={column.value} value={column.value}>
+                  {getResourceColumnLabel(column, isMarket)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="manage-search-control">
+            <span>Buscar em</span>
+            <select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}>
+              <option value="month">{formatMonthName(selectedMonth)}</option>
+              <option value="year">Ano de {selectedYear}</option>
+              <option value="all">Toda a base de dados</option>
+            </select>
+          </label>
+        </div>
+
         <div className="resource-total-card">
-          <span>Total do mês</span>
-          <strong>{formatCurrency(monthlyTotal)}</strong>
-          <small>{monthlyItems.length} {monthlyItems.length === 1 ? "lançamento" : "lançamentos"}</small>
+          <span>{totalLabel}</span>
+          <strong>{formatCurrency(filteredTotal)}</strong>
+          <small aria-live="polite">{displayedCount}</small>
         </div>
 
         <div className="resource-table-wrap">
           <table className="resource-table">
             <caption className="sr-only">
-              {isMarket ? "Itens de mercado" : "Outros pagamentos"} de {formatMonthLabel(selectedMonth)}
+              {isMarket ? "Itens de mercado" : "Outros pagamentos"} {scopeDescription}
             </caption>
             <thead>
               <tr>
-                <th scope="col">{isMarket ? "Mercado" : "Local"}</th>
-                <th scope="col">Data</th>
-                <th scope="col">Produto</th>
-                <th scope="col">{isMarket ? "Descrição" : "Pagamento"}</th>
-                <th scope="col">Qtd</th>
-                <th scope="col">Valor</th>
-                <th scope="col">Total</th>
+                {RESOURCE_SORTABLE_COLUMNS.map((column) => {
+                  const label = getResourceColumnLabel(column, isMarket);
+                  const isActive = sortConfig.key === column.value;
+                  const nextDirection = isActive && sortConfig.direction === "asc" ? "decrescente" : "crescente";
+
+                  return (
+                    <th
+                      aria-sort={isActive ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+                      key={column.value}
+                      scope="col"
+                    >
+                      <button
+                        aria-label={`Ordenar por ${label} em ordem ${nextDirection}`}
+                        className="table-sort-button"
+                        onClick={() => handleSort(column.value)}
+                        title={`Ordenar por ${label}`}
+                        type="button"
+                      >
+                        <span>{label}</span>
+                        {isActive
+                          ? sortConfig.direction === "asc"
+                            ? <ArrowUp aria-hidden="true" size={15} />
+                            : <ArrowDown aria-hidden="true" size={15} />
+                          : <ChevronsUpDown aria-hidden="true" size={15} />}
+                      </button>
+                    </th>
+                  );
+                })}
                 <th aria-label="Ações" scope="col" />
               </tr>
             </thead>
             <tbody>
-              {monthlyItems.map((item) => (
+              {sortedItems.map((item) => (
                 <tr key={item.id}>
                   <td>{isMarket ? item.market : item.place}</td>
                   <td>{formatDate(isMarket ? item.purchasedAt : item.paidAt)}</td>
@@ -188,7 +413,13 @@ export function ResourceListView({
               ))}
             </tbody>
           </table>
-          {!monthlyItems.length && <div className="empty-state">Nenhum lançamento neste mês.</div>}
+          {!filteredItems.length && (
+            <div className="empty-state">
+              {hasSearchTerm
+                ? `Nenhum lançamento encontrado para “${searchTerm.trim()}” ${scopeDescription}.`
+                : `Nenhum lançamento ${scopeDescription}.`}
+            </div>
+          )}
         </div>
       </section>
     </div>

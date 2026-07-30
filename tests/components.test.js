@@ -15,6 +15,7 @@ let ExpenseHistoryModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
 let PersonExpensesModule;
+let ResourceListModule;
 let SettlementModule;
 let FormsModule;
 
@@ -38,6 +39,7 @@ before(async () => {
     NewExpenseFormModule,
     OtherAccountsModule,
     PersonExpensesModule,
+    ResourceListModule,
     SettlementModule,
     FormsModule,
   ] = await Promise.all([
@@ -49,6 +51,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
     viteServer.ssrLoadModule("/src/components/PersonExpenses.jsx"),
+    viteServer.ssrLoadModule("/src/components/ResourceListView.jsx"),
     viteServer.ssrLoadModule("/src/components/SettlementPanel.jsx"),
     viteServer.ssrLoadModule("/src/config/forms.js"),
   ]);
@@ -428,4 +431,149 @@ test("Outras Contas integra mercado e pagamentos no resumo anual", () => {
   assert.match(html, /Oficina/);
   assert.match(html, /100,00/);
   assert.match(html, /2 lançamentos/);
+});
+
+test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação", () => {
+  const items = [
+    {
+      id: "other-1",
+      place: "Oficina",
+      product: "Revisão",
+      paymentMethod: "Cartão",
+      quantity: 1,
+      unitValue: 80,
+      totalValue: 80,
+      monthKey: "2026-07",
+      paidAt: "2026-07-06",
+    },
+  ];
+  const html = renderToStaticMarkup(
+    createElement(ResourceListModule.ResourceListView, {
+      form: {
+        place: "",
+        product: "",
+        paymentMethod: "Cartão",
+        quantity: "1",
+        unitValue: "",
+        paidAt: "2026-07-30",
+      },
+      formError: "",
+      items,
+      kind: "other-payments",
+      placeSuggestions: [],
+      selectedMonth: "2026-07",
+      onChange() {},
+      onEdit() {},
+      onDelete() {},
+      onDeleteMonth() {},
+      onMonthChange() {},
+      onSubmit() {},
+    }),
+  );
+
+  assert.match(html, /Buscar pagamentos/);
+  assert.match(html, /Todas as colunas/);
+  assert.match(html, /Ano de 2026/);
+  assert.match(html, /Toda a base de dados/);
+  assert.equal((html.match(/class="table-sort-button"/g) || []).length, 7);
+  assert.equal((html.match(/aria-sort="none"/g) || []).length, 7);
+});
+
+test("filtros e ordenação de Outras Contas funcionam para mercado e pagamentos", () => {
+  const marketItems = [
+    {
+      id: "market-1",
+      market: "Mercado Central",
+      product: "Arroz",
+      description: "Alimentos",
+      quantity: 2,
+      unitValue: 3,
+      totalValue: 6,
+      monthKey: "2026-07",
+      purchasedAt: "2026-07-05",
+    },
+    {
+      id: "market-2",
+      market: "Atacado",
+      product: "Leite",
+      description: "Laticínios",
+      quantity: 1,
+      unitValue: 2,
+      totalValue: 2,
+      monthKey: "2026-06",
+      purchasedAt: "2026-06-05",
+    },
+    {
+      id: "market-3",
+      market: "Loja antiga",
+      product: "Café",
+      description: "Alimentos",
+      quantity: 1,
+      unitValue: 5,
+      totalValue: 5,
+      monthKey: "2025-12",
+      purchasedAt: "2025-12-05",
+    },
+  ];
+
+  assert.equal(
+    ResourceListModule.getResourceItemsForSearchScope(marketItems, "2026-07", "month", true).length,
+    1,
+  );
+  assert.equal(
+    ResourceListModule.getResourceItemsForSearchScope(marketItems, "2026-07", "year", true).length,
+    2,
+  );
+  assert.equal(
+    ResourceListModule.getResourceItemsForSearchScope(marketItems, "2026-07", "all", true).length,
+    3,
+  );
+  assert.equal(
+    ResourceListModule.resourceItemMatchesSearch(marketItems[0], "central", "location", true),
+    true,
+  );
+  assert.equal(
+    ResourceListModule.resourceItemMatchesSearch(marketItems[0], "laticínios", "detail", true),
+    false,
+  );
+  assert.deepEqual(
+    ResourceListModule.sortResourceItems(marketItems, "totalValue", "asc", true).map((item) => item.id),
+    ["market-2", "market-3", "market-1"],
+  );
+  assert.deepEqual(
+    ResourceListModule.sortResourceItems(marketItems, "location", "desc", true).map((item) => item.id),
+    ["market-1", "market-3", "market-2"],
+  );
+
+  const otherPayments = [
+    {
+      id: "other-1",
+      place: "Oficina",
+      product: "Revisão",
+      paymentMethod: "Cartão",
+      totalValue: 80,
+      paidAt: "2026-07-06",
+    },
+    {
+      id: "other-2",
+      place: "Amazon",
+      product: "Cabo",
+      paymentMethod: "Dinheiro",
+      totalValue: 12,
+      paidAt: "2026-07-02",
+    },
+  ];
+
+  assert.equal(
+    ResourceListModule.resourceItemMatchesSearch(otherPayments[0], "oficina", "location", false),
+    true,
+  );
+  assert.equal(
+    ResourceListModule.resourceItemMatchesSearch(otherPayments[1], "dinheiro", "detail", false),
+    true,
+  );
+  assert.deepEqual(
+    ResourceListModule.sortResourceItems(otherPayments, "totalValue", "desc", false).map((item) => item.id),
+    ["other-1", "other-2"],
+  );
 });

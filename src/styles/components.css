@@ -3230,6 +3230,12 @@ textarea:focus {
   text-align: right;
 }
 
+.resource-table th:nth-last-child(2) .table-sort-button,
+.resource-table th:nth-last-child(3) .table-sort-button {
+  justify-content: flex-end;
+  width: 100%;
+}
+
 .resource-table td:last-child {
   width: 104px;
 }
