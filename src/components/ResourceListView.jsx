@@ -141,7 +141,7 @@ export function ResourceListView({
   const [searchColumn, setSearchColumn] = useState("all");
   const [searchScope, setSearchScope] = useState("month");
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
-  const [marketAnalysis, setMarketAnalysis] = useState(null);
+  const [resourceAnalysis, setResourceAnalysis] = useState(null);
   const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
   const selectedYear = selectedMonth.slice(0, 4);
   const monthlyItems = useMemo(
@@ -205,26 +205,30 @@ export function ResourceListView({
     }));
   }
 
-  function openMarketAnalysis(type, item) {
+  function openResourceAnalysis(type, item) {
     const fields = {
       market: "market",
+      place: "place",
       product: "product",
       description: "description",
     };
     const fallbackLabels = {
       market: "Mercado não informado",
+      place: "Local não informado",
       product: "Produto não informado",
       description: "Descrição não informada",
     };
     const value = item[fields[type]];
     const fallbackLabel = fallbackLabels[type];
-    const initialYear = (item.monthKey || monthFromDate(item.purchasedAt)).slice(0, 4);
+    const itemDate = isMarket ? item.purchasedAt : item.paidAt;
+    const initialYear = (item.monthKey || monthFromDate(itemDate)).slice(0, 4);
 
-    setMarketAnalysis({
+    setResourceAnalysis({
       type,
       value: value || "",
       label: String(value || fallbackLabel).trim(),
       initialYear,
+      kind: isMarket ? "market" : "other-payments",
     });
   }
 
@@ -423,34 +427,42 @@ export function ResourceListView({
                       <button
                         aria-label={`Ver dashboard do mercado ${item.market || "não informado"}`}
                         className="resource-analysis-trigger"
-                        onClick={() => openMarketAnalysis("market", item)}
+                        onClick={() => openResourceAnalysis("market", item)}
                         title="Ver dashboard do mercado"
                         type="button"
                       >
                         {item.market || "Mercado não informado"}
                       </button>
-                    ) : item.place}
+                    ) : (
+                      <button
+                        aria-label={`Ver dashboard do local ${item.place || "não informado"}`}
+                        className="resource-analysis-trigger"
+                        onClick={() => openResourceAnalysis("place", item)}
+                        title="Ver dashboard do local"
+                        type="button"
+                      >
+                        {item.place || "Local não informado"}
+                      </button>
+                    )}
                   </td>
                   <td>{formatDate(isMarket ? item.purchasedAt : item.paidAt)}</td>
                   <td>
-                    {isMarket ? (
-                      <button
-                        aria-label={`Ver dashboard do produto ${item.product || "não informado"}`}
-                        className="resource-analysis-trigger"
-                        onClick={() => openMarketAnalysis("product", item)}
-                        title="Ver dashboard do produto"
-                        type="button"
-                      >
-                        {item.product || "Produto não informado"}
-                      </button>
-                    ) : item.product}
+                    <button
+                      aria-label={`Ver dashboard do produto ${item.product || "não informado"}`}
+                      className="resource-analysis-trigger"
+                      onClick={() => openResourceAnalysis("product", item)}
+                      title="Ver dashboard do produto"
+                      type="button"
+                    >
+                      {item.product || "Produto não informado"}
+                    </button>
                   </td>
                   <td>
                     {isMarket ? (
                       <button
                         aria-label={`Ver dashboard da descrição ${item.description || "não informada"}`}
                         className="resource-analysis-trigger"
-                        onClick={() => openMarketAnalysis("description", item)}
+                        onClick={() => openResourceAnalysis("description", item)}
                         title="Ver dashboard da descrição"
                         type="button"
                       >
@@ -485,11 +497,12 @@ export function ResourceListView({
         </div>
       </section>
 
-      {marketAnalysis && (
+      {resourceAnalysis && (
         <MarketAnalysisModal
-          analysis={marketAnalysis}
+          analysis={resourceAnalysis}
           items={items}
-          onClose={() => setMarketAnalysis(null)}
+          kind={resourceAnalysis.kind}
+          onClose={() => setResourceAnalysis(null)}
           selectedMonth={selectedMonth}
         />
       )}

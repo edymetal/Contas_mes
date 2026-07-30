@@ -481,6 +481,9 @@ test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação
   assert.equal((html.match(/class="table-sort-button"/g) || []).length, 7);
   assert.equal((html.match(/aria-sort="none"/g) || []).length, 7);
   assert.equal((html.match(/class="resource-quantity-column"/g) || []).length, 2);
+  assert.match(html, /Ver dashboard do local Oficina/);
+  assert.match(html, /Ver dashboard do produto Revisão/);
+  assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 2);
 });
 
 test("filtros e ordenação de Outras Contas funcionam para mercado e pagamentos", () => {
@@ -582,7 +585,7 @@ test("filtros e ordenação de Outras Contas funcionam para mercado e pagamentos
   );
 });
 
-test("dashboard de mercado e produto consolida quantidades, meses, anos e total geral", () => {
+test("dashboards de Mercado e Outros pagamentos consolidam meses, anos e total geral", () => {
   const marketItems = [
     {
       id: "market-1",
@@ -656,6 +659,57 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
   assert.equal(descriptionDashboard.overall.count, 3);
   assert.equal(descriptionDashboard.overall.value, 15);
 
+  const otherPayments = [
+    {
+      id: "other-1",
+      place: "Oficina",
+      product: "Revisão",
+      quantity: 1,
+      totalValue: 80,
+      monthKey: "2026-07",
+      paidAt: "2026-07-06",
+    },
+    {
+      id: "other-2",
+      place: "Oficina",
+      product: "Troca de óleo",
+      quantity: 2,
+      totalValue: 30,
+      monthKey: "2025-10",
+      paidAt: "2025-10-10",
+    },
+    {
+      id: "other-3",
+      place: "Amazon",
+      product: "Revisão",
+      quantity: 3,
+      totalValue: 12,
+      monthKey: "2026-07",
+      paidAt: "2026-07-12",
+    },
+  ];
+  const placeDashboard = MarketAnalysisModule.getMarketAnalysisDashboard(
+    otherPayments,
+    "place",
+    "oficina",
+    "2026",
+    "other-payments",
+  );
+  const otherProductDashboard = MarketAnalysisModule.getMarketAnalysisDashboard(
+    otherPayments,
+    "product",
+    "revisão",
+    "2026",
+    "other-payments",
+  );
+
+  assert.deepEqual(placeDashboard.availableYears, ["2026", "2025"]);
+  assert.equal(placeDashboard.overall.quantity, 3);
+  assert.equal(placeDashboard.overall.value, 110);
+  assert.equal(placeDashboard.selectedYear.value, 80);
+  assert.equal(otherProductDashboard.overall.quantity, 4);
+  assert.equal(otherProductDashboard.overall.value, 92);
+
   const html = renderToStaticMarkup(
     createElement(MarketAnalysisModule.MarketAnalysisModal, {
       analysis: {
@@ -678,9 +732,27 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
   assert.match(html, /Total geral de todos os anos/);
   assert.match(html, /Ano anterior/);
   assert.match(html, /2025/);
+
+  const otherHtml = renderToStaticMarkup(
+    createElement(MarketAnalysisModule.MarketAnalysisModal, {
+      analysis: {
+        type: "place",
+        value: "Oficina",
+        label: "Oficina",
+        initialYear: "2026",
+      },
+      items: otherPayments,
+      kind: "other-payments",
+      onClose() {},
+      selectedMonth: "2026-07",
+    }),
+  );
+
+  assert.match(otherHtml, /Dashboard por local/);
+  assert.match(otherHtml, /Oficina/);
 });
 
-test("nomes do mercado e do produto abrem seus dashboards na tabela", () => {
+test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", () => {
   const html = renderToStaticMarkup(
     createElement(ResourceListModule.ResourceListView, {
       form: {

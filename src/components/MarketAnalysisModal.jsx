@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  MapPin,
   Package,
   ShoppingCart,
   X,
@@ -23,6 +24,7 @@ const quantityFormatter = new Intl.NumberFormat("pt-BR", {
 
 const ANALYSIS_CONFIG = {
   market: { field: "market", label: "Mercado", icon: ShoppingCart },
+  place: { field: "place", label: "Local", icon: MapPin },
   product: { field: "product", label: "Produto", icon: Package },
   description: { field: "description", label: "Descrição", icon: FileText },
 };
@@ -31,8 +33,9 @@ function formatQuantity(value) {
   return quantityFormatter.format(Number(value || 0));
 }
 
-function getMarketItemMonthKey(item) {
-  return item.monthKey || monthFromDate(item.purchasedAt);
+function getAnalysisItemMonthKey(item, kind) {
+  const itemDate = kind === "market" ? item.purchasedAt : item.paidAt;
+  return item.monthKey || monthFromDate(itemDate);
 }
 
 function sumMarketItems(items) {
@@ -42,7 +45,13 @@ function sumMarketItems(items) {
   }), { quantity: 0, value: 0 });
 }
 
-export function getMarketAnalysisDashboard(items, analysisType, analysisValue, visibleYear) {
+export function getMarketAnalysisDashboard(
+  items,
+  analysisType,
+  analysisValue,
+  visibleYear,
+  kind = "market",
+) {
   const field = ANALYSIS_CONFIG[analysisType]?.field || ANALYSIS_CONFIG.market.field;
   const normalizedValue = normalizeSearchText(String(analysisValue || "").trim());
   const matchingItems = items.filter((item) => (
@@ -50,17 +59,17 @@ export function getMarketAnalysisDashboard(items, analysisType, analysisValue, v
   ));
   const availableYears = Array.from(new Set(
     matchingItems
-      .map((item) => getMarketItemMonthKey(item).slice(0, 4))
+      .map((item) => getAnalysisItemMonthKey(item, kind).slice(0, 4))
       .filter(Boolean),
   )).sort((first, second) => second.localeCompare(first));
   const yearItems = matchingItems.filter((item) => (
-    getMarketItemMonthKey(item).startsWith(`${visibleYear}-`)
+    getAnalysisItemMonthKey(item, kind).startsWith(`${visibleYear}-`)
   ));
   const overallTotals = sumMarketItems(matchingItems);
   const yearTotals = sumMarketItems(yearItems);
   const months = MONTHS_PT.map(({ value }) => {
     const monthKey = `${visibleYear}-${value}`;
-    const monthItems = yearItems.filter((item) => getMarketItemMonthKey(item) === monthKey);
+    const monthItems = yearItems.filter((item) => getAnalysisItemMonthKey(item, kind) === monthKey);
     const totals = sumMarketItems(monthItems);
 
     return {
@@ -72,7 +81,7 @@ export function getMarketAnalysisDashboard(items, analysisType, analysisValue, v
   });
   const years = availableYears.map((year) => {
     const yearGroup = matchingItems.filter((item) => (
-      getMarketItemMonthKey(item).startsWith(`${year}-`)
+      getAnalysisItemMonthKey(item, kind).startsWith(`${year}-`)
     ));
     const totals = sumMarketItems(yearGroup);
 
@@ -105,14 +114,15 @@ export function getMarketAnalysisDashboard(items, analysisType, analysisValue, v
 export function MarketAnalysisModal({
   analysis,
   items,
+  kind = "market",
   onClose,
   selectedMonth,
 }) {
   const dialogRef = useDialogAccessibility(onClose);
   const selectedYear = selectedMonth.slice(0, 4);
   const initialDashboard = useMemo(
-    () => getMarketAnalysisDashboard(items, analysis.type, analysis.value, selectedYear),
-    [analysis.type, analysis.value, items, selectedYear],
+    () => getMarketAnalysisDashboard(items, analysis.type, analysis.value, selectedYear, kind),
+    [analysis.type, analysis.value, items, kind, selectedYear],
   );
   const [visibleYear, setVisibleYear] = useState(() => {
     if (initialDashboard.availableYears.includes(selectedYear)) return selectedYear;
@@ -120,8 +130,8 @@ export function MarketAnalysisModal({
     return initialDashboard.availableYears[0] || selectedYear;
   });
   const dashboard = useMemo(
-    () => getMarketAnalysisDashboard(items, analysis.type, analysis.value, visibleYear),
-    [analysis.type, analysis.value, items, visibleYear],
+    () => getMarketAnalysisDashboard(items, analysis.type, analysis.value, visibleYear, kind),
+    [analysis.type, analysis.value, items, kind, visibleYear],
   );
   const olderYear = dashboard.availableYears.find((year) => year < visibleYear);
   const newerYear = [...dashboard.availableYears].reverse().find((year) => year > visibleYear);
