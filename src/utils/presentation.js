@@ -46,6 +46,10 @@ export function getDescriptionSuggestions(items) {
   return getPreviousValueSuggestions(items, "description", "descricao nao informada");
 }
 
+export function getExpenseTitleSuggestions(expenses) {
+  return getPreviousValueSuggestions(expenses, "title", "despesa nao informada");
+}
+
 export function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }

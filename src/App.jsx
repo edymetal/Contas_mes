@@ -89,6 +89,7 @@ import {
   formatEmail,
   formatMonthLabel,
   getDescriptionSuggestions,
+  getExpenseTitleSuggestions,
   getPlaceSuggestions,
   getProductSuggestions,
   getSettlementPaymentMonthKey,
@@ -179,6 +180,10 @@ function App() {
   const otherPaymentProductSuggestions = useMemo(
     () => getProductSuggestions(otherPayments),
     [otherPayments],
+  );
+  const expenseTitleSuggestions = useMemo(
+    () => getExpenseTitleSuggestions(allExpenses),
+    [allExpenses],
   );
 
   useEffect(() => {
@@ -1779,6 +1784,7 @@ function App() {
             onChange={updateForm}
             onSubmit={handleCreateExpense}
             onToggleParticipant={toggleParticipant}
+            titleSuggestions={expenseTitleSuggestions}
           />
         )}
 

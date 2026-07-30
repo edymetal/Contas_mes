@@ -3,6 +3,7 @@ import { Check, UserRound } from "lucide-react";
 import { CATEGORIES, PEOPLE } from "../config/people";
 import { roundMoney } from "../domain/expenses";
 import { formatCurrency } from "../utils/presentation";
+import { PlaceAutocomplete } from "./ResourceListView";
 
 export function NewExpenseForm({
   form,
@@ -10,6 +11,7 @@ export function NewExpenseForm({
   onChange,
   onSubmit,
   onToggleParticipant,
+  titleSuggestions = [],
 }) {
   const splitPreview = useMemo(() => {
     const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
@@ -24,10 +26,12 @@ export function NewExpenseForm({
         <div className="form-grid">
           <label>
             <span>Nome da despesa</span>
-            <input
+            <PlaceAutocomplete
+              id="new-expense-title"
               placeholder="Aluguel, Internet, Seguro Carro"
               value={form.title}
-              onChange={(event) => onChange("title", event.target.value)}
+              suggestions={titleSuggestions}
+              onChange={(value) => onChange("title", value)}
             />
           </label>
 

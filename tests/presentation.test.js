@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   getDescriptionSuggestions,
+  getExpenseTitleSuggestions,
   getPlaceSuggestions,
   getProductSuggestions,
 } from "../src/utils/presentation.js";
@@ -41,4 +42,16 @@ test("lista descrições anteriores sem valores vazios ou duplicados", () => {
   ]);
 
   assert.deepEqual(suggestions, ["Alimento", "Bebida"]);
+});
+
+test("lista nomes de despesas anteriores sem repetir séries mensais", () => {
+  const suggestions = getExpenseTitleSuggestions([
+    { title: "Internet" },
+    { title: " internet " },
+    { title: "Água" },
+    { title: "agua" },
+    { title: "" },
+  ]);
+
+  assert.deepEqual(suggestions, ["Água", "Internet"]);
 });

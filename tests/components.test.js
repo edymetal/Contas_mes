@@ -247,10 +247,13 @@ test("formulário de conta preserva participantes e ação principal", () => {
       onChange() {},
       onSubmit() {},
       onToggleParticipant() {},
+      titleSuggestions: ["Aluguel", "Internet"],
     }),
   );
 
   assert.match(html, /Nome da despesa/);
+  assert.match(html, /aria-controls="new-expense-title-options"/);
+  assert.match(html, /role="combobox"/);
   assert.match(html, /Quem deve participar do rateio/);
   assert.equal((html.match(/type="checkbox"/g) || []).length, 3);
   assert.equal((html.match(/class="participant-option"/g) || []).length, 3);
