@@ -13,6 +13,7 @@ import { ResourceListView } from "./ResourceListView";
 
 export function OtherAccountsView({
   dataLoading,
+  marketDescriptionSuggestions,
   marketForm,
   marketFormError,
   marketItems,
@@ -87,6 +88,7 @@ export function OtherAccountsView({
         <ResourceListView
           form={isMarket ? marketForm : otherPaymentForm}
           formError={isMarket ? marketFormError : otherPaymentFormError}
+          descriptionSuggestions={isMarket ? marketDescriptionSuggestions : []}
           items={isMarket ? marketItems : otherPayments}
           kind={activeTab}
           placeSuggestions={otherPaymentPlaceSuggestions}

@@ -42,6 +42,10 @@ export function getProductSuggestions(items) {
   return getPreviousValueSuggestions(items, "product", "produto nao informado");
 }
 
+export function getDescriptionSuggestions(items) {
+  return getPreviousValueSuggestions(items, "description", "descricao nao informada");
+}
+
 export function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }

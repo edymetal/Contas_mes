@@ -671,6 +671,7 @@ function FixedExpensesView({ emptyText, groups }) {
 }
 
 export function EditResourceItemModal({
+  descriptionSuggestions = [],
   item,
   placeSuggestions = [],
   productSuggestions = [],
@@ -765,7 +766,12 @@ export function EditResourceItemModal({
             {isMarket ? (
               <label>
                 <span>Descrição</span>
-                <input value={form.description} onChange={(event) => updateField("description", event.target.value)} />
+                <PlaceAutocomplete
+                  id="edit-market-description"
+                  value={form.description}
+                  suggestions={descriptionSuggestions}
+                  onChange={(value) => updateField("description", value)}
+                />
               </label>
             ) : (
               <label>

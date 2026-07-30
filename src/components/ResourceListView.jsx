@@ -129,6 +129,7 @@ export function sortResourceItems(items, sortKey, sortDirection = "asc", isMarke
 export function ResourceListView({
   form,
   formError,
+  descriptionSuggestions = [],
   items,
   kind,
   placeSuggestions = [],
@@ -292,7 +293,13 @@ export function ResourceListView({
           {isMarket ? (
             <label>
               Descrição
-              <input value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Ex.: Alimentos" />
+              <PlaceAutocomplete
+                id="new-market-description"
+                value={form.description}
+                suggestions={descriptionSuggestions}
+                onChange={(value) => onChange("description", value)}
+                placeholder="Ex.: Alimentos"
+              />
             </label>
           ) : (
             <label>

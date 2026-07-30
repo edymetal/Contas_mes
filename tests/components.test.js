@@ -781,6 +781,7 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
         },
       ],
       kind: "market",
+      descriptionSuggestions: ["Alimentos", "Bebidas"],
       placeSuggestions: [],
       productSuggestions: ["Arroz", "Leite"],
       selectedMonth: "2026-07",
@@ -799,5 +800,33 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
   assert.match(html, /Ver dashboard do produto Arroz/);
   assert.match(html, /Ver dashboard da descrição Arroz/);
   assert.match(html, /aria-controls="new-market-product-options"/);
+  assert.match(html, /aria-controls="new-market-description-options"/);
+  assert.equal((html.match(/role="combobox"/g) || []).length, 2);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 3);
+});
+
+test("edição de Mercado oferece históricos para produto e descrição", () => {
+  const html = renderToStaticMarkup(
+    createElement(ExpenseManagementModule.EditResourceItemModal, {
+      descriptionSuggestions: ["Alimento", "Bebida"],
+      item: {
+        id: "market-1",
+        kind: "market",
+        market: "ARD",
+        product: "Arroz",
+        description: "Alimento",
+        quantity: 1,
+        unitValue: 3,
+        purchasedAt: "2026-07-05",
+      },
+      placeSuggestions: [],
+      productSuggestions: ["Arroz", "Leite"],
+      onClose() {},
+      onSave() {},
+    }),
+  );
+
+  assert.match(html, /aria-controls="edit-market-product-options"/);
+  assert.match(html, /aria-controls="edit-market-description-options"/);
+  assert.equal((html.match(/role="combobox"/g) || []).length, 2);
 });

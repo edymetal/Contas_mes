@@ -88,6 +88,7 @@ import {
   formatCurrency,
   formatEmail,
   formatMonthLabel,
+  getDescriptionSuggestions,
   getPlaceSuggestions,
   getProductSuggestions,
   getSettlementPaymentMonthKey,
@@ -167,6 +168,13 @@ function App() {
   const viewTitleRef = useRef(null);
   const canManageData = isAdminProfile(profile);
   const otherPaymentPlaceSuggestions = useMemo(() => getPlaceSuggestions(otherPayments), [otherPayments]);
+  const marketDescriptionSuggestions = useMemo(
+    () => getDescriptionSuggestions(marketItems.map((item) => ({
+      ...item,
+      description: normalizeReceiptCategory(item.product, item.description),
+    }))),
+    [marketItems],
+  );
   const marketProductSuggestions = useMemo(() => getProductSuggestions(marketItems), [marketItems]);
   const otherPaymentProductSuggestions = useMemo(
     () => getProductSuggestions(otherPayments),
@@ -1777,6 +1785,7 @@ function App() {
         {canManageData && activeView === "other-accounts" && (
           <OtherAccountsView
             dataLoading={marketItemsLoading || otherPaymentsLoading}
+            marketDescriptionSuggestions={marketDescriptionSuggestions}
             marketForm={marketForm}
             marketFormError={marketFormError}
             marketItems={marketItems}
@@ -1865,6 +1874,9 @@ function App() {
 
       {canManageData && editingResourceItem && (
         <EditResourceItemModal
+          descriptionSuggestions={
+            editingResourceItem.kind === "market" ? marketDescriptionSuggestions : []
+          }
           item={editingResourceItem}
           placeSuggestions={otherPaymentPlaceSuggestions}
           productSuggestions={
