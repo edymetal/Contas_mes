@@ -643,7 +643,7 @@ test("dashboards de Mercado e Outros pagamentos consolidam meses, anos e total g
   const descriptionDashboard = MarketAnalysisModule.getMarketAnalysisDashboard(
     marketItems,
     "description",
-    "alimentos",
+    "arroz",
     "2026",
   );
 
@@ -792,6 +792,6 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
 
   assert.match(html, /Ver dashboard do mercado ARD/);
   assert.match(html, /Ver dashboard do produto Arroz/);
-  assert.match(html, /Ver dashboard da descrição Alimentos/);
+  assert.match(html, /Ver dashboard da descrição Arroz/);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 3);
 });

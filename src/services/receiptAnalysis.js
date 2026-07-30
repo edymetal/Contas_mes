@@ -31,7 +31,7 @@ const receiptSchema = {
         type: "object",
         properties: {
           product: { type: "string", description: "Nome do produto exatamente como impresso em italiano" },
-          description: { type: "string", description: "Categoria genérica em português com 1 palavra ou, no máximo, 2 palavras" },
+          description: { type: "string", description: "Categoria genérica em português, sempre no singular, com 1 palavra ou no máximo 2 palavras" },
           quantity: { type: "number", description: "Quantidade ou peso comprado; use 1 quando não indicado" },
           unit: { type: "string", description: "Unidade, como un, kg ou l" },
           unitValue: { type: "number", description: "Preço por unidade/peso; use o total da linha se não indicado" },
@@ -54,9 +54,10 @@ const prompt = `Analise integralmente esta nota fiscal/scontrino de supermercado
 Extraia todos os produtos e os dados fiscais visíveis. Não invente informações ilegíveis ou ausentes.
 Regras importantes:
 - preserve o nome original italiano de cada produto em product;
-- em description, escreva somente a categoria genérica do produto em português, com 1 palavra ou, no máximo, 2 palavras;
+- em description, escreva somente a categoria genérica do produto em português, sempre no singular, com 1 palavra ou, no máximo, 2 palavras;
+- nunca use plural em description, mesmo quando a nota trouxer várias unidades do produto;
 - não repita marca, sabor, peso, volume, quantidade ou tamanho em description;
-- use categorias simples e consistentes, por exemplo: Leite, Pães, Salsicha, Cerveja, Biscoitos, Chocolates, Salgadinhos, Açúcar, Papel Higiênico, Taxas/Sacolas, Café e Detergente;
+- use categorias simples e consistentes, por exemplo: Leite, Pão, Salsicha, Cerveja, Biscoito, Chocolate, Salgadinho, Açúcar, Papel Higiênico, Taxa/Sacola, Café e Detergente;
 - converta vírgulas decimais italianas para números JSON;
 - diferencie quantidade/peso, preço unitário, desconto e total final da linha;
 - datas devem usar YYYY-MM-DD e horários HH:mm;
@@ -112,27 +113,115 @@ function roundMoney(value) {
 }
 
 const receiptCategoryRules = [
-  [/shopper|sacchett|borsa bio/, "Taxas/Sacolas"],
+  [/shopper|sacchett|borsa bio/, "Taxa/Sacola"],
   [/birra|cerveja/, "Cerveja"],
   [/wurstel|salsicc/, "Salsicha"],
-  [/biscott/, "Biscoitos"],
-  [/cioccol|snicker|\bmars\b/, "Chocolates"],
-  [/patatin|salgadinh/, "Salgadinhos"],
+  [/biscott/, "Biscoito"],
+  [/cioccol|snicker|\bmars\b/, "Chocolate"],
+  [/patatin|salgadinh/, "Salgadinho"],
   [/zuccher|acucar/, "Açúcar"],
   [/igienic/, "Papel Higiênico"],
   [/caffe|cafe/, "Café"],
   [/deters|deterg|lavapiatt/, "Detergente"],
   [/\blatte\b|\bleite\b/, "Leite"],
-  [/salumer|prosciutt|salame|mortadell|\bfrios\b|embutid/, "Frios"],
-  [/pane|panin|baguette|sfornasole|\bpao\b|\bpaes\b/, "Pães"],
-  [/formaggi|formaggio|mozzarell|queijo/, "Queijos"],
+  [/salumer|prosciutt|salame|mortadell|\bfrios\b|embutid/, "Embutido"],
+  [/pane|panin|baguette|sfornasole|\bpao\b|\bpaes\b/, "Pão"],
+  [/formaggi|formaggio|mozzarell|queijo/, "Queijo"],
   [/yogurt|iogurte/, "Iogurte"],
-  [/\buova\b|\bovo|ovos/, "Ovos"],
+  [/\buova\b|\bovo|ovos/, "Ovo"],
   [/\briso\b|arroz/, "Arroz"],
-  [/pasta|spaghetti|penne|macarrao/, "Massas"],
+  [/pasta|spaghetti|penne|macarrao/, "Massa"],
   [/\bpollo\b|frango/, "Frango"],
   [/\bacqua\b|\bagua\b/, "Água"],
 ];
+
+const singularCategoryWordOverrides = new Map([
+  ["caes", "cão"],
+  ["chapeus", "chapéu"],
+  ["maes", "mãe"],
+  ["paes", "pão"],
+  ["papeis", "papel"],
+  ["pasteis", "pastel"],
+]);
+
+const singularCategoryInvariants = new Set([
+  "arroz",
+  "atlas",
+  "cais",
+  "cuscuz",
+  "gas",
+  "lapis",
+  "onibus",
+  "pires",
+  "tenis",
+  "virus",
+]);
+
+function normalizeWordForComparison(word) {
+  return String(word || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function preserveWordCase(source, value) {
+  if (source === source.toLocaleUpperCase("pt-BR")) {
+    return value.toLocaleUpperCase("pt-BR");
+  }
+  if (/^[A-ZÀ-ÖØ-Þ]/u.test(source)) {
+    return `${value.charAt(0).toLocaleUpperCase("pt-BR")}${value.slice(1)}`;
+  }
+  return value;
+}
+
+function singularizeCategoryWord(word) {
+  const match = String(word || "").match(/^([^A-Za-zÀ-ÖØ-öø-ÿ]*)([A-Za-zÀ-ÖØ-öø-ÿ]+)([^A-Za-zÀ-ÖØ-öø-ÿ]*)$/u);
+  if (!match) return word;
+
+  const [, prefix, source, suffix] = match;
+  const normalizedSource = normalizeWordForComparison(source);
+  if (singularCategoryInvariants.has(normalizedSource)) return word;
+
+  const overriddenValue = singularCategoryWordOverrides.get(normalizedSource);
+  let singular = overriddenValue || source;
+  if (!overriddenValue) {
+    singular = singular
+      .replace(/ões$/iu, "ão")
+      .replace(/ães$/iu, "ão")
+      .replace(/ãos$/iu, "ão")
+      .replace(/ais$/iu, "al")
+      .replace(/éis$/iu, "el")
+      .replace(/óis$/iu, "ol")
+      .replace(/uis$/iu, "ul")
+      .replace(/ns$/iu, "m")
+      .replace(/res$/iu, "r")
+      .replace(/zes$/iu, "z");
+
+    if (singular === source) {
+      singular = singular.replace(/([aeiouáéíóúâêôãõ])s$/iu, "$1");
+    }
+  }
+
+  return `${prefix}${preserveWordCase(source, singular)}${suffix}`;
+}
+
+export function singularizeReceiptCategory(description) {
+  const words = String(description || "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+
+  const connectors = new Set(["a", "as", "com", "da", "das", "de", "do", "dos", "e", "em", "para"]);
+  const meaningfulWords = words.filter((word) => !connectors.has(normalizeWordForComparison(word)));
+  const selectedWords = (words.length <= 2 ? words : meaningfulWords.length ? meaningfulWords : words).slice(0, 2);
+  const singularDescription = selectedWords
+    .map((word) => word.split(/([/-])/).map((part) => (
+      part === "/" || part === "-" ? part : singularizeCategoryWord(part)
+    )).join(""))
+    .join(" ");
+
+  return singularDescription
+    ? `${singularDescription.charAt(0).toLocaleUpperCase("pt-BR")}${singularDescription.slice(1)}`
+    : "";
+}
 
 export function normalizeReceiptCategory(product, description) {
   const normalizedSource = `${product || ""} ${description || ""}`
@@ -140,13 +229,10 @@ export function normalizeReceiptCategory(product, description) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   const matchedCategory = receiptCategoryRules.find(([pattern]) => pattern.test(normalizedSource));
-  if (matchedCategory) return matchedCategory[1];
+  if (matchedCategory) return singularizeReceiptCategory(matchedCategory[1]);
 
   const words = String(description || "").trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 2) return words.join(" ");
-  const connectors = new Set(["a", "as", "com", "da", "das", "de", "do", "dos", "e", "em", "para"]);
-  const meaningfulWords = words.filter((word) => !connectors.has(word.toLowerCase()));
-  return (meaningfulWords.length ? meaningfulWords : words).slice(0, 2).join(" ");
+  return singularizeReceiptCategory(words.join(" "));
 }
 
 function normalizeReceipt(receipt, model = PRIMARY_MODEL) {

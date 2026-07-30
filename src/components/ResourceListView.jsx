@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { PAYMENT_TYPES } from "../config/people";
 import { monthFromDate, roundMoney } from "../domain/expenses";
+import { normalizeReceiptCategory } from "../services/receiptAnalysis";
 import {
   formatCurrency,
   formatDate,
@@ -36,6 +37,10 @@ const RESOURCE_SEARCH_COLUMNS = [
 
 const RESOURCE_SORTABLE_COLUMNS = RESOURCE_SEARCH_COLUMNS.filter((column) => column.value !== "all");
 
+function getMarketItemDescription(item) {
+  return normalizeReceiptCategory(item.product, item.description);
+}
+
 function getResourceColumnLabel(column, isMarket) {
   return isMarket ? column.marketLabel : column.otherLabel;
 }
@@ -47,7 +52,7 @@ function getResourceValuesByColumn(item, isMarket) {
     location: [isMarket ? item.market : item.place],
     date: [itemDate, formatDate(itemDate)],
     product: [item.product],
-    detail: [isMarket ? item.description : item.paymentMethod],
+    detail: [isMarket ? getMarketItemDescription(item) : item.paymentMethod],
     quantity: [item.quantity],
     unitValue: [item.unitValue, formatCurrency(item.unitValue)],
     totalValue: [item.totalValue, formatCurrency(item.totalValue)],
@@ -89,7 +94,7 @@ function getResourceSortValue(item, sortKey, isMarket) {
     location: isMarket ? item.market : item.place,
     date: itemDate,
     product: item.product,
-    detail: isMarket ? item.description : item.paymentMethod,
+    detail: isMarket ? getMarketItemDescription(item) : item.paymentMethod,
     quantity: item.quantity,
     unitValue: item.unitValue,
     totalValue: item.totalValue,
@@ -218,7 +223,7 @@ export function ResourceListView({
       product: "Produto não informado",
       description: "Descrição não informada",
     };
-    const value = item[fields[type]];
+    const value = type === "description" ? getMarketItemDescription(item) : item[fields[type]];
     const fallbackLabel = fallbackLabels[type];
     const itemDate = isMarket ? item.purchasedAt : item.paidAt;
     const initialYear = (item.monthKey || monthFromDate(itemDate)).slice(0, 4);
@@ -460,13 +465,13 @@ export function ResourceListView({
                   <td>
                     {isMarket ? (
                       <button
-                        aria-label={`Ver dashboard da descrição ${item.description || "não informada"}`}
+                        aria-label={`Ver dashboard da descrição ${getMarketItemDescription(item) || "não informada"}`}
                         className="resource-analysis-trigger"
                         onClick={() => openResourceAnalysis("description", item)}
                         title="Ver dashboard da descrição"
                         type="button"
                       >
-                        {item.description || "Descrição não informada"}
+                        {getMarketItemDescription(item) || "Descrição não informada"}
                       </button>
                     ) : item.paymentMethod}
                   </td>

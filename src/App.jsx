@@ -29,6 +29,7 @@ import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db, googleProvider, hasFirebaseConfig } from "./services/firebase";
 import { commitFirestoreMutations } from "./services/firestoreMutations";
 import { reportClientError } from "./services/observability";
+import { normalizeReceiptCategory } from "./services/receiptAnalysis";
 import { PEOPLE, getProfileByEmail } from "./config/people";
 import {
   emptyExpenseForm as emptyForm,
@@ -567,7 +568,7 @@ function App() {
       await addDoc(collection(db, "marketItems"), {
         market: marketForm.market.trim(),
         product: marketForm.product.trim(),
-        description: marketForm.description.trim(),
+        description: normalizeReceiptCategory(marketForm.product, marketForm.description),
         quantity,
         unitValue: roundMoney(unitValue),
         totalValue: roundMoney(quantity * unitValue),
@@ -610,7 +611,7 @@ function App() {
       }
       return {
         product,
-        description: String(item.description || "").trim(),
+        description: normalizeReceiptCategory(product, item.description),
         quantity,
         unit: String(item.unit || "un").trim() || "un",
         unitValue: roundMoney(unitValue),
@@ -780,7 +781,7 @@ function App() {
     };
     if (isMarket) {
       fields.market = updatedData.market.trim();
-      fields.description = updatedData.description.trim();
+      fields.description = normalizeReceiptCategory(updatedData.product, updatedData.description);
       fields.purchasedAt = date;
     } else {
       fields.place = updatedData.place.trim();

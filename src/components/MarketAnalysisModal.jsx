@@ -12,6 +12,7 @@ import {
 import { MONTHS_PT } from "../config/forms";
 import { monthFromDate, roundMoney } from "../domain/expenses";
 import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
+import { normalizeReceiptCategory } from "../services/receiptAnalysis";
 import {
   formatCurrency,
   formatMonthName,
@@ -26,7 +27,12 @@ const ANALYSIS_CONFIG = {
   market: { field: "market", label: "Mercado", icon: ShoppingCart },
   place: { field: "place", label: "Local", icon: MapPin },
   product: { field: "product", label: "Produto", icon: Package },
-  description: { field: "description", label: "Descrição", icon: FileText },
+  description: {
+    field: "description",
+    label: "Descrição",
+    icon: FileText,
+    getValue: (item) => normalizeReceiptCategory(item.product, item.description),
+  },
 };
 
 function formatQuantity(value) {
@@ -52,10 +58,12 @@ export function getMarketAnalysisDashboard(
   visibleYear,
   kind = "market",
 ) {
-  const field = ANALYSIS_CONFIG[analysisType]?.field || ANALYSIS_CONFIG.market.field;
+  const analysisConfig = ANALYSIS_CONFIG[analysisType] || ANALYSIS_CONFIG.market;
   const normalizedValue = normalizeSearchText(String(analysisValue || "").trim());
   const matchingItems = items.filter((item) => (
-    normalizeSearchText(String(item[field] || "").trim()) === normalizedValue
+    normalizeSearchText(String(
+      analysisConfig.getValue ? analysisConfig.getValue(item) : item[analysisConfig.field] || "",
+    ).trim()) === normalizedValue
   ));
   const availableYears = Array.from(new Set(
     matchingItems
