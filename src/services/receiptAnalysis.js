@@ -1,3 +1,5 @@
+import { normalizeMarketName } from "../domain/resources.js";
+
 const PRIMARY_MODEL = "gemini-3.5-flash";
 const FALLBACK_MODEL = "gemini-3.1-flash-lite";
 const MODEL_CANDIDATES = [PRIMARY_MODEL, FALLBACK_MODEL];
@@ -256,7 +258,7 @@ function normalizeReceipt(receipt, model = PRIMARY_MODEL) {
     });
 
   return {
-    market: String(receipt.market || "").trim(),
+    market: normalizeMarketName(receipt.market),
     address: String(receipt.address || "").trim(),
     vatNumber: String(receipt.vatNumber || "").trim(),
     receiptNumber: String(receipt.receiptNumber || "").trim(),

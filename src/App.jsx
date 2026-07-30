@@ -82,6 +82,7 @@ import {
   monthFromDate,
   roundMoney,
 } from "./domain/expenses";
+import { normalizeMarketName } from "./domain/resources";
 import {
   currentMonthValue,
   formatCurrency,
@@ -566,7 +567,7 @@ function App() {
 
     try {
       await addDoc(collection(db, "marketItems"), {
-        market: marketForm.market.trim(),
+        market: normalizeMarketName(marketForm.market),
         product: marketForm.product.trim(),
         description: normalizeReceiptCategory(marketForm.product, marketForm.description),
         quantity,
@@ -590,7 +591,7 @@ function App() {
     setActionMessage("");
     if (!ensureCanManageData()) throw new Error("Sua conta não pode adicionar lançamentos.");
 
-    const market = String(receipt.market || "").trim();
+    const market = normalizeMarketName(receipt.market);
     const purchasedAt = String(receipt.purchasedAt || "");
     const items = Array.isArray(receipt.items) ? receipt.items : [];
     if (!market || !purchasedAt || !items.length) {
@@ -780,7 +781,7 @@ function App() {
       updatedAt: serverTimestamp(),
     };
     if (isMarket) {
-      fields.market = updatedData.market.trim();
+      fields.market = normalizeMarketName(updatedData.market);
       fields.description = normalizeReceiptCategory(updatedData.product, updatedData.description);
       fields.purchasedAt = date;
     } else {

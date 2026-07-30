@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { MONTHS_PT } from "../config/forms";
 import { monthFromDate, roundMoney } from "../domain/expenses";
+import { normalizeMarketName } from "../domain/resources";
 import { formatCurrency, formatMonthName } from "../utils/presentation";
 import { ResourceListView } from "./ResourceListView";
 
@@ -124,7 +125,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth }) {
       const monthKey = item.monthKey || monthFromDate(item.purchasedAt);
       const month = monthlyTotals.get(monthKey);
       if (month) month.market = roundMoney(month.market + Number(item.totalValue || 0));
-      const label = String(item.market || "Mercado não informado").trim();
+      const label = normalizeMarketName(item.market) || "Mercado não informado";
       const key = `market:${label.toLowerCase()}`;
       const current = locations.get(key) || { label, kind: "Mercado", total: 0, count: 0 };
       current.total = roundMoney(current.total + Number(item.totalValue || 0));
@@ -151,7 +152,7 @@ function OtherAccountsDashboard({ marketItems, otherPayments, selectedMonth }) {
         total: marketTotal,
         count: marketYearItems.length,
         percent: total ? (marketTotal / total) * 100 : 0,
-        locations: new Set(marketYearItems.map((item) => item.market).filter(Boolean)).size,
+        locations: new Set(marketYearItems.map((item) => normalizeMarketName(item.market)).filter(Boolean)).size,
       },
       other: {
         total: otherTotal,

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { PAYMENT_TYPES } from "../config/people";
 import { monthFromDate, roundMoney } from "../domain/expenses";
+import { normalizeMarketName } from "../domain/resources";
 import { normalizeReceiptCategory } from "../services/receiptAnalysis";
 import {
   formatCurrency,
@@ -49,7 +50,7 @@ function getResourceValuesByColumn(item, isMarket) {
   const itemDate = isMarket ? item.purchasedAt : item.paidAt;
 
   return {
-    location: [isMarket ? item.market : item.place],
+    location: [isMarket ? normalizeMarketName(item.market) : item.place],
     date: [itemDate, formatDate(itemDate)],
     product: [item.product],
     detail: [isMarket ? getMarketItemDescription(item) : item.paymentMethod],
@@ -91,7 +92,7 @@ function getResourceSortValue(item, sortKey, isMarket) {
   const itemDate = isMarket ? item.purchasedAt : item.paidAt;
   const numericColumns = new Set(["quantity", "unitValue", "totalValue"]);
   const values = {
-    location: isMarket ? item.market : item.place,
+    location: isMarket ? normalizeMarketName(item.market) : item.place,
     date: itemDate,
     product: item.product,
     detail: isMarket ? getMarketItemDescription(item) : item.paymentMethod,
@@ -223,7 +224,11 @@ export function ResourceListView({
       product: "Produto não informado",
       description: "Descrição não informada",
     };
-    const value = type === "description" ? getMarketItemDescription(item) : item[fields[type]];
+    const value = type === "description"
+      ? getMarketItemDescription(item)
+      : type === "market"
+        ? normalizeMarketName(item.market)
+        : item[fields[type]];
     const fallbackLabel = fallbackLabels[type];
     const itemDate = isMarket ? item.purchasedAt : item.paidAt;
     const initialYear = (item.monthKey || monthFromDate(itemDate)).slice(0, 4);
@@ -430,13 +435,13 @@ export function ResourceListView({
                   <td>
                     {isMarket ? (
                       <button
-                        aria-label={`Ver dashboard do mercado ${item.market || "não informado"}`}
+                        aria-label={`Ver dashboard do mercado ${normalizeMarketName(item.market) || "não informado"}`}
                         className="resource-analysis-trigger"
                         onClick={() => openResourceAnalysis("market", item)}
                         title="Ver dashboard do mercado"
                         type="button"
                       >
-                        {item.market || "Mercado não informado"}
+                        {normalizeMarketName(item.market) || "Mercado não informado"}
                       </button>
                     ) : (
                       <button

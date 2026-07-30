@@ -32,6 +32,7 @@ import {
   shiftMonth,
   sumInstallmentExpenses,
 } from "../domain/expenses";
+import { normalizeMarketName } from "../domain/resources";
 import {
   formatCurrency,
   formatDate,
@@ -673,7 +674,7 @@ export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave 
   const isMarket = item.kind === "market";
   const dialogRef = useDialogAccessibility(onClose);
   const [form, setForm] = useState({
-    market: item.market || "",
+    market: isMarket ? normalizeMarketName(item.market) : item.market || "",
     place: item.place || "",
     product: item.product || "",
     description: item.description || "",

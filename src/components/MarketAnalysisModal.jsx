@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { MONTHS_PT } from "../config/forms";
 import { monthFromDate, roundMoney } from "../domain/expenses";
+import { normalizeMarketName } from "../domain/resources";
 import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import { normalizeReceiptCategory } from "../services/receiptAnalysis";
 import {
@@ -24,7 +25,12 @@ const quantityFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 const ANALYSIS_CONFIG = {
-  market: { field: "market", label: "Mercado", icon: ShoppingCart },
+  market: {
+    field: "market",
+    label: "Mercado",
+    icon: ShoppingCart,
+    normalizeValue: normalizeMarketName,
+  },
   place: { field: "place", label: "Local", icon: MapPin },
   product: { field: "product", label: "Produto", icon: Package },
   description: {
@@ -59,10 +65,17 @@ export function getMarketAnalysisDashboard(
   kind = "market",
 ) {
   const analysisConfig = ANALYSIS_CONFIG[analysisType] || ANALYSIS_CONFIG.market;
-  const normalizedValue = normalizeSearchText(String(analysisValue || "").trim());
+  const comparisonValue = analysisConfig.normalizeValue
+    ? analysisConfig.normalizeValue(analysisValue)
+    : analysisValue;
+  const normalizedValue = normalizeSearchText(String(comparisonValue || "").trim());
   const matchingItems = items.filter((item) => (
     normalizeSearchText(String(
-      analysisConfig.getValue ? analysisConfig.getValue(item) : item[analysisConfig.field] || "",
+      analysisConfig.getValue
+        ? analysisConfig.getValue(item)
+        : analysisConfig.normalizeValue
+          ? analysisConfig.normalizeValue(item[analysisConfig.field])
+          : item[analysisConfig.field] || "",
     ).trim()) === normalizedValue
   ));
   const availableYears = Array.from(new Set(
