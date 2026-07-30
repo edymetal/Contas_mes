@@ -150,7 +150,7 @@ test("dashboard renderiza indicadores, categoria e próximo vencimento", () => {
   assert.match(html, /150,00/);
 });
 
-test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", () => {
+test("Acerto oculta os usuários e o resumo quando não há dívida pendente", () => {
   const html = renderToStaticMarkup(
     createElement(SettlementModule.SettlementPanel, {
       firebaseUser: null,
@@ -196,12 +196,13 @@ test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", (
   );
 
   assert.match(html, /Acertos calculados/);
-  assert.match(html, /Quitado/);
-  assert.match(html, /Total da dívida/);
-  assert.match(html, /336,48/);
-  assert.match(html, /277,25/);
-  assert.match(html, /59,23/);
-  assert.match(html, /Acerto concluído/);
+  assert.match(html, /0 acerto\(s\) pendente\(s\) em Julho 2026/);
+  assert.match(html, /Nenhuma dívida pendente neste mês/);
+  assert.doesNotMatch(html, /settlement-selector/);
+  assert.doesNotMatch(html, /Quem paga/);
+  assert.doesNotMatch(html, /Quem recebe/);
+  assert.doesNotMatch(html, /Total da dívida/);
+  assert.doesNotMatch(html, /Resumo do saldo/);
   assert.match(html, /1 pagamento\(s\) referente\(s\) a Julho 2026/);
   assert.match(html, /02\/08\/2026/);
   assert.doesNotMatch(html, /10,00/);

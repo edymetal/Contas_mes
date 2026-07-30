@@ -99,9 +99,13 @@ export function SettlementPanel({
   settlementPayments = [],
   userProfiles = {},
 }) {
+  const pendingRows = useMemo(
+    () => rows.filter((row) => Number(row.amount || 0) > 0),
+    [rows],
+  );
   const [paymentForms, setPaymentForms] = useState({});
   const [activeSettlementKey, setActiveSettlementKey] = useState(
-    () => rows[0] ? getRowKey(rows[0]) : null,
+    () => pendingRows[0] ? getRowKey(pendingRows[0]) : null,
   );
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [editingPaymentForm, setEditingPaymentForm] = useState({
@@ -148,16 +152,15 @@ export function SettlementPanel({
   }
 
   useEffect(() => {
-    if (!rows.length) {
+    if (!pendingRows.length) {
       setActiveSettlementKey(null);
       return;
     }
 
-    if (!activeSettlementKey || !rows.some((row) => getRowKey(row) === activeSettlementKey)) {
-      const preferredRow = rows.find((row) => row.amount > 0) || rows[0];
-      setActiveSettlementKey(getRowKey(preferredRow));
+    if (!activeSettlementKey || !pendingRows.some((row) => getRowKey(row) === activeSettlementKey)) {
+      setActiveSettlementKey(getRowKey(pendingRows[0]));
     }
-  }, [activeSettlementKey, rows]);
+  }, [activeSettlementKey, pendingRows]);
 
   useEffect(() => {
     if (editingPaymentId && !filteredSettlementPayments.some((payment) => payment.id === editingPaymentId)) {
@@ -222,14 +225,14 @@ export function SettlementPanel({
     });
   }
 
-  const selectedRow = rows.find((row) => getRowKey(row) === activeSettlementKey);
+  const selectedRow = pendingRows.find((row) => getRowKey(row) === activeSettlementKey);
 
   return (
     <section className="panel">
       <div className="section-heading settlement-history-heading">
         <div>
           <h2>Acertos calculados</h2>
-          <span>{rows.length} acerto(s) em {formatMonthLabel(selectedMonth)}</span>
+          <span>{pendingRows.length} acerto(s) pendente(s) em {formatMonthLabel(selectedMonth)}</span>
         </div>
         <ResourceMonthSwitcher
           selectedMonth={selectedMonth}
@@ -237,12 +240,12 @@ export function SettlementPanel({
         />
       </div>
 
-      {!rows.length ? (
-        <div className="empty-state">Nenhuma dívida ou compensação encontrada neste mês.</div>
+      {!pendingRows.length ? (
+        <div className="empty-state">Nenhuma dívida pendente neste mês.</div>
       ) : (
         <>
           <div className="settlement-selector" aria-label="Escolha o saldo para visualizar">
-            {rows.map((row) => {
+            {pendingRows.map((row) => {
               const key = getRowKey(row);
               const isActive = key === activeSettlementKey;
 
@@ -255,7 +258,7 @@ export function SettlementPanel({
                   aria-expanded={isActive}
                 >
                   <span>{personName(row.fromId)}</span>
-                  <small>{row.amount > 0 ? formatCurrency(row.amount) : "Quitado"}</small>
+                  <small>{formatCurrency(row.amount)}</small>
                 </button>
               );
             })}
@@ -301,8 +304,7 @@ export function SettlementPanel({
                   </div>
                 </div>
 
-                {row.amount > 0 ? (
-                  <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
+                <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
                     <div className="settlement-form-title">
                       <strong>Registrar pagamento</strong>
                       <span>Informe um valor parcial ou quite o restante da dívida.</span>
@@ -361,13 +363,7 @@ export function SettlementPanel({
                         Pagar Tudo
                       </button>
                     </div>
-                  </form>
-                ) : (
-                  <div className="settlement-complete-state" role="status">
-                    <strong>Acerto concluído</strong>
-                    <span>A dívida foi totalmente coberta pelos pagamentos e abatimentos acima.</span>
-                  </div>
-                )}
+                </form>
               </article>
             );
               })}
