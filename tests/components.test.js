@@ -464,6 +464,7 @@ test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação
       items,
       kind: "other-payments",
       placeSuggestions: [],
+      productSuggestions: ["Revisão", "Troca de óleo"],
       selectedMonth: "2026-07",
       onChange() {},
       onEdit() {},
@@ -481,6 +482,8 @@ test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação
   assert.equal((html.match(/class="table-sort-button"/g) || []).length, 7);
   assert.equal((html.match(/aria-sort="none"/g) || []).length, 7);
   assert.equal((html.match(/class="resource-quantity-column"/g) || []).length, 2);
+  assert.equal((html.match(/role="combobox"/g) || []).length, 2);
+  assert.match(html, /aria-controls="new-other-payments-product-options"/);
   assert.match(html, /Ver dashboard do local Oficina/);
   assert.match(html, /Ver dashboard do produto Revisão/);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 2);
@@ -779,6 +782,7 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
       ],
       kind: "market",
       placeSuggestions: [],
+      productSuggestions: ["Arroz", "Leite"],
       selectedMonth: "2026-07",
       onChange() {},
       onEdit() {},
@@ -794,5 +798,6 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
   assert.match(html, />ARD DISCOUNT</);
   assert.match(html, /Ver dashboard do produto Arroz/);
   assert.match(html, /Ver dashboard da descrição Arroz/);
+  assert.match(html, /aria-controls="new-market-product-options"/);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 3);
 });

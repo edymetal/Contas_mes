@@ -16,9 +16,11 @@ export function OtherAccountsView({
   marketForm,
   marketFormError,
   marketItems,
+  marketProductSuggestions,
   otherPaymentForm,
   otherPaymentFormError,
   otherPaymentPlaceSuggestions,
+  otherPaymentProductSuggestions,
   otherPayments,
   selectedMonth,
   onMarketChange,
@@ -88,6 +90,7 @@ export function OtherAccountsView({
           items={isMarket ? marketItems : otherPayments}
           kind={activeTab}
           placeSuggestions={otherPaymentPlaceSuggestions}
+          productSuggestions={isMarket ? marketProductSuggestions : otherPaymentProductSuggestions}
           selectedMonth={selectedMonth}
           onChange={isMarket ? onMarketChange : onOtherPaymentChange}
           onEdit={isMarket ? onEditMarketItem : onEditOtherPayment}

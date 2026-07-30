@@ -17,21 +17,29 @@ export function formatSignedCurrency(value, sign) {
   return `${sign === "negative" ? "-" : "+"}${formatCurrency(amount)}`;
 }
 
-export function getPlaceSuggestions(payments) {
-  const uniquePlaces = new Map();
+function getPreviousValueSuggestions(items, field, ignoredValue) {
+  const uniqueValues = new Map();
 
-  payments.forEach((payment) => {
-    const place = String(payment.place || "").trim();
-    if (!place) return;
+  items.forEach((item) => {
+    const value = String(item[field] || "").trim();
+    if (!value) return;
 
-    const normalizedPlace = place.toLocaleLowerCase("pt-BR");
-    if (normalizedPlace === "local não informado") return;
-    if (!uniquePlaces.has(normalizedPlace)) uniquePlaces.set(normalizedPlace, place);
+    const normalizedValue = normalizeSearchText(value);
+    if (normalizedValue === ignoredValue) return;
+    if (!uniqueValues.has(normalizedValue)) uniqueValues.set(normalizedValue, value);
   });
 
-  return Array.from(uniquePlaces.values()).sort((first, second) => (
+  return Array.from(uniqueValues.values()).sort((first, second) => (
     first.localeCompare(second, "pt-BR", { sensitivity: "base" })
   ));
+}
+
+export function getPlaceSuggestions(payments) {
+  return getPreviousValueSuggestions(payments, "place", "local nao informado");
+}
+
+export function getProductSuggestions(items) {
+  return getPreviousValueSuggestions(items, "product", "produto nao informado");
 }
 
 export function todayInputValue() {

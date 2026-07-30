@@ -89,6 +89,7 @@ import {
   formatEmail,
   formatMonthLabel,
   getPlaceSuggestions,
+  getProductSuggestions,
   getSettlementPaymentMonthKey,
   getViewTitle,
   todayInputValue,
@@ -166,6 +167,11 @@ function App() {
   const viewTitleRef = useRef(null);
   const canManageData = isAdminProfile(profile);
   const otherPaymentPlaceSuggestions = useMemo(() => getPlaceSuggestions(otherPayments), [otherPayments]);
+  const marketProductSuggestions = useMemo(() => getProductSuggestions(marketItems), [marketItems]);
+  const otherPaymentProductSuggestions = useMemo(
+    () => getProductSuggestions(otherPayments),
+    [otherPayments],
+  );
 
   useEffect(() => {
     if (!isDrawerOpen) return undefined;
@@ -1774,9 +1780,11 @@ function App() {
             marketForm={marketForm}
             marketFormError={marketFormError}
             marketItems={marketItems}
+            marketProductSuggestions={marketProductSuggestions}
             otherPaymentForm={otherPaymentForm}
             otherPaymentFormError={otherPaymentFormError}
             otherPaymentPlaceSuggestions={otherPaymentPlaceSuggestions}
+            otherPaymentProductSuggestions={otherPaymentProductSuggestions}
             otherPayments={otherPayments}
             selectedMonth={selectedMonth}
             onMarketChange={(field, value) => setMarketForm((current) => ({ ...current, [field]: value }))}
@@ -1859,6 +1867,11 @@ function App() {
         <EditResourceItemModal
           item={editingResourceItem}
           placeSuggestions={otherPaymentPlaceSuggestions}
+          productSuggestions={
+            editingResourceItem.kind === "market"
+              ? marketProductSuggestions
+              : otherPaymentProductSuggestions
+          }
           onClose={() => setEditingResourceItem(null)}
           onSave={handleUpdateResourceItem}
         />

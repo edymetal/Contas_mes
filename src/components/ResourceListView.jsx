@@ -131,7 +131,8 @@ export function ResourceListView({
   formError,
   items,
   kind,
-  placeSuggestions,
+  placeSuggestions = [],
+  productSuggestions = [],
   selectedMonth,
   onChange,
   onEdit,
@@ -280,7 +281,13 @@ export function ResourceListView({
           </label>
           <label>
             Produto
-            <input value={form.product} onChange={(event) => onChange("product", event.target.value)} placeholder="Nome do produto" />
+            <PlaceAutocomplete
+              id={`new-${kind}-product`}
+              value={form.product}
+              suggestions={productSuggestions}
+              onChange={(value) => onChange("product", value)}
+              placeholder="Nome do produto"
+            />
           </label>
           {isMarket ? (
             <label>

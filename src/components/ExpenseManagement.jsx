@@ -670,7 +670,13 @@ function FixedExpensesView({ emptyText, groups }) {
   );
 }
 
-export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave }) {
+export function EditResourceItemModal({
+  item,
+  placeSuggestions = [],
+  productSuggestions = [],
+  onClose,
+  onSave,
+}) {
   const isMarket = item.kind === "market";
   const dialogRef = useDialogAccessibility(onClose);
   const [form, setForm] = useState({
@@ -748,7 +754,13 @@ export function EditResourceItemModal({ item, placeSuggestions, onClose, onSave 
             </label>
             <label>
               <span>Produto</span>
-              <input value={form.product} onChange={(event) => updateField("product", event.target.value)} required />
+              <PlaceAutocomplete
+                id={`edit-${item.kind}-product`}
+                value={form.product}
+                suggestions={productSuggestions}
+                onChange={(value) => updateField("product", value)}
+                required
+              />
             </label>
             {isMarket ? (
               <label>
