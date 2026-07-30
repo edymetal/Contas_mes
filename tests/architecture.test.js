@@ -52,6 +52,27 @@ test("carrega estilos base, de componentes e responsivos nessa ordem", () => {
   assert.ok(responsiveIndex > componentsIndex, "estilos responsivos devem ser carregados por último");
 });
 
+test("liga a navegação e a renderização de Relatórios à permissão administrativa", () => {
+  const appSource = readProjectFile("src/App.jsx");
+
+  assert.match(
+    appSource,
+    /const visibleNavItems = navItems\.filter\(\(item\) => canAccessView\(profile, item\.id\)\)/,
+  );
+  assert.match(
+    appSource,
+    /\{canManageData && activeView === "reports" && \(/,
+  );
+  assert.ok(
+    (
+      appSource.match(
+        /!canManageData\s*\|\|\s*!profile\s*\|\|\s*!db\s*\|\|\s*!\["other-accounts", "reports"\]\.includes\(activeView\)/g,
+      ) || []
+    ).length >= 2,
+    "as fontes complementares devem permanecer protegidas nos dois carregamentos",
+  );
+});
+
 test("mantém os recursos estruturais de acessibilidade e recuperação de falhas", () => {
   const appSource = readProjectFile("src/App.jsx");
   const mainSource = readProjectFile("src/main.jsx");

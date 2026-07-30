@@ -52,6 +52,7 @@ import { PersonExpenses } from "./components/PersonExpenses";
 import { ReportsPanel } from "./components/ReportsPanel";
 import { PaymentModal, SettlementPanel } from "./components/SettlementPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { canAccessView, isAdminProfile } from "./domain/access";
 import {
   calculateSettlementSummaries,
   collectPendingSettlementShares,
@@ -116,10 +117,6 @@ const navItems = [
   { id: "manage", label: "Gerenciar contas", icon: SlidersHorizontal },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
-
-function isAdminProfile(profile) {
-  return profile?.role === "admin";
-}
 
 function getObservedActionError(error, action) {
   reportClientError(error, `firebase:${action}`);
@@ -317,7 +314,14 @@ function App() {
   }, [profile]);
 
   useEffect(() => {
-    if (!profile || !db || !["other-accounts", "reports"].includes(activeView)) return undefined;
+    if (
+      !canManageData
+      || !profile
+      || !db
+      || !["other-accounts", "reports"].includes(activeView)
+    ) {
+      return undefined;
+    }
 
     setMarketItemsLoading(true);
     return onSnapshot(
@@ -335,10 +339,17 @@ function App() {
         setActionMessage(getObservedActionError(error, "carregar os itens de mercado"));
       },
     );
-  }, [activeView, profile]);
+  }, [activeView, canManageData, profile]);
 
   useEffect(() => {
-    if (!profile || !db || !["other-accounts", "reports"].includes(activeView)) return undefined;
+    if (
+      !canManageData
+      || !profile
+      || !db
+      || !["other-accounts", "reports"].includes(activeView)
+    ) {
+      return undefined;
+    }
 
     setOtherPaymentsLoading(true);
     return onSnapshot(
@@ -356,7 +367,7 @@ function App() {
         setActionMessage(getObservedActionError(error, "carregar os outros pagamentos"));
       },
     );
-  }, [activeView, profile]);
+  }, [activeView, canManageData, profile]);
 
   useEffect(() => {
     if (!profile || !db) return undefined;
@@ -556,10 +567,9 @@ function App() {
   );
 
   useEffect(() => {
-    if (!profile || canManageData) return;
-    const canViewActivePage = activeView === "dashboard" || PEOPLE.some((person) => person.id === activeView);
-    if (!canViewActivePage) setActiveView(profile.id);
-  }, [activeView, canManageData, profile]);
+    if (!profile || canAccessView(profile, activeView)) return;
+    setActiveView(profile.id);
+  }, [activeView, profile]);
 
   async function handleLogin() {
     setAuthError("");
@@ -1689,16 +1699,15 @@ function App() {
     return <LoginScreen error={authError} onLogin={handleLogin} missingConfig={!hasFirebaseConfig} />;
   }
 
-  const visibleNavItems = canManageData
-    ? navItems
-    : navItems.filter((item) => (
-        item.id === "dashboard"
-        || item.id === "reports"
-        || PEOPLE.some((person) => person.id === item.id)
-      ));
+  const visibleNavItems = navItems.filter((item) => canAccessView(profile, item.id));
   const visiblePeople = PEOPLE;
 
   function navigateToView(viewId) {
+    if (!canAccessView(profile, viewId)) {
+      setActionMessage("Esta área está disponível apenas para o administrador.");
+      setIsDrawerOpen(false);
+      return;
+    }
     setActiveView(viewId);
     setIsDrawerOpen(false);
     window.requestAnimationFrame(() => viewTitleRef.current?.focus());
@@ -1844,7 +1853,7 @@ function App() {
           />
         )}
 
-        {activeView === "reports" && (
+        {canManageData && activeView === "reports" && (
           <ReportsPanel
             dataLoading={dataLoading || marketItemsLoading || otherPaymentsLoading}
             expenses={normalizedExpenses}
