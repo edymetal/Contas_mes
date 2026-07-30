@@ -366,6 +366,7 @@ export function ResourceListView({
                   return (
                     <th
                       aria-sort={isActive ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+                      className={column.value === "quantity" ? "resource-quantity-column" : undefined}
                       key={column.value}
                       scope="col"
                     >
@@ -396,7 +397,7 @@ export function ResourceListView({
                   <td>{formatDate(isMarket ? item.purchasedAt : item.paidAt)}</td>
                   <td>{item.product}</td>
                   <td>{isMarket ? item.description || "-" : item.paymentMethod}</td>
-                  <td>{item.quantity}</td>
+                  <td className="resource-quantity-column">{item.quantity}</td>
                   <td>{formatCurrency(item.unitValue)}</td>
                   <td><strong>{formatCurrency(item.totalValue)}</strong></td>
                   <td>

@@ -3236,6 +3236,15 @@ textarea:focus {
   width: 100%;
 }
 
+.resource-table .resource-quantity-column {
+  text-align: center;
+}
+
+.resource-table th.resource-quantity-column .table-sort-button {
+  justify-content: center;
+  width: 100%;
+}
+
 .resource-table td:last-child {
   width: 104px;
 }

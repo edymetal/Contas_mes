@@ -477,6 +477,7 @@ test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação
   assert.match(html, /Toda a base de dados/);
   assert.equal((html.match(/class="table-sort-button"/g) || []).length, 7);
   assert.equal((html.match(/aria-sort="none"/g) || []).length, 7);
+  assert.equal((html.match(/class="resource-quantity-column"/g) || []).length, 2);
 });
 
 test("filtros e ordenação de Outras Contas funcionam para mercado e pagamentos", () => {
