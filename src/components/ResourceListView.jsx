@@ -19,6 +19,7 @@ import {
   formatMonthName,
   normalizeSearchText,
 } from "../utils/presentation";
+import { MarketAnalysisModal } from "./MarketAnalysisModal";
 import { ResourceMonthSwitcher } from "./MonthSwitcher";
 import { MarketReceiptImporter } from "./ReceiptImporter";
 
@@ -140,6 +141,7 @@ export function ResourceListView({
   const [searchColumn, setSearchColumn] = useState("all");
   const [searchScope, setSearchScope] = useState("month");
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
+  const [marketAnalysis, setMarketAnalysis] = useState(null);
   const hasSearchTerm = Boolean(normalizeSearchText(searchTerm).trim());
   const selectedYear = selectedMonth.slice(0, 4);
   const monthlyItems = useMemo(
@@ -201,6 +203,19 @@ export function ResourceListView({
       key: sortKey,
       direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc",
     }));
+  }
+
+  function openMarketAnalysis(type, item) {
+    const value = type === "market" ? item.market : item.product;
+    const fallbackLabel = type === "market" ? "Mercado não informado" : "Produto não informado";
+    const initialYear = (item.monthKey || monthFromDate(item.purchasedAt)).slice(0, 4);
+
+    setMarketAnalysis({
+      type,
+      value: value || "",
+      label: String(value || fallbackLabel).trim(),
+      initialYear,
+    });
   }
 
   return (
@@ -393,9 +408,33 @@ export function ResourceListView({
             <tbody>
               {sortedItems.map((item) => (
                 <tr key={item.id}>
-                  <td>{isMarket ? item.market : item.place}</td>
+                  <td>
+                    {isMarket ? (
+                      <button
+                        aria-label={`Ver dashboard do mercado ${item.market || "não informado"}`}
+                        className="resource-analysis-trigger"
+                        onClick={() => openMarketAnalysis("market", item)}
+                        title="Ver dashboard do mercado"
+                        type="button"
+                      >
+                        {item.market || "Mercado não informado"}
+                      </button>
+                    ) : item.place}
+                  </td>
                   <td>{formatDate(isMarket ? item.purchasedAt : item.paidAt)}</td>
-                  <td>{item.product}</td>
+                  <td>
+                    {isMarket ? (
+                      <button
+                        aria-label={`Ver dashboard do produto ${item.product || "não informado"}`}
+                        className="resource-analysis-trigger"
+                        onClick={() => openMarketAnalysis("product", item)}
+                        title="Ver dashboard do produto"
+                        type="button"
+                      >
+                        {item.product || "Produto não informado"}
+                      </button>
+                    ) : item.product}
+                  </td>
                   <td>{isMarket ? item.description || "-" : item.paymentMethod}</td>
                   <td className="resource-quantity-column">{item.quantity}</td>
                   <td>{formatCurrency(item.unitValue)}</td>
@@ -423,6 +462,15 @@ export function ResourceListView({
           )}
         </div>
       </section>
+
+      {marketAnalysis && (
+        <MarketAnalysisModal
+          analysis={marketAnalysis}
+          items={items}
+          onClose={() => setMarketAnalysis(null)}
+          selectedMonth={selectedMonth}
+        />
+      )}
     </div>
   );
 }

@@ -3255,10 +3255,320 @@ textarea:focus {
   gap: 8px;
 }
 
+.resource-analysis-trigger {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 750;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+
+.resource-analysis-trigger:hover {
+  color: var(--primary);
+  text-decoration-style: solid;
+}
+
 .danger-button:hover {
   border-color: var(--danger);
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.modal.market-analysis-modal {
+  width: min(1040px, 100%);
+}
+
+.market-analysis-heading {
+  align-items: flex-start;
+}
+
+.market-analysis-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.market-analysis-title-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.market-analysis-title > div {
+  min-width: 0;
+}
+
+.market-analysis-title h2 {
+  margin: 3px 0 0;
+}
+
+.market-analysis-title > div > span {
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.market-analysis-title p {
+  max-width: 680px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.market-analysis-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.market-analysis-summary article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+}
+
+.market-analysis-summary article.total {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
+  background: color-mix(in srgb, var(--primary) 9%, var(--panel));
+}
+
+.market-analysis-summary article.annual {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--line));
+  background: color-mix(in srgb, var(--success) 8%, var(--panel));
+}
+
+.market-analysis-summary article.quantity {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--line));
+  background: color-mix(in srgb, var(--warning) 7%, var(--panel));
+}
+
+.market-analysis-summary span,
+.market-analysis-summary small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.market-analysis-summary strong {
+  display: block;
+  margin: 8px 0 5px;
+  color: var(--text);
+  font-family: "Outfit", sans-serif;
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  line-height: 1.1;
+}
+
+.market-analysis-summary article.total strong {
+  color: var(--primary);
+}
+
+.market-analysis-summary article.annual strong {
+  color: var(--success);
+}
+
+.market-analysis-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.72fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.market-analysis-months,
+.market-analysis-years {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.market-analysis-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-muted);
+}
+
+.market-analysis-section-heading > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.market-analysis-section-heading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.market-analysis-section-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.market-analysis-month-table-wrap {
+  overflow-x: auto;
+}
+
+.market-analysis-month-table {
+  width: 100%;
+  min-width: 470px;
+  border-collapse: collapse;
+}
+
+.market-analysis-month-table th,
+.market-analysis-month-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.market-analysis-month-table thead th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.market-analysis-month-table tbody th {
+  color: var(--text);
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.market-analysis-month-table th:nth-child(2),
+.market-analysis-month-table td:nth-child(2) {
+  text-align: center;
+}
+
+.market-analysis-month-table th:last-child,
+.market-analysis-month-table td:last-child {
+  text-align: right;
+}
+
+.market-analysis-month-table tbody td {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.market-analysis-month-table tbody tr.is-empty {
+  opacity: 0.48;
+}
+
+.market-analysis-month-table tfoot th,
+.market-analysis-month-table tfoot td {
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--primary) 7%, var(--panel-muted));
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.market-analysis-year-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.market-analysis-year-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+}
+
+.market-analysis-year-button:hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--line));
+  background: var(--primary-soft);
+}
+
+.market-analysis-year-button.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.market-analysis-year-button > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.market-analysis-year-button > span:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.market-analysis-year-button strong {
+  font-size: 0.9rem;
+}
+
+.market-analysis-year-button > span:last-child strong {
+  color: var(--primary);
+}
+
+.market-analysis-year-button small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.market-analysis-grand-total {
+  display: grid;
+  gap: 5px;
+  margin: 0 12px 12px;
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--success) 8%, var(--panel));
+}
+
+.market-analysis-grand-total span,
+.market-analysis-grand-total small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.market-analysis-grand-total strong {
+  color: var(--success);
+  font-family: "Outfit", sans-serif;
+  font-size: 1.25rem;
 }
 
 /* Expense & Settlement Lists */

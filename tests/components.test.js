@@ -12,6 +12,7 @@ let AppFeedback;
 let DashboardModule;
 let ExpenseManagementModule;
 let ExpenseHistoryModule;
+let MarketAnalysisModule;
 let NewExpenseFormModule;
 let OtherAccountsModule;
 let PersonExpensesModule;
@@ -36,6 +37,7 @@ before(async () => {
     DashboardModule,
     ExpenseManagementModule,
     ExpenseHistoryModule,
+    MarketAnalysisModule,
     NewExpenseFormModule,
     OtherAccountsModule,
     PersonExpensesModule,
@@ -48,6 +50,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/Dashboard.jsx"),
     viteServer.ssrLoadModule("/src/components/ExpenseManagement.jsx"),
     viteServer.ssrLoadModule("/src/components/ExpenseHistoryModal.jsx"),
+    viteServer.ssrLoadModule("/src/components/MarketAnalysisModal.jsx"),
     viteServer.ssrLoadModule("/src/components/NewExpenseForm.jsx"),
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
     viteServer.ssrLoadModule("/src/components/PersonExpenses.jsx"),
@@ -577,4 +580,133 @@ test("filtros e ordenação de Outras Contas funcionam para mercado e pagamentos
     ResourceListModule.sortResourceItems(otherPayments, "totalValue", "desc", false).map((item) => item.id),
     ["other-1", "other-2"],
   );
+});
+
+test("dashboard de mercado e produto consolida quantidades, meses, anos e total geral", () => {
+  const marketItems = [
+    {
+      id: "market-1",
+      market: "ARD",
+      product: "Arroz",
+      quantity: 2,
+      totalValue: 6,
+      monthKey: "2026-07",
+      purchasedAt: "2026-07-05",
+    },
+    {
+      id: "market-2",
+      market: "ARD",
+      product: "Arroz",
+      quantity: 1.5,
+      totalValue: 4,
+      monthKey: "2026-01",
+      purchasedAt: "2026-01-08",
+    },
+    {
+      id: "market-3",
+      market: "ARD",
+      product: "Feijão",
+      quantity: 3,
+      totalValue: 9,
+      monthKey: "2025-12",
+      purchasedAt: "2025-12-02",
+    },
+    {
+      id: "market-4",
+      market: "Mercado Central",
+      product: "Arroz",
+      quantity: 1,
+      totalValue: 5,
+      monthKey: "2026-07",
+      purchasedAt: "2026-07-15",
+    },
+  ];
+  const marketDashboard = MarketAnalysisModule.getMarketAnalysisDashboard(
+    marketItems,
+    "market",
+    "ard",
+    "2026",
+  );
+  const productDashboard = MarketAnalysisModule.getMarketAnalysisDashboard(
+    marketItems,
+    "product",
+    "arroz",
+    "2026",
+  );
+
+  assert.deepEqual(marketDashboard.availableYears, ["2026", "2025"]);
+  assert.equal(marketDashboard.overall.count, 3);
+  assert.equal(marketDashboard.overall.quantity, 6.5);
+  assert.equal(marketDashboard.overall.value, 19);
+  assert.equal(marketDashboard.selectedYear.quantity, 3.5);
+  assert.equal(marketDashboard.selectedYear.value, 10);
+  assert.equal(marketDashboard.months.find((month) => month.monthKey === "2026-07").value, 6);
+  assert.equal(productDashboard.overall.count, 3);
+  assert.equal(productDashboard.overall.value, 15);
+
+  const html = renderToStaticMarkup(
+    createElement(MarketAnalysisModule.MarketAnalysisModal, {
+      analysis: {
+        type: "market",
+        value: "ARD",
+        label: "ARD",
+        initialYear: "2026",
+      },
+      items: marketItems,
+      onClose() {},
+      selectedMonth: "2026-07",
+    }),
+  );
+
+  assert.match(html, /Dashboard por mercado/);
+  assert.match(html, /Quantidade total geral/);
+  assert.match(html, /Valor total geral/);
+  assert.match(html, /Valores por mês em 2026/);
+  assert.match(html, /Todos os anos/);
+  assert.match(html, /Total geral de todos os anos/);
+  assert.match(html, /Ano anterior/);
+  assert.match(html, /2025/);
+});
+
+test("nomes do mercado e do produto abrem seus dashboards na tabela", () => {
+  const html = renderToStaticMarkup(
+    createElement(ResourceListModule.ResourceListView, {
+      form: {
+        market: "",
+        product: "",
+        description: "",
+        quantity: "1",
+        unitValue: "",
+        purchasedAt: "2026-07-30",
+      },
+      formError: "",
+      items: [
+        {
+          id: "market-1",
+          market: "ARD",
+          product: "Arroz",
+          description: "Alimentos",
+          quantity: 2,
+          unitValue: 3,
+          totalValue: 6,
+          monthKey: "2026-07",
+          purchasedAt: "2026-07-05",
+        },
+      ],
+      kind: "market",
+      placeSuggestions: [],
+      selectedMonth: "2026-07",
+      onChange() {},
+      onEdit() {},
+      onDelete() {},
+      onDeleteMonth() {},
+      onMarketReceiptSubmit() {},
+      onMonthChange() {},
+      onSubmit() {},
+    }),
+  );
+
+  assert.match(html, /Ver dashboard do mercado ARD/);
+  assert.match(html, /Ver dashboard do produto Arroz/);
+  assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 2);
 });

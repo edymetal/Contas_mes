@@ -18,6 +18,10 @@
     grid-template-columns: 1fr;
   }
 
+  .market-analysis-content {
+    grid-template-columns: 1fr;
+  }
+
   .receipt-import-panel {
     grid-template-columns: 1fr;
   }
@@ -348,6 +352,20 @@
 
   .expense-history-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-analysis-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-analysis-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .market-analysis-section-heading .expense-history-year-navigation {
+    grid-template-columns: 40px minmax(80px, 1fr) 40px;
+    width: 100%;
   }
 
   .expense-history-list-heading {
@@ -764,6 +782,23 @@
 @media (max-width: 480px) {
   .expense-history-summary {
     grid-template-columns: 1fr;
+  }
+
+  .market-analysis-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .market-analysis-title-icon {
+    display: none;
+  }
+
+  .market-analysis-year-button {
+    grid-template-columns: 1fr;
+  }
+
+  .market-analysis-year-button > span:last-child {
+    justify-items: start;
+    text-align: left;
   }
 
   .person-total-card {
