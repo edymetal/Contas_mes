@@ -4867,6 +4867,14 @@ textarea:focus {
   min-width: 40px;
 }
 
+.report-section-icon svg {
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.28));
+  opacity: 1;
+  stroke: #fff;
+  stroke-width: 2.4;
+}
+
 .report-section-icon.annual {
   background: linear-gradient(135deg, var(--report-blue), var(--report-cyan));
 }
