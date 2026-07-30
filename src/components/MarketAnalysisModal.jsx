@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Package,
   ShoppingCart,
   X,
@@ -20,6 +21,12 @@ const quantityFormatter = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 2,
 });
 
+const ANALYSIS_CONFIG = {
+  market: { field: "market", label: "Mercado", icon: ShoppingCart },
+  product: { field: "product", label: "Produto", icon: Package },
+  description: { field: "description", label: "Descrição", icon: FileText },
+};
+
 function formatQuantity(value) {
   return quantityFormatter.format(Number(value || 0));
 }
@@ -36,7 +43,7 @@ function sumMarketItems(items) {
 }
 
 export function getMarketAnalysisDashboard(items, analysisType, analysisValue, visibleYear) {
-  const field = analysisType === "product" ? "product" : "market";
+  const field = ANALYSIS_CONFIG[analysisType]?.field || ANALYSIS_CONFIG.market.field;
   const normalizedValue = normalizeSearchText(String(analysisValue || "").trim());
   const matchingItems = items.filter((item) => (
     normalizeSearchText(String(item[field] || "").trim()) === normalizedValue
@@ -118,8 +125,8 @@ export function MarketAnalysisModal({
   );
   const olderYear = dashboard.availableYears.find((year) => year < visibleYear);
   const newerYear = [...dashboard.availableYears].reverse().find((year) => year > visibleYear);
-  const analysisLabel = analysis.type === "market" ? "Mercado" : "Produto";
-  const AnalysisIcon = analysis.type === "market" ? ShoppingCart : Package;
+  const analysisConfig = ANALYSIS_CONFIG[analysis.type] || ANALYSIS_CONFIG.market;
+  const AnalysisIcon = analysisConfig.icon;
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -137,7 +144,7 @@ export function MarketAnalysisModal({
               <AnalysisIcon size={22} />
             </span>
             <div>
-              <span>Dashboard por {analysisLabel.toLowerCase()}</span>
+              <span>Dashboard por {analysisConfig.label.toLowerCase()}</span>
               <h2 id="market-analysis-title">{analysis.label}</h2>
               <p>Quantidades e valores acumulados por mês, ano e em toda a base de dados.</p>
             </div>

@@ -588,6 +588,7 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
       id: "market-1",
       market: "ARD",
       product: "Arroz",
+      description: "Alimentos",
       quantity: 2,
       totalValue: 6,
       monthKey: "2026-07",
@@ -597,6 +598,7 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
       id: "market-2",
       market: "ARD",
       product: "Arroz",
+      description: "Alimentos",
       quantity: 1.5,
       totalValue: 4,
       monthKey: "2026-01",
@@ -606,6 +608,7 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
       id: "market-3",
       market: "ARD",
       product: "Feijão",
+      description: "Grãos",
       quantity: 3,
       totalValue: 9,
       monthKey: "2025-12",
@@ -615,6 +618,7 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
       id: "market-4",
       market: "Mercado Central",
       product: "Arroz",
+      description: "Alimentos",
       quantity: 1,
       totalValue: 5,
       monthKey: "2026-07",
@@ -633,6 +637,12 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
     "arroz",
     "2026",
   );
+  const descriptionDashboard = MarketAnalysisModule.getMarketAnalysisDashboard(
+    marketItems,
+    "description",
+    "alimentos",
+    "2026",
+  );
 
   assert.deepEqual(marketDashboard.availableYears, ["2026", "2025"]);
   assert.equal(marketDashboard.overall.count, 3);
@@ -643,6 +653,8 @@ test("dashboard de mercado e produto consolida quantidades, meses, anos e total 
   assert.equal(marketDashboard.months.find((month) => month.monthKey === "2026-07").value, 6);
   assert.equal(productDashboard.overall.count, 3);
   assert.equal(productDashboard.overall.value, 15);
+  assert.equal(descriptionDashboard.overall.count, 3);
+  assert.equal(descriptionDashboard.overall.value, 15);
 
   const html = renderToStaticMarkup(
     createElement(MarketAnalysisModule.MarketAnalysisModal, {
@@ -708,5 +720,6 @@ test("nomes do mercado e do produto abrem seus dashboards na tabela", () => {
 
   assert.match(html, /Ver dashboard do mercado ARD/);
   assert.match(html, /Ver dashboard do produto Arroz/);
-  assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 2);
+  assert.match(html, /Ver dashboard da descrição Alimentos/);
+  assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 3);
 });

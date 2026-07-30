@@ -206,8 +206,18 @@ export function ResourceListView({
   }
 
   function openMarketAnalysis(type, item) {
-    const value = type === "market" ? item.market : item.product;
-    const fallbackLabel = type === "market" ? "Mercado não informado" : "Produto não informado";
+    const fields = {
+      market: "market",
+      product: "product",
+      description: "description",
+    };
+    const fallbackLabels = {
+      market: "Mercado não informado",
+      product: "Produto não informado",
+      description: "Descrição não informada",
+    };
+    const value = item[fields[type]];
+    const fallbackLabel = fallbackLabels[type];
     const initialYear = (item.monthKey || monthFromDate(item.purchasedAt)).slice(0, 4);
 
     setMarketAnalysis({
@@ -435,7 +445,19 @@ export function ResourceListView({
                       </button>
                     ) : item.product}
                   </td>
-                  <td>{isMarket ? item.description || "-" : item.paymentMethod}</td>
+                  <td>
+                    {isMarket ? (
+                      <button
+                        aria-label={`Ver dashboard da descrição ${item.description || "não informada"}`}
+                        className="resource-analysis-trigger"
+                        onClick={() => openMarketAnalysis("description", item)}
+                        title="Ver dashboard da descrição"
+                        type="button"
+                      >
+                        {item.description || "Descrição não informada"}
+                      </button>
+                    ) : item.paymentMethod}
+                  </td>
                   <td className="resource-quantity-column">{item.quantity}</td>
                   <td>{formatCurrency(item.unitValue)}</td>
                   <td><strong>{formatCurrency(item.totalValue)}</strong></td>
