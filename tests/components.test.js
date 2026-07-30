@@ -149,6 +149,7 @@ test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", (
     createElement(SettlementModule.SettlementPanel, {
       firebaseUser: null,
       onDeletePayment() {},
+      onMonthChange() {},
       onRegisterPayment() {},
       onUpdatePayment() {},
       rows: [
@@ -161,7 +162,29 @@ test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", (
           amount: 0,
         },
       ],
-      settlementPayments: [],
+      selectedMonth: "2026-07",
+      settlementPayments: [
+        {
+          id: "july-settlement",
+          amount: 59.23,
+          fromId: "sonia",
+          kind: "payment",
+          monthKey: "2026-07",
+          paidAt: "2026-08-02",
+          toId: "edney",
+          type: "PIX",
+        },
+        {
+          id: "august-settlement",
+          amount: 10,
+          fromId: "sonia",
+          kind: "payment",
+          monthKey: "2026-08",
+          paidAt: "2026-07-01",
+          toId: "edney",
+          type: "Dinheiro",
+        },
+      ],
       userProfiles: {},
     }),
   );
@@ -173,6 +196,10 @@ test("Acerto mantém o resumo de dívida quitada sem oferecer novo pagamento", (
   assert.match(html, /277,25/);
   assert.match(html, /59,23/);
   assert.match(html, /Acerto concluído/);
+  assert.match(html, /1 pagamento\(s\) referente\(s\) a Julho 2026/);
+  assert.match(html, /02\/08\/2026/);
+  assert.doesNotMatch(html, /10,00/);
+  assert.equal((html.match(/resource-month-controls/g) || []).length, 1);
   assert.doesNotMatch(html, /Registrar pagamento/);
 });
 

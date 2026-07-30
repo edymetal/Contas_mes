@@ -27,6 +27,20 @@ test("mantém App.jsx focado em estado e orquestração", () => {
   }
 });
 
+test("Acerto usa o mês global para cálculos e histórico", () => {
+  const appSource = readProjectFile("src/App.jsx");
+  const settlementSource = readProjectFile("src/components/SettlementPanel.jsx");
+  const settlementProps = appSource.match(/<SettlementPanel[\s\S]*?\/>/)?.[0] || "";
+
+  assert.match(settlementProps, /selectedMonth=\{selectedMonth\}/);
+  assert.match(settlementProps, /onMonthChange=\{setSelectedMonth\}/);
+  assert.doesNotMatch(settlementSource, /historyMonth/);
+  assert.match(
+    settlementSource,
+    /getSettlementAccountingMonth\(payment\) === selectedMonth/,
+  );
+});
+
 test("carrega estilos base, de componentes e responsivos nessa ordem", () => {
   const mainSource = readProjectFile("src/main.jsx");
   const baseIndex = mainSource.indexOf("./styles/base.css");

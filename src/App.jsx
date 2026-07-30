@@ -1807,7 +1807,9 @@ function App() {
         {canManageData && activeView === "settlement" && (
           <SettlementPanel
             firebaseUser={firebaseUser}
+            onMonthChange={setSelectedMonth}
             rows={settlementSummaries}
+            selectedMonth={selectedMonth}
             settlementPayments={settlementPayments}
             userProfiles={userProfiles}
             onDeletePayment={deleteSettlementPayment}

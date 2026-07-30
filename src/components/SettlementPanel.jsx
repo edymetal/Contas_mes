@@ -3,8 +3,11 @@ import { ArrowRightLeft, Pencil, Trash2 } from "lucide-react";
 import { ResourceMonthSwitcher } from "./MonthSwitcher";
 import { PersonAvatar } from "./PersonExpenses";
 import { PAYMENT_TYPES, getPersonById } from "../config/people";
-import { monthFromDate, roundMoney } from "../domain/expenses";
-import { hasLaterSettlementPayment } from "../domain/settlements";
+import { roundMoney } from "../domain/expenses";
+import {
+  getSettlementAccountingMonth,
+  hasLaterSettlementPayment,
+} from "../domain/settlements";
 import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import {
   formatCurrency,
@@ -90,7 +93,9 @@ export function SettlementPanel({
   onDeletePayment,
   onRegisterPayment,
   onUpdatePayment,
+  onMonthChange,
   rows = [],
+  selectedMonth,
   settlementPayments = [],
   userProfiles = {},
 }) {
@@ -98,7 +103,6 @@ export function SettlementPanel({
   const [activeSettlementKey, setActiveSettlementKey] = useState(
     () => rows[0] ? getRowKey(rows[0]) : null,
   );
-  const [historyMonth, setHistoryMonth] = useState(() => monthFromDate(todayInputValue()));
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [editingPaymentForm, setEditingPaymentForm] = useState({
     amount: "",
@@ -107,8 +111,10 @@ export function SettlementPanel({
     description: "",
   });
   const filteredSettlementPayments = useMemo(
-    () => settlementPayments.filter((payment) => getPaidAtMonthKey(payment) === historyMonth),
-    [historyMonth, settlementPayments],
+    () => settlementPayments.filter(
+      (payment) => getSettlementAccountingMonth(payment) === selectedMonth,
+    ),
+    [selectedMonth, settlementPayments],
   );
   const paymentsByMonth = useMemo(() => {
     const grouped = filteredSettlementPayments.reduce((acc, payment) => {
@@ -220,9 +226,15 @@ export function SettlementPanel({
 
   return (
     <section className="panel">
-      <div className="section-heading">
-        <h2>Acertos calculados</h2>
-        <span>{rows.length} acerto(s)</span>
+      <div className="section-heading settlement-history-heading">
+        <div>
+          <h2>Acertos calculados</h2>
+          <span>{rows.length} acerto(s) em {formatMonthLabel(selectedMonth)}</span>
+        </div>
+        <ResourceMonthSwitcher
+          selectedMonth={selectedMonth}
+          onMonthChange={onMonthChange}
+        />
       </div>
 
       {!rows.length ? (
@@ -368,14 +380,15 @@ export function SettlementPanel({
         <div className="section-heading settlement-history-heading">
           <div>
             <h2>Histórico de pagamentos</h2>
-            <span>{filteredSettlementPayments.length} pagamento(s) em {formatMonthLabel(historyMonth)}</span>
+            <span>
+              {filteredSettlementPayments.length} pagamento(s) referente(s) a {formatMonthLabel(selectedMonth)}
+            </span>
           </div>
-          <ResourceMonthSwitcher selectedMonth={historyMonth} onMonthChange={setHistoryMonth} />
         </div>
 
         {!filteredSettlementPayments.length ? (
           <div className="empty-state settlement-history-empty">
-            Nenhum pagamento registrado em {formatMonthLabel(historyMonth)}.
+            Nenhum pagamento referente a {formatMonthLabel(selectedMonth)}.
           </div>
         ) : (
           <div className="settlement-history-list">
