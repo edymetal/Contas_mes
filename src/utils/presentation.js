@@ -133,6 +133,7 @@ export function getPersonPhotoUrl(person, firebaseUser, userProfiles = {}) {
 
 export function getViewTitle(activeView) {
   if (activeView === "dashboard") return "Dashboard geral";
+  if (activeView === "reports") return "Relatórios";
   if (activeView === "new") return "Nova conta";
   if (activeView === "other-accounts") return "Outras Contas";
   if (activeView === "settlement") return "Acerto de contas";

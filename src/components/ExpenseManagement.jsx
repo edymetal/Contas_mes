@@ -12,12 +12,15 @@ import {
 import { CategoryTag } from "./CategoryTag";
 import { ExpenseHistoryModal } from "./ExpenseHistoryModal";
 import { PlaceAutocomplete } from "./ResourceListView";
+import { SplitAllocationFields } from "./SplitAllocationFields";
 import { CATEGORIES, PAYMENT_TYPES, PEOPLE } from "../config/people";
 import { getFirebaseActionError } from "../domain/errors";
 import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import { reportClientError } from "../services/observability";
 import {
+  createEqualSplitValues,
   formatInstallmentLabel,
+  getExpenseSplitConfiguration,
   getExpenseDisplayMonthKey,
   getExpenseKind,
   getExpensesForMonth,
@@ -809,6 +812,9 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
   const [category, setCategory] = useState(expense.category);
   const [payerId, setPayerId] = useState(expense.payerId);
   const [participants, setParticipants] = useState(expense.participants || []);
+  const initialSplit = useMemo(() => getExpenseSplitConfiguration(expense), [expense]);
+  const [splitMode, setSplitMode] = useState(initialSplit.mode);
+  const [splitValues, setSplitValues] = useState(initialSplit.values);
   const [error, setError] = useState("");
 
   const match = expense.installment ? expense.installment.match(/Parcela (\d+) de (\d+)/) : null;
@@ -817,18 +823,14 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
   const [currentInstallment, setCurrentInstallment] = useState(match ? Number(match[1]) : 1);
   const [totalInstallments, setTotalInstallments] = useState(match ? Number(match[2]) : 1);
 
-  const splitPreview = useMemo(() => {
-    const val = roundMoney(Number(String(totalValue).replace(",", ".")));
-    if (!val || !participants.length) return 0;
-    return roundMoney(val / participants.length);
-  }, [totalValue, participants]);
-
   function toggleParticipant(personId) {
-    setParticipants((current) =>
-      current.includes(personId)
+    setParticipants((current) => {
+      const nextParticipants = current.includes(personId)
         ? current.filter((id) => id !== personId)
-        : [...current, personId]
-    );
+        : [...current, personId];
+      setSplitValues(createEqualSplitValues(totalValue, nextParticipants, splitMode));
+      return nextParticipants;
+    });
   }
 
   async function handleSubmit(e) {
@@ -858,6 +860,8 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
         category,
         payerId,
         participants,
+        splitMode,
+        splitValues,
         installment: isInstallment ? `Parcela ${currentInstallment} de ${totalInstallments}` : null,
       });
     } catch (err) {
@@ -992,10 +996,14 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
             </div>
           </fieldset>
 
-          <div className="split-preview">
-            <span>Novo valor por pessoa</span>
-            <strong>{formatCurrency(splitPreview)}</strong>
-          </div>
+          <SplitAllocationFields
+            participants={participants}
+            splitMode={splitMode}
+            splitValues={splitValues}
+            totalValue={totalValue}
+            onModeChange={setSplitMode}
+            onValuesChange={setSplitValues}
+          />
 
           {error && <div className="error-box" role="alert">{error}</div>}
 

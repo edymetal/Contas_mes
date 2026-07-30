@@ -17,6 +17,7 @@ let NewExpenseFormModule;
 let OtherAccountsModule;
 let PersonExpensesModule;
 let ResourceListModule;
+let ReportsModule;
 let SettlementModule;
 let FormsModule;
 
@@ -42,6 +43,7 @@ before(async () => {
     OtherAccountsModule,
     PersonExpensesModule,
     ResourceListModule,
+    ReportsModule,
     SettlementModule,
     FormsModule,
   ] = await Promise.all([
@@ -55,6 +57,7 @@ before(async () => {
     viteServer.ssrLoadModule("/src/components/OtherAccounts.jsx"),
     viteServer.ssrLoadModule("/src/components/PersonExpenses.jsx"),
     viteServer.ssrLoadModule("/src/components/ResourceListView.jsx"),
+    viteServer.ssrLoadModule("/src/components/ReportsPanel.jsx"),
     viteServer.ssrLoadModule("/src/components/SettlementPanel.jsx"),
     viteServer.ssrLoadModule("/src/config/forms.js"),
   ]);
@@ -260,6 +263,41 @@ test("formulário de conta preserva participantes e ação principal", () => {
   assert.equal((html.match(/class="participant-option"/g) || []).length, 3);
   assert.match(html, /30,00/);
   assert.match(html, /Salvar conta/);
+});
+
+test("relatórios comparam períodos e oferecem as duas exportações", () => {
+  const html = renderToStaticMarkup(
+    createElement(ReportsModule.ReportsPanel, {
+      dataLoading: false,
+      expenses: [
+        {
+          id: "expense-1",
+          category: "Casa",
+          dueDate: "2026-07-10",
+          payerId: "edney",
+          participants: ["edney", "sonia"],
+          shares: {
+            edney: { amount: 50, status: "self" },
+            sonia: { amount: 50, status: "pending" },
+          },
+          title: "Aluguel",
+          totalValue: 100,
+        },
+      ],
+      marketItems: [],
+      otherPayments: [],
+      selectedMonth: "2026-07",
+      onMonthChange() {},
+    }),
+  );
+
+  assert.match(html, /Relatórios e comparações/);
+  assert.match(html, /Exportar CSV/);
+  assert.match(html, /Exportar PDF/);
+  assert.match(html, /Comparação mensal/);
+  assert.match(html, /Evolução anual/);
+  assert.match(html, /Evolução por categorias/);
+  assert.equal((html.match(/<caption class="sr-only">/g) || []).length, 2);
 });
 
 test("gerenciamento oferece busca de contas por dados relevantes", () => {

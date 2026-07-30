@@ -26,6 +26,8 @@ export const emptyExpenseForm = {
   category: "Casa",
   payerId: "edney",
   participants: ["edney", "sonia", "rodney"],
+  splitMode: "equal",
+  splitValues: {},
   type: "normal",
   currentInstallment: 1,
   installmentsCount: 12,

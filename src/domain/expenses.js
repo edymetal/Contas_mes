@@ -31,6 +31,256 @@ export function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+export const SPLIT_MODES = Object.freeze({
+  EQUAL: "equal",
+  PERCENTAGE: "percentage",
+  FIXED: "fixed",
+});
+
+function normalizeParticipantIds(participants) {
+  return [...new Set((participants || []).filter(Boolean))];
+}
+
+function parseSplitNumber(value) {
+  if (typeof value === "string") {
+    return Number(value.replace(",", "."));
+  }
+  return Number(value);
+}
+
+export function normalizeSplitMode(mode) {
+  return Object.values(SPLIT_MODES).includes(mode) ? mode : SPLIT_MODES.EQUAL;
+}
+
+function allocateCents(totalCents, participantIds, weights) {
+  const weightTotal = participantIds.reduce(
+    (total, personId) => total + Math.max(0, Number(weights[personId] || 0)),
+    0,
+  );
+  if (!weightTotal) {
+    return Object.fromEntries(participantIds.map((personId) => [personId, 0]));
+  }
+
+  const allocations = {};
+  const fractions = [];
+  let allocatedCents = 0;
+
+  participantIds.forEach((personId, index) => {
+    const exactCents = totalCents * Math.max(0, Number(weights[personId] || 0)) / weightTotal;
+    const cents = Math.floor(exactCents);
+    allocations[personId] = cents;
+    allocatedCents += cents;
+    fractions.push({ personId, fraction: exactCents - cents, index });
+  });
+
+  fractions
+    .sort((first, second) => second.fraction - first.fraction || first.index - second.index)
+    .slice(0, Math.max(0, totalCents - allocatedCents))
+    .forEach(({ personId }) => {
+      allocations[personId] += 1;
+    });
+
+  return Object.fromEntries(
+    participantIds.map((personId) => [personId, allocations[personId] / 100]),
+  );
+}
+
+export function calculateSplitAmounts(
+  totalValue,
+  participants,
+  splitMode = SPLIT_MODES.EQUAL,
+  splitValues = {},
+) {
+  const participantIds = normalizeParticipantIds(participants);
+  const mode = normalizeSplitMode(splitMode);
+  const total = roundMoney(parseSplitNumber(totalValue));
+  const emptyAmounts = Object.fromEntries(participantIds.map((personId) => [personId, 0]));
+
+  if (!Number.isFinite(total) || total <= 0) {
+    return {
+      mode,
+      amounts: emptyAmounts,
+      inputTotal: 0,
+      allocatedTotal: 0,
+      difference: Number.isFinite(total) ? total : 0,
+      isValid: false,
+      error: "Informe um valor válido para calcular o rateio.",
+    };
+  }
+
+  if (!participantIds.length) {
+    return {
+      mode,
+      amounts: {},
+      inputTotal: 0,
+      allocatedTotal: 0,
+      difference: total,
+      isValid: false,
+      error: "Selecione pelo menos uma pessoa no rateio.",
+    };
+  }
+
+  const totalCents = Math.round(total * 100);
+
+  if (mode === SPLIT_MODES.EQUAL) {
+    const weights = Object.fromEntries(participantIds.map((personId) => [personId, 1]));
+    const amounts = allocateCents(totalCents, participantIds, weights);
+    return {
+      mode,
+      amounts,
+      inputTotal: participantIds.length,
+      allocatedTotal: total,
+      difference: 0,
+      isValid: true,
+      error: "",
+    };
+  }
+
+  const parsedValues = {};
+  const invalidPerson = participantIds.find((personId) => {
+    const value = parseSplitNumber(splitValues?.[personId] ?? "");
+    parsedValues[personId] = value;
+    return !Number.isFinite(value) || value < 0;
+  });
+
+  if (invalidPerson) {
+    return {
+      mode,
+      amounts: emptyAmounts,
+      inputTotal: 0,
+      allocatedTotal: 0,
+      difference: total,
+      isValid: false,
+      error: "Preencha o rateio apenas com valores válidos e não negativos.",
+    };
+  }
+
+  if (mode === SPLIT_MODES.PERCENTAGE) {
+    const percentageTotal = roundMoney(
+      participantIds.reduce((sum, personId) => sum + parsedValues[personId], 0),
+    );
+    const isValid = Math.abs(percentageTotal - 100) < 0.01;
+    const amounts = isValid
+      ? allocateCents(totalCents, participantIds, parsedValues)
+      : Object.fromEntries(
+          participantIds.map((personId) => [
+            personId,
+            roundMoney(total * parsedValues[personId] / 100),
+          ]),
+        );
+    const allocatedTotal = roundMoney(
+      Object.values(amounts).reduce((sum, amount) => sum + amount, 0),
+    );
+
+    return {
+      mode,
+      amounts,
+      inputTotal: percentageTotal,
+      allocatedTotal,
+      difference: roundMoney(total - allocatedTotal),
+      isValid,
+      error: isValid ? "" : `A soma dos percentuais deve ser 100% (atual: ${percentageTotal}%).`,
+    };
+  }
+
+  const amounts = Object.fromEntries(
+    participantIds.map((personId) => [personId, roundMoney(parsedValues[personId])]),
+  );
+  const allocatedTotal = roundMoney(
+    Object.values(amounts).reduce((sum, amount) => sum + amount, 0),
+  );
+  const difference = roundMoney(total - allocatedTotal);
+  const isValid = Math.abs(difference) < 0.01;
+
+  return {
+    mode,
+    amounts,
+    inputTotal: allocatedTotal,
+    allocatedTotal,
+    difference,
+    isValid,
+    error: isValid
+      ? ""
+      : `A soma dos valores deve ser igual ao total da conta (diferença: ${Math.abs(difference).toFixed(2)} €).`,
+  };
+}
+
+export function createEqualSplitValues(
+  totalValue,
+  participants,
+  splitMode = SPLIT_MODES.PERCENTAGE,
+) {
+  const participantIds = normalizeParticipantIds(participants);
+  const mode = normalizeSplitMode(splitMode);
+  if (!participantIds.length || mode === SPLIT_MODES.EQUAL) return {};
+
+  if (mode === SPLIT_MODES.FIXED) {
+    return calculateSplitAmounts(totalValue, participantIds, SPLIT_MODES.EQUAL).amounts;
+  }
+
+  const percentageCents = allocateCents(
+    10_000,
+    participantIds,
+    Object.fromEntries(participantIds.map((personId) => [personId, 1])),
+  );
+  return percentageCents;
+}
+
+export function serializeSplitValues(participants, splitMode, splitValues = {}) {
+  const mode = normalizeSplitMode(splitMode);
+  if (mode === SPLIT_MODES.EQUAL) return {};
+
+  return Object.fromEntries(
+    normalizeParticipantIds(participants).map((personId) => [
+      personId,
+      roundMoney(parseSplitNumber(splitValues?.[personId] ?? 0)),
+    ]),
+  );
+}
+
+export function getExpenseSplitConfiguration(expense) {
+  const participants = normalizeParticipantIds(expense?.participants);
+  const mode = normalizeSplitMode(expense?.splitMode);
+  if (mode === SPLIT_MODES.EQUAL) {
+    return { mode, values: {} };
+  }
+
+  if (expense?.splitValues && typeof expense.splitValues === "object") {
+    return {
+      mode,
+      values: serializeSplitValues(participants, mode, expense.splitValues),
+    };
+  }
+
+  if (mode === SPLIT_MODES.FIXED) {
+    return {
+      mode,
+      values: Object.fromEntries(
+        participants.map((personId) => [
+          personId,
+          roundMoney(Number(expense?.shares?.[personId]?.amount || 0)),
+        ]),
+      ),
+    };
+  }
+
+  const total = Number(expense?.totalValue || 0);
+  if (!total) return { mode: SPLIT_MODES.EQUAL, values: {} };
+  const values = Object.fromEntries(
+    participants.map((personId) => [
+      personId,
+      roundMoney(Number(expense?.shares?.[personId]?.amount || 0) / total * 100),
+    ]),
+  );
+  const percentageTotal = roundMoney(Object.values(values).reduce((sum, value) => sum + value, 0));
+  const lastParticipant = participants.at(-1);
+  if (lastParticipant && percentageTotal !== 100) {
+    values[lastParticipant] = roundMoney(values[lastParticipant] + 100 - percentageTotal);
+  }
+
+  return { mode, values };
+}
+
 export function monthFromDate(date) {
   return date ? date.slice(0, 7) : "";
 }

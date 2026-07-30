@@ -1,9 +1,8 @@
-import { useMemo } from "react";
 import { Check, UserRound } from "lucide-react";
 import { CATEGORIES, PEOPLE } from "../config/people";
-import { roundMoney } from "../domain/expenses";
 import { formatCurrency } from "../utils/presentation";
 import { PlaceAutocomplete } from "./ResourceListView";
+import { SplitAllocationFields } from "./SplitAllocationFields";
 
 export function NewExpenseForm({
   form,
@@ -13,13 +12,6 @@ export function NewExpenseForm({
   onToggleParticipant,
   titleSuggestions = [],
 }) {
-  const splitPreview = useMemo(() => {
-    const totalValue = roundMoney(Number(String(form.totalValue).replace(",", ".")));
-    if (!totalValue || !form.participants.length) return 0;
-
-    return roundMoney(totalValue / form.participants.length);
-  }, [form.totalValue, form.participants.length]);
-
   return (
     <section className="panel form-panel">
       <form onSubmit={onSubmit}>
@@ -232,10 +224,14 @@ export function NewExpenseForm({
           </div>
         </fieldset>
 
-        <div className="split-preview">
-          <span>Valor por pessoa (por mês)</span>
-          <strong>{formatCurrency(splitPreview)}</strong>
-        </div>
+        <SplitAllocationFields
+          participants={form.participants}
+          splitMode={form.splitMode}
+          splitValues={form.splitValues}
+          totalValue={form.totalValue}
+          onModeChange={(value) => onChange("splitMode", value)}
+          onValuesChange={(value) => onChange("splitValues", value)}
+        />
 
         {formError && <div className="error-box" role="alert">{formError}</div>}
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   BarChart3,
+  FileText,
   Home,
   LogOut,
   Menu,
@@ -48,6 +49,7 @@ import { ResourceMonthSwitcher } from "./components/MonthSwitcher";
 import { NewExpenseForm } from "./components/NewExpenseForm";
 import { OtherAccountsView } from "./components/OtherAccounts";
 import { PersonExpenses } from "./components/PersonExpenses";
+import { ReportsPanel } from "./components/ReportsPanel";
 import { PaymentModal, SettlementPanel } from "./components/SettlementPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import {
@@ -66,8 +68,11 @@ import {
 } from "./domain/dashboard";
 import {
   addMonths,
+  calculateSplitAmounts,
+  createEqualSplitValues,
   filterExpensesForMonth,
   getExpenseDisplayMonthKey,
+  getExpenseSplitConfiguration,
   getExpenseMonthKey,
   getExpensesForMonth,
   getInstallmentInfo,
@@ -81,6 +86,7 @@ import {
   isValidInstallmentExpense,
   monthFromDate,
   roundMoney,
+  serializeSplitValues,
 } from "./domain/expenses";
 import { normalizeMarketName } from "./domain/resources";
 import {
@@ -102,6 +108,7 @@ const appVersion = import.meta.env.VITE_APP_VERSION || packageInfo.version;
 
 const navItems = [
   { id: "dashboard", label: "Painel", icon: BarChart3 },
+  { id: "reports", label: "Relatórios", icon: FileText },
   { id: "new", label: "Nova conta", icon: Plus },
   ...PEOPLE.map((person) => ({ id: person.id, label: person.name, icon: UserRound })),
   { id: "other-accounts", label: "Outras Contas", icon: WalletCards },
@@ -310,7 +317,7 @@ function App() {
   }, [profile]);
 
   useEffect(() => {
-    if (!profile || !db || !canManageData || activeView !== "other-accounts") return undefined;
+    if (!profile || !db || !["other-accounts", "reports"].includes(activeView)) return undefined;
 
     setMarketItemsLoading(true);
     return onSnapshot(
@@ -328,10 +335,10 @@ function App() {
         setActionMessage(getObservedActionError(error, "carregar os itens de mercado"));
       },
     );
-  }, [activeView, canManageData, profile]);
+  }, [activeView, profile]);
 
   useEffect(() => {
-    if (!profile || !db || !canManageData || activeView !== "other-accounts") return undefined;
+    if (!profile || !db || !["other-accounts", "reports"].includes(activeView)) return undefined;
 
     setOtherPaymentsLoading(true);
     return onSnapshot(
@@ -349,7 +356,7 @@ function App() {
         setActionMessage(getObservedActionError(error, "carregar os outros pagamentos"));
       },
     );
-  }, [activeView, canManageData, profile]);
+  }, [activeView, profile]);
 
   useEffect(() => {
     if (!profile || !db) return undefined;
@@ -403,7 +410,16 @@ function App() {
         const seriesId = firstExpense.installmentSeriesId || doc(collection(db, "expenses")).id;
         const finalDueDate = firstInfo.finalDueDate || addMonths(firstExpense.dueDate, group.total - group.first);
         const participants = firstExpense.participants || [];
-        const shareAmount = roundMoney(Number(firstExpense.totalValue || 0) / Math.max(participants.length, 1));
+        const splitConfiguration = getExpenseSplitConfiguration(firstExpense);
+        const calculatedSplit = calculateSplitAmounts(
+          firstExpense.totalValue,
+          participants,
+          splitConfiguration.mode,
+          splitConfiguration.values,
+        );
+        const restoredSplit = calculatedSplit.isValid
+          ? calculatedSplit
+          : calculateSplitAmounts(firstExpense.totalValue, participants);
 
         group.expenses.forEach((expense) => {
           const info = getInstallmentInfo(expense);
@@ -435,7 +451,7 @@ function App() {
           const shares = participants.reduce((acc, personId) => {
             const isPayer = personId === firstExpense.payerId;
             acc[personId] = {
-              amount: shareAmount,
+              amount: restoredSplit.amounts[personId] || 0,
               status: isPayer ? "self" : "paid",
               payment: { type: "Pago", paidAt: dueDate },
             };
@@ -455,6 +471,12 @@ function App() {
               category: firstExpense.category || "Outros",
               payerId: firstExpense.payerId,
               participants,
+              splitMode: restoredSplit.mode,
+              splitValues: serializeSplitValues(
+                participants,
+                restoredSplit.mode,
+                splitConfiguration.values,
+              ),
               installment: `Parcela ${current} de ${group.total}`,
               installmentMeta: {
                 current,
@@ -826,7 +848,11 @@ function App() {
         ? current.participants.filter((item) => item !== personId)
         : [...current.participants, personId];
 
-      return { ...current, participants };
+      return {
+        ...current,
+        participants,
+        splitValues: createEqualSplitValues(current.totalValue, participants, current.splitMode),
+      };
     });
   }
 
@@ -851,6 +877,22 @@ function App() {
       setFormError("Selecione pelo menos uma pessoa no rateio.");
       return;
     }
+
+    const calculatedSplit = calculateSplitAmounts(
+      rawValue,
+      form.participants,
+      form.splitMode,
+      form.splitValues,
+    );
+    if (!calculatedSplit.isValid) {
+      setFormError(calculatedSplit.error);
+      return;
+    }
+    const serializedSplitValues = serializeSplitValues(
+      form.participants,
+      calculatedSplit.mode,
+      form.splitValues,
+    );
 
     const type = form.type || "normal";
     let computedDueDate = form.dueDate;
@@ -922,12 +964,11 @@ function App() {
         type,
       });
       
-      const shareAmount = roundMoney(valuePerMonth / form.participants.length);
       const shares = form.participants.reduce((acc, personId) => {
         const isHistoricalInstallment = type === "installment" && installmentNumber < currentInstallment;
         const isPayer = personId === form.payerId;
         acc[personId] = {
-          amount: shareAmount,
+          amount: calculatedSplit.amounts[personId] || 0,
           status: isPayer ? "self" : isHistoricalInstallment ? "paid" : "pending",
           payment: isPayer || isHistoricalInstallment ? { type: "Pago", paidAt: currentDueDate } : null,
         };
@@ -965,6 +1006,8 @@ function App() {
         category: form.category,
         payerId: form.payerId,
         participants: form.participants,
+        splitMode: calculatedSplit.mode,
+        splitValues: serializedSplitValues,
         installment: label,
         installmentMeta,
         installmentSeriesId,
@@ -1408,19 +1451,33 @@ function App() {
       throw new Error("Selecione pelo menos uma pessoa no rateio.");
     }
 
+    const calculatedSplit = calculateSplitAmounts(
+      rawValue,
+      updatedData.participants,
+      updatedData.splitMode,
+      updatedData.splitValues,
+    );
+    if (!calculatedSplit.isValid) {
+      throw new Error(calculatedSplit.error);
+    }
+    const serializedSplitValues = serializeSplitValues(
+      updatedData.participants,
+      calculatedSplit.mode,
+      updatedData.splitValues,
+    );
+
     const snapshot = await getDocs(collection(db, "expenses"));
     const persistedExpenses = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     const oldExpense = persistedExpenses.find((expense) => expense.id === expenseId);
     if (!oldExpense) throw new Error("A conta selecionada não foi encontrada.");
 
-    const shareAmount = roundMoney(rawValue / updatedData.participants.length);
     const buildShares = (oldShares, dueDate) => updatedData.participants.reduce((acc, personId) => {
       const oldShare = oldShares?.[personId];
       const wasPayer = personId === updatedData.payerId;
 
       if (wasPayer) {
         acc[personId] = {
-          amount: shareAmount,
+          amount: calculatedSplit.amounts[personId] || 0,
           status: "self",
           payment: { type: "Pago", paidAt: dueDate },
         };
@@ -1428,7 +1485,7 @@ function App() {
         const currentStatus = (oldShare?.status === "self" || !oldShare?.status) ? "pending" : oldShare.status;
         const currentPayment = (oldShare?.status === "self" || !oldShare?.status) ? null : oldShare.payment;
         acc[personId] = {
-          amount: shareAmount,
+          amount: calculatedSplit.amounts[personId] || 0,
           status: currentStatus,
           payment: currentPayment,
         };
@@ -1473,6 +1530,8 @@ function App() {
             category: updatedData.category,
             payerId: updatedData.payerId,
             participants: updatedData.participants,
+            splitMode: calculatedSplit.mode,
+            splitValues: serializedSplitValues,
             shares: buildShares(item.shares, dueDate),
             installment: "Fixo",
             installmentMeta: null,
@@ -1538,6 +1597,8 @@ function App() {
           category: updatedData.category,
           payerId: updatedData.payerId,
           participants: updatedData.participants,
+          splitMode: calculatedSplit.mode,
+          splitValues: serializedSplitValues,
           shares: buildShares(existingExpense?.shares, dueDate),
           installment: `Parcela ${current} de ${updatedInstallmentInfo.total}`,
           installmentMeta: {
@@ -1595,6 +1656,8 @@ function App() {
       category: updatedData.category,
       payerId: updatedData.payerId,
       participants: updatedData.participants,
+      splitMode: calculatedSplit.mode,
+      splitValues: serializedSplitValues,
       shares,
       installmentMeta: null,
       updatedAt: serverTimestamp(),
@@ -1628,7 +1691,11 @@ function App() {
 
   const visibleNavItems = canManageData
     ? navItems
-    : navItems.filter((item) => item.id === "dashboard" || PEOPLE.some((person) => person.id === item.id));
+    : navItems.filter((item) => (
+        item.id === "dashboard"
+        || item.id === "reports"
+        || PEOPLE.some((person) => person.id === item.id)
+      ));
   const visiblePeople = PEOPLE;
 
   function navigateToView(viewId) {
@@ -1774,6 +1841,17 @@ function App() {
             metrics={metrics}
             selectedMonth={selectedMonth}
             yearSummary={dashboardYearSummary}
+          />
+        )}
+
+        {activeView === "reports" && (
+          <ReportsPanel
+            dataLoading={dataLoading || marketItemsLoading || otherPaymentsLoading}
+            expenses={normalizedExpenses}
+            marketItems={marketItems}
+            otherPayments={otherPayments}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
           />
         )}
 

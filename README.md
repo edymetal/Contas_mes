@@ -2,6 +2,16 @@
 
 Aplicacao estatica em React para controle de despesas domesticas compartilhadas entre Edney, Sonia e Rodney.
 
+## Funcionalidades principais
+
+- Cadastro de contas unicas, fixas e parceladas, com acompanhamento mensal e acerto entre as pessoas.
+- Rateio igual, por percentual ou por valor definido para cada participante. Contas antigas sem configuracao de
+  rateio continuam sendo interpretadas automaticamente como divisao igual.
+- Relatorios com comparacao entre dois meses, evolucao anual por categoria, pessoa ou estabelecimento e totais
+  separados de contas compartilhadas, Mercado e outros pagamentos.
+- Exportacao dos lancamentos do mes em CSV e geracao de PDF pelo dialogo de impressao do navegador.
+- Leitura de notas fiscais italianas, historicos, dashboards, backup em JSON e funcionamento como PWA.
+
 ## Onde configurar o Firebase
 
 1. Crie um projeto no Firebase.
