@@ -1,5 +1,19 @@
 import { useMemo, useState } from "react";
-import { Download, FileText, Printer, TrendingUp } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  BarChart3,
+  CalendarDays,
+  Download,
+  FileText,
+  Home,
+  Printer,
+  ReceiptText,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+  WalletCards,
+} from "lucide-react";
 import {
   createAnnualReport,
   createReportComparison,
@@ -13,10 +27,10 @@ import {
 } from "../utils/presentation";
 
 const TOTAL_ROWS = [
-  { key: "consolidated", label: "Total consolidado" },
-  { key: "shared", label: "Contas compartilhadas" },
-  { key: "market", label: "Mercado" },
-  { key: "other", label: "Outros pagamentos" },
+  { key: "consolidated", label: "Total consolidado", icon: WalletCards },
+  { key: "shared", label: "Contas compartilhadas", icon: Home },
+  { key: "market", label: "Mercado", icon: ShoppingCart },
+  { key: "other", label: "Outros pagamentos", icon: ReceiptText },
 ];
 
 const DIMENSION_OPTIONS = {
@@ -71,6 +85,10 @@ export function ReportsPanel({
   );
   const dimensionRows = annualReport.dimensions[dimension];
   const annualMaximum = Math.max(...annualReport.months.map((month) => month.total), 1);
+  const dimensionMaximum = Math.max(
+    ...dimensionRows.flatMap((row) => row.months.map((month) => month.value)),
+    1,
+  );
 
   function exportCsv() {
     const csv = createReportCsv(expenses, marketItems, otherPayments, selectedMonth);
@@ -84,17 +102,24 @@ export function ReportsPanel({
   return (
     <div className="reports-shell">
       <section className="panel report-toolbar no-print">
-        <div className="section-heading">
-          <div>
+        <div className="report-hero">
+          <div className="report-hero-icon">
+            <BarChart3 aria-hidden="true" size={27} />
+          </div>
+          <div className="report-hero-copy">
             <span className="eyebrow">Análise financeira</span>
             <h2>Relatórios e comparações</h2>
+            <p>Compare períodos e descubra como cada grupo participa dos gastos.</p>
           </div>
-          <FileText aria-hidden="true" size={28} />
+          <div className="report-hero-badge">
+            <TrendingUp aria-hidden="true" size={17} />
+            Visão consolidada
+          </div>
         </div>
 
         <div className="report-controls">
           <label>
-            <span>Mês principal</span>
+            <span><CalendarDays aria-hidden="true" size={15} /> Mês principal</span>
             <input
               onChange={(event) => onMonthChange(event.target.value)}
               type="month"
@@ -102,7 +127,7 @@ export function ReportsPanel({
             />
           </label>
           <label>
-            <span>Comparar com</span>
+            <span><CalendarDays aria-hidden="true" size={15} /> Comparar com</span>
             <input
               onChange={(event) => setComparisonMonth(event.target.value)}
               type="month"
@@ -110,7 +135,7 @@ export function ReportsPanel({
             />
           </label>
           <label>
-            <span>Evolução por</span>
+            <span><Users aria-hidden="true" size={15} /> Evolução por</span>
             <select value={dimension} onChange={(event) => setDimension(event.target.value)}>
               {Object.entries(DIMENSION_OPTIONS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -137,15 +162,23 @@ export function ReportsPanel({
       </header>
 
       <section aria-busy={dataLoading} className="report-summary-grid">
-        {TOTAL_ROWS.map(({ key, label }) => {
+        {TOTAL_ROWS.map(({ icon: Icon, key, label }) => {
           const change = comparison.changes[key];
+          const ChangeIcon = change.difference > 0 ? ArrowUp : change.difference < 0 ? ArrowDown : TrendingUp;
           return (
             <article className={`report-summary-card ${key}`} key={key}>
-              <span>{label}</span>
-              <strong>{formatCurrency(change.current)}</strong>
-              <small className={change.difference > 0 ? "increase" : change.difference < 0 ? "decrease" : ""}>
+              <div className="report-summary-card-head">
+                <span className="report-summary-icon"><Icon aria-hidden="true" size={20} /></span>
+                <span>{label}</span>
+              </div>
+              <div className="report-summary-value">
+                <strong>{formatCurrency(change.current)}</strong>
+                <small>em {formatMonthName(selectedMonth)}</small>
+              </div>
+              <div className={`report-change-pill ${change.difference > 0 ? "increase" : change.difference < 0 ? "decrease" : ""}`}>
+                <ChangeIcon aria-hidden="true" size={14} />
                 {formatChange(change)}
-              </small>
+              </div>
             </article>
           );
         })}
@@ -153,9 +186,12 @@ export function ReportsPanel({
 
       <section className="panel report-comparison-panel">
         <div className="section-heading">
-          <div>
-            <span className="eyebrow">Comparação mensal</span>
-            <h2>{formatMonthLabel(selectedMonth)} × {formatMonthLabel(comparisonMonth)}</h2>
+          <div className="report-section-title">
+            <span className="report-section-icon comparison"><FileText aria-hidden="true" size={20} /></span>
+            <div>
+              <span className="eyebrow">Comparação mensal</span>
+              <h2>{formatMonthLabel(selectedMonth)} × {formatMonthLabel(comparisonMonth)}</h2>
+            </div>
           </div>
         </div>
 
@@ -173,15 +209,27 @@ export function ReportsPanel({
               </tr>
             </thead>
             <tbody>
-              {TOTAL_ROWS.map(({ key, label }) => {
+              {TOTAL_ROWS.map(({ icon: Icon, key, label }) => {
                 const change = comparison.changes[key];
                 return (
-                  <tr key={key}>
-                    <th scope="row">{label}</th>
+                  <tr className={`report-source-row ${key}`} key={key}>
+                    <th scope="row">
+                      <span className="report-source-label">
+                        <span className="report-source-icon"><Icon aria-hidden="true" size={16} /></span>
+                        {label}
+                      </span>
+                    </th>
                     <td>{formatCurrency(change.current)}</td>
                     <td>{formatCurrency(change.comparison)}</td>
-                    <td className={change.difference > 0 ? "increase" : change.difference < 0 ? "decrease" : ""}>
-                      {change.difference > 0 ? "+" : ""}{formatCurrency(change.difference)}
+                    <td>
+                      <span className={`report-table-change ${change.difference > 0 ? "increase" : change.difference < 0 ? "decrease" : ""}`}>
+                        {change.difference > 0
+                          ? <ArrowUp aria-hidden="true" size={13} />
+                          : change.difference < 0
+                            ? <ArrowDown aria-hidden="true" size={13} />
+                            : null}
+                        {change.difference > 0 ? "+" : ""}{formatCurrency(change.difference)}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -193,18 +241,32 @@ export function ReportsPanel({
 
       <section className="panel report-annual-panel">
         <div className="section-heading">
-          <div>
-            <span className="eyebrow">Evolução anual</span>
-            <h2>Totais mensais de {year}</h2>
+          <div className="report-section-title">
+            <span className="report-section-icon annual"><BarChart3 aria-hidden="true" size={20} /></span>
+            <div>
+              <span className="eyebrow">Evolução anual</span>
+              <h2>Totais mensais de {year}</h2>
+            </div>
           </div>
-          <strong>{formatCurrency(annualReport.total)}</strong>
+          <div className="report-annual-total">
+            <span>Total no ano</span>
+            <strong>{formatCurrency(annualReport.total)}</strong>
+          </div>
+        </div>
+
+        <div className="report-chart-legend" aria-label="Legenda do gráfico">
+          <span className="shared">Contas compartilhadas</span>
+          <span className="market">Mercado</span>
+          <span className="other">Outros pagamentos</span>
         </div>
 
         <div className="report-annual-chart">
           {annualReport.months.map((month) => (
             <article className={month.monthKey === selectedMonth ? "selected" : ""} key={month.monthKey}>
               <div className="report-annual-bar" aria-hidden="true">
-                <span style={{ height: `${month.total / annualMaximum * 100}%` }} />
+                <span className="shared" style={{ height: `${month.shared / annualMaximum * 100}%` }} />
+                <span className="market" style={{ height: `${month.market / annualMaximum * 100}%` }} />
+                <span className="other" style={{ height: `${month.other / annualMaximum * 100}%` }} />
               </div>
               <strong>{formatCurrency(month.total)}</strong>
               <span>{formatMonthName(month.monthKey).slice(0, 3)}</span>
@@ -215,16 +277,19 @@ export function ReportsPanel({
 
       <section className="panel report-dimension-panel">
         <div className="section-heading">
-          <div>
-            <span className="eyebrow">Detalhamento anual</span>
-            <h2>Evolução por {DIMENSION_OPTIONS[dimension].toLocaleLowerCase("pt-BR")}</h2>
+          <div className="report-section-title">
+            <span className="report-section-icon dimension"><TrendingUp aria-hidden="true" size={20} /></span>
+            <div>
+              <span className="eyebrow">Detalhamento anual</span>
+              <h2>Evolução por {DIMENSION_OPTIONS[dimension].toLocaleLowerCase("pt-BR")}</h2>
+            </div>
           </div>
-          <TrendingUp aria-hidden="true" size={24} />
+          <span className="report-dimension-badge">{dimensionRows.length} grupo(s)</span>
         </div>
 
         {dimensionRows.length ? (
           <div className="report-table-wrap">
-            <table className="report-table report-dimension-table">
+            <table className={`report-table report-dimension-table dimension-${dimension}`}>
               <caption className="sr-only">
                 Evolução mensal por {DIMENSION_OPTIONS[dimension].toLocaleLowerCase("pt-BR")} em {year}
               </caption>
@@ -232,7 +297,13 @@ export function ReportsPanel({
                 <tr>
                   <th scope="col">{DIMENSION_OPTIONS[dimension]}</th>
                   {annualReport.months.map((month) => (
-                    <th key={month.monthKey} scope="col">{formatMonthName(month.monthKey).slice(0, 3)}</th>
+                    <th
+                      className={month.monthKey === selectedMonth ? "selected-month" : ""}
+                      key={month.monthKey}
+                      scope="col"
+                    >
+                      {formatMonthName(month.monthKey).slice(0, 3)}
+                    </th>
                   ))}
                   <th scope="col">Total</th>
                 </tr>
@@ -240,9 +311,15 @@ export function ReportsPanel({
               <tbody>
                 {dimensionRows.map((row) => (
                   <tr key={row.key}>
-                    <th scope="row">{row.label}</th>
+                    <th scope="row"><span className="report-dimension-label">{row.label}</span></th>
                     {row.months.map((month) => (
-                      <td key={month.monthKey}>{formatCurrency(month.value)}</td>
+                      <td
+                        className={`${month.value ? "has-value" : "empty-value"} ${month.monthKey === selectedMonth ? "selected-month" : ""}`}
+                        key={month.monthKey}
+                        style={month.value ? { "--cell-alpha": 0.1 + month.value / dimensionMaximum * 0.42 } : undefined}
+                      >
+                        {month.value ? formatCurrency(month.value) : "—"}
+                      </td>
                     ))}
                     <td><strong>{formatCurrency(row.total)}</strong></td>
                   </tr>

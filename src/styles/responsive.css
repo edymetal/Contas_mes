@@ -851,6 +851,40 @@
     grid-column: auto;
     grid-template-columns: 1fr;
   }
+
+  .report-hero {
+    align-items: start;
+    grid-template-columns: auto 1fr;
+  }
+
+  .report-hero-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .report-hero-copy p {
+    line-height: 1.45;
+  }
+
+  .report-section-title {
+    align-items: flex-start;
+  }
+
+  .report-annual-total {
+    justify-items: start;
+  }
+
+  .report-chart-legend {
+    justify-content: flex-start;
+  }
+
+  .report-summary-card {
+    gap: 12px;
+  }
+
+  .report-dimension-badge {
+    align-self: flex-start;
+  }
 }
 
 @media print {

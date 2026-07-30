@@ -297,6 +297,10 @@ test("relatórios comparam períodos e oferecem as duas exportações", () => {
   assert.match(html, /Comparação mensal/);
   assert.match(html, /Evolução anual/);
   assert.match(html, /Evolução por categorias/);
+  assert.match(html, /Visão consolidada/);
+  assert.match(html, /Legenda do gráfico/);
+  assert.equal((html.match(/class="report-summary-icon"/g) || []).length, 4);
+  assert.equal((html.match(/class="report-annual-bar"/g) || []).length, 12);
   assert.equal((html.match(/<caption class="sr-only">/g) || []).length, 2);
 });
 
