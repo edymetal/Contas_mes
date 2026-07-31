@@ -258,15 +258,45 @@ export function ResourceListView({
         </div>
 
         <form className="form-grid resource-form" onSubmit={onSubmit}>
-          <label>
-            {isMarket ? "Mercado" : "Local"}
-            {isMarket ? (
+          {isMarket ? (
+            <label>
+              Mercado
               <input
                 value={form.market}
                 onChange={(event) => onChange("market", event.target.value)}
                 placeholder="Ex.: ARD"
               />
-            ) : (
+            </label>
+          ) : (
+            <label>
+              Produto
+              <PlaceAutocomplete
+                id={`new-${kind}-product`}
+                value={form.product}
+                suggestions={productSuggestions}
+                onChange={(value) => onChange("product", value)}
+                placeholder="Nome do produto"
+              />
+            </label>
+          )}
+          <label>
+            Data
+            <input type="date" value={form[dateField]} onChange={(event) => onChange(dateField, event.target.value)} />
+          </label>
+          {isMarket ? (
+            <label>
+              Produto
+              <PlaceAutocomplete
+                id={`new-${kind}-product`}
+                value={form.product}
+                suggestions={productSuggestions}
+                onChange={(value) => onChange("product", value)}
+                placeholder="Nome do produto"
+              />
+            </label>
+          ) : (
+            <label>
+              Local
               <PlaceAutocomplete
                 id="new-other-payment-place"
                 value={form.place}
@@ -274,22 +304,8 @@ export function ResourceListView({
                 onChange={(value) => onChange("place", value)}
                 placeholder="Ex.: Amazon"
               />
-            )}
-          </label>
-          <label>
-            Data
-            <input type="date" value={form[dateField]} onChange={(event) => onChange(dateField, event.target.value)} />
-          </label>
-          <label>
-            Produto
-            <PlaceAutocomplete
-              id={`new-${kind}-product`}
-              value={form.product}
-              suggestions={productSuggestions}
-              onChange={(value) => onChange("product", value)}
-              placeholder="Nome do produto"
-            />
-          </label>
+            </label>
+          )}
           {isMarket ? (
             <label>
               Descrição

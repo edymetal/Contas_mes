@@ -551,6 +551,10 @@ test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação
   assert.equal((html.match(/class="resource-quantity-column"/g) || []).length, 2);
   assert.equal((html.match(/role="combobox"/g) || []).length, 2);
   assert.match(html, /aria-controls="new-other-payments-product-options"/);
+  assert.ok(
+    html.indexOf('placeholder="Nome do produto"') < html.indexOf('placeholder="Ex.: Amazon"'),
+    "o campo Produto deve aparecer antes do campo Local",
+  );
   assert.match(html, /Ver dashboard do local Oficina/);
   assert.match(html, /Ver dashboard do produto Revisão/);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 2);
