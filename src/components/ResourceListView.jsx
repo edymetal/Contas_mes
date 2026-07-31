@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { PAYMENT_TYPES } from "../config/people";
 import { monthFromDate, roundMoney } from "../domain/expenses";
-import { normalizeMarketName } from "../domain/resources";
+import { getLatestPlaceForProduct, normalizeMarketName } from "../domain/resources";
 import { normalizeReceiptCategory } from "../services/receiptAnalysis";
 import {
   formatCurrency,
@@ -275,6 +275,10 @@ export function ResourceListView({
                 value={form.product}
                 suggestions={productSuggestions}
                 onChange={(value) => onChange("product", value)}
+                onSelect={(product) => {
+                  const place = getLatestPlaceForProduct(items, product);
+                  if (place) onChange("place", place);
+                }}
                 placeholder="Nome do produto"
               />
             </label>
@@ -550,7 +554,15 @@ export function ResourceListView({
   );
 }
 
-export function PlaceAutocomplete({ id, value, suggestions, onChange, placeholder, required = false }) {
+export function PlaceAutocomplete({
+  id,
+  value,
+  suggestions,
+  onChange,
+  onSelect,
+  placeholder,
+  required = false,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const searchValue = normalizeSearchText(value.trim());
@@ -568,6 +580,7 @@ export function PlaceAutocomplete({ id, value, suggestions, onChange, placeholde
 
   function selectSuggestion(suggestion) {
     onChange(suggestion);
+    onSelect?.(suggestion);
     setIsOpen(false);
     setActiveIndex(0);
   }

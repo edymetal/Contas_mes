@@ -18,3 +18,24 @@ export function normalizeMarketName(value) {
 
   return MARKET_NAME_ALIASES.get(normalizeResourceNameForComparison(marketName)) || marketName;
 }
+
+export function getLatestPlaceForProduct(payments, product) {
+  const normalizedProduct = normalizeResourceNameForComparison(product);
+  if (!normalizedProduct) return "";
+
+  const latestPayment = payments.reduce((latest, payment) => {
+    const place = String(payment.place || "").trim();
+    if (
+      !place
+      || normalizeResourceNameForComparison(place) === "local nao informado"
+      || normalizeResourceNameForComparison(payment.product) !== normalizedProduct
+    ) {
+      return latest;
+    }
+
+    const paidAt = String(payment.paidAt || "");
+    return !latest || paidAt > latest.paidAt ? { paidAt, place } : latest;
+  }, null);
+
+  return latestPayment?.place || "";
+}
