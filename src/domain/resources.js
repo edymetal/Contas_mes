@@ -19,23 +19,43 @@ export function normalizeMarketName(value) {
   return MARKET_NAME_ALIASES.get(normalizeResourceNameForComparison(marketName)) || marketName;
 }
 
-export function getLatestPlaceForProduct(payments, product) {
+function getLatestResourceForProduct(items, product, resourceField, dateField, ignoredValue) {
   const normalizedProduct = normalizeResourceNameForComparison(product);
   if (!normalizedProduct) return "";
 
-  const latestPayment = payments.reduce((latest, payment) => {
-    const place = String(payment.place || "").trim();
+  const latestItem = items.reduce((latest, item) => {
+    const resource = String(item[resourceField] || "").trim();
     if (
-      !place
-      || normalizeResourceNameForComparison(place) === "local nao informado"
-      || normalizeResourceNameForComparison(payment.product) !== normalizedProduct
+      !resource
+      || normalizeResourceNameForComparison(resource) === ignoredValue
+      || normalizeResourceNameForComparison(item.product) !== normalizedProduct
     ) {
       return latest;
     }
 
-    const paidAt = String(payment.paidAt || "");
-    return !latest || paidAt > latest.paidAt ? { paidAt, place } : latest;
+    const itemDate = String(item[dateField] || "");
+    return !latest || itemDate > latest.itemDate ? { itemDate, resource } : latest;
   }, null);
 
-  return latestPayment?.place || "";
+  return latestItem?.resource || "";
+}
+
+export function getLatestPlaceForProduct(payments, product) {
+  return getLatestResourceForProduct(
+    payments,
+    product,
+    "place",
+    "paidAt",
+    "local nao informado",
+  );
+}
+
+export function getLatestMarketForProduct(marketItems, product) {
+  return normalizeMarketName(getLatestResourceForProduct(
+    marketItems,
+    product,
+    "market",
+    "purchasedAt",
+    "mercado nao informado",
+  ));
 }

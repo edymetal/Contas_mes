@@ -872,6 +872,10 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
   assert.match(html, /Ver dashboard da descrição Arroz/);
   assert.match(html, /aria-controls="new-market-product-options"/);
   assert.match(html, /aria-controls="new-market-description-options"/);
+  assert.ok(
+    html.indexOf('placeholder="Nome do produto"') < html.indexOf('placeholder="Ex.: ARD"'),
+    "o campo Produto deve aparecer antes do campo Mercado",
+  );
   assert.equal((html.match(/role="combobox"/g) || []).length, 2);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 3);
 });

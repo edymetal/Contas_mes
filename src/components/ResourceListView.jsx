@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { PAYMENT_TYPES } from "../config/people";
 import { monthFromDate, roundMoney } from "../domain/expenses";
-import { getLatestPlaceForProduct, normalizeMarketName } from "../domain/resources";
+import {
+  getLatestMarketForProduct,
+  getLatestPlaceForProduct,
+  normalizeMarketName,
+} from "../domain/resources";
 import { normalizeReceiptCategory } from "../services/receiptAnalysis";
 import {
   formatCurrency,
@@ -258,6 +262,29 @@ export function ResourceListView({
         </div>
 
         <form className="form-grid resource-form" onSubmit={onSubmit}>
+          <label>
+            Produto
+            <PlaceAutocomplete
+              id={`new-${kind}-product`}
+              value={form.product}
+              suggestions={productSuggestions}
+              onChange={(value) => onChange("product", value)}
+              onSelect={(product) => {
+                if (isMarket) {
+                  const market = getLatestMarketForProduct(items, product);
+                  if (market) onChange("market", market);
+                } else {
+                  const place = getLatestPlaceForProduct(items, product);
+                  if (place) onChange("place", place);
+                }
+              }}
+              placeholder="Nome do produto"
+            />
+          </label>
+          <label>
+            Data
+            <input type="date" value={form[dateField]} onChange={(event) => onChange(dateField, event.target.value)} />
+          </label>
           {isMarket ? (
             <label>
               Mercado
@@ -265,37 +292,6 @@ export function ResourceListView({
                 value={form.market}
                 onChange={(event) => onChange("market", event.target.value)}
                 placeholder="Ex.: ARD"
-              />
-            </label>
-          ) : (
-            <label>
-              Produto
-              <PlaceAutocomplete
-                id={`new-${kind}-product`}
-                value={form.product}
-                suggestions={productSuggestions}
-                onChange={(value) => onChange("product", value)}
-                onSelect={(product) => {
-                  const place = getLatestPlaceForProduct(items, product);
-                  if (place) onChange("place", place);
-                }}
-                placeholder="Nome do produto"
-              />
-            </label>
-          )}
-          <label>
-            Data
-            <input type="date" value={form[dateField]} onChange={(event) => onChange(dateField, event.target.value)} />
-          </label>
-          {isMarket ? (
-            <label>
-              Produto
-              <PlaceAutocomplete
-                id={`new-${kind}-product`}
-                value={form.product}
-                suggestions={productSuggestions}
-                onChange={(value) => onChange("product", value)}
-                placeholder="Nome do produto"
               />
             </label>
           ) : (

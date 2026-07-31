@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getLatestPlaceForProduct, normalizeMarketName } from "../src/domain/resources.js";
+import {
+  getLatestMarketForProduct,
+  getLatestPlaceForProduct,
+  normalizeMarketName,
+} from "../src/domain/resources.js";
 
 test("padroniza ARD como ARD DISCOUNT", () => {
   assert.equal(normalizeMarketName("ARD"), "ARD DISCOUNT");
@@ -23,4 +27,15 @@ test("encontra o local mais recente associado ao produto selecionado", () => {
 
   assert.equal(getLatestPlaceForProduct(payments, "  REVISÃO "), "Oficina Atual");
   assert.equal(getLatestPlaceForProduct(payments, "Produto inexistente"), "");
+});
+
+test("encontra o mercado mais recente associado ao produto selecionado", () => {
+  const marketItems = [
+    { product: "Arroz", market: "Mercado Antigo", purchasedAt: "2026-04-12" },
+    { product: "Outro produto", market: "Outro mercado", purchasedAt: "2026-07-20" },
+    { product: "arroz", market: "ARD", purchasedAt: "2026-07-18" },
+  ];
+
+  assert.equal(getLatestMarketForProduct(marketItems, " ARROZ "), "ARD DISCOUNT");
+  assert.equal(getLatestMarketForProduct(marketItems, "Produto inexistente"), "");
 });
