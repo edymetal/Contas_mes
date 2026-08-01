@@ -19,6 +19,13 @@ export function normalizeMarketName(value) {
   return MARKET_NAME_ALIASES.get(normalizeResourceNameForComparison(marketName)) || marketName;
 }
 
+export function isValidResourceUnitValue(value, isMarket = false) {
+  const unitValue = Number(String(value).replace(",", "."));
+  if (!Number.isFinite(unitValue)) return false;
+
+  return isMarket ? unitValue !== 0 : unitValue > 0;
+}
+
 function getLatestResourceForProduct(items, product, resourceField, dateField, ignoredValue) {
   const normalizedProduct = normalizeResourceNameForComparison(product);
   if (!normalizedProduct) return "";

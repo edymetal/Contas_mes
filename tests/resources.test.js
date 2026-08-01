@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   getLatestMarketForProduct,
   getLatestPlaceForProduct,
+  isValidResourceUnitValue,
   normalizeMarketName,
 } from "../src/domain/resources.js";
 
@@ -16,6 +17,14 @@ test("preserva os demais nomes de mercado", () => {
   assert.equal(normalizeMarketName("Mercado Central"), "Mercado Central");
   assert.equal(normalizeMarketName("  Supermercado Roma  "), "Supermercado Roma");
   assert.equal(normalizeMarketName(""), "");
+});
+
+test("aceita descontos negativos somente nos itens de mercado", () => {
+  assert.equal(isValidResourceUnitValue(-0.75, true), true);
+  assert.equal(isValidResourceUnitValue("-0,75", true), true);
+  assert.equal(isValidResourceUnitValue(0, true), false);
+  assert.equal(isValidResourceUnitValue(-0.75, false), false);
+  assert.equal(isValidResourceUnitValue(0.75, false), true);
 });
 
 test("encontra o local mais recente associado ao produto selecionado", () => {

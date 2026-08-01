@@ -558,6 +558,7 @@ test("tabelas de Outras Contas oferecem busca por coluna, período e ordenação
   assert.match(html, /Ver dashboard do local Oficina/);
   assert.match(html, /Ver dashboard do produto Revisão/);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 2);
+  assert.equal((html.match(/min="0.01"/g) || []).length, 2);
 });
 
 test("filtros e ordenação de Outras Contas funcionam para mercado e pagamentos", () => {
@@ -834,7 +835,7 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
         product: "",
         description: "",
         quantity: "1",
-        unitValue: "",
+        unitValue: "-0.75",
         purchasedAt: "2026-07-30",
       },
       formError: "",
@@ -878,6 +879,8 @@ test("nomes do mercado, produto e descrição abrem seus dashboards na tabela", 
   );
   assert.equal((html.match(/role="combobox"/g) || []).length, 2);
   assert.equal((html.match(/class="resource-analysis-trigger"/g) || []).length, 3);
+  assert.match(html, /value="-0.75"/);
+  assert.equal((html.match(/min="0.01"/g) || []).length, 1);
 });
 
 test("edição de Mercado oferece históricos para produto e descrição", () => {
@@ -891,7 +894,7 @@ test("edição de Mercado oferece históricos para produto e descrição", () =>
         product: "Arroz",
         description: "Alimento",
         quantity: 1,
-        unitValue: 3,
+        unitValue: -0.75,
         purchasedAt: "2026-07-05",
       },
       placeSuggestions: [],
@@ -904,4 +907,6 @@ test("edição de Mercado oferece históricos para produto e descrição", () =>
   assert.match(html, /aria-controls="edit-market-product-options"/);
   assert.match(html, /aria-controls="edit-market-description-options"/);
   assert.equal((html.match(/role="combobox"/g) || []).length, 2);
+  assert.match(html, /value="-0.75"/);
+  assert.equal((html.match(/min="0.01"/g) || []).length, 1);
 });

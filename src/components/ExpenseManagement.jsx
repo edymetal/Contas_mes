@@ -790,7 +790,7 @@ export function EditResourceItemModal({
             </label>
             <label>
               <span>Valor unitário (€)</span>
-              <input type="number" min="0.01" step="0.01" value={form.unitValue} onChange={(event) => updateField("unitValue", event.target.value)} required />
+              <input type="number" min={isMarket ? undefined : "0.01"} step="0.01" value={form.unitValue} onChange={(event) => updateField("unitValue", event.target.value)} required />
             </label>
           </div>
           {error && <p className="form-error" role="alert">{error}</p>}

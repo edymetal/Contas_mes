@@ -331,7 +331,7 @@ export function ResourceListView({
           </label>
           <label>
             Valor unitário (€)
-            <input type="number" min="0.01" step="0.01" value={form.unitValue} onChange={(event) => onChange("unitValue", event.target.value)} />
+            <input type="number" min={isMarket ? undefined : "0.01"} step="0.01" value={form.unitValue} onChange={(event) => onChange("unitValue", event.target.value)} />
           </label>
           {formError && <p className="form-error resource-form-error" role="alert">{formError}</p>}
           <div className="resource-form-action">
