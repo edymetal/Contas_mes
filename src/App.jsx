@@ -89,7 +89,7 @@ import {
   roundMoney,
   serializeSplitValues,
 } from "./domain/expenses";
-import { normalizeMarketName } from "./domain/resources";
+import { isValidResourceUnitValue, normalizeMarketName } from "./domain/resources";
 import {
   currentMonthValue,
   formatCurrency,
@@ -611,7 +611,7 @@ function App() {
       setMarketFormError("Preencha mercado, produto e data da compra.");
       return;
     }
-    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue <= 0) {
+    if (!Number.isFinite(quantity) || quantity <= 0 || !isValidResourceUnitValue(unitValue, true)) {
       setMarketFormError("Informe quantidade e valor válidos.");
       return;
     }
@@ -737,7 +737,7 @@ function App() {
       setOtherPaymentFormError("Preencha local, produto e data do pagamento.");
       return;
     }
-    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue <= 0) {
+    if (!Number.isFinite(quantity) || quantity <= 0 || !isValidResourceUnitValue(unitValue)) {
       setOtherPaymentFormError("Informe quantidade e valor válidos.");
       return;
     }
@@ -817,7 +817,7 @@ function App() {
     if (!location.trim() || !updatedData.product.trim() || !date) {
       throw new Error("Preencha local, produto e data.");
     }
-    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue <= 0) {
+    if (!Number.isFinite(quantity) || quantity <= 0 || !isValidResourceUnitValue(unitValue, isMarket)) {
       throw new Error("Informe quantidade e valor válidos.");
     }
 
