@@ -56,6 +56,7 @@ import { canAccessView, isAdminProfile } from "./domain/access";
 import {
   calculateSettlementSummaries,
   collectPendingSettlementShares,
+  getSelectableSettlementDebts,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
   resolveLegacyAffectedShares,
@@ -1193,7 +1194,23 @@ function App() {
   async function registerSettlementPayment(row, paymentData) {
     if (!ensureCanManageData()) return false;
 
-    const rawAmount = Number(String(paymentData.amount).replace(",", "."));
+    const selectionMode = paymentData.selectionMode === "debts" ? "debts" : "amount";
+    let selectedDebts = [];
+    let rawAmount = Number(String(paymentData.amount).replace(",", "."));
+
+    if (selectionMode === "debts") {
+      const requestedDebtIds = [...new Set(paymentData.selectedDebtIds || [])];
+      const selectableDebts = getSelectableSettlementDebts(expenses, row);
+      selectedDebts = selectableDebts.filter((debt) => requestedDebtIds.includes(debt.expenseId));
+
+      if (!requestedDebtIds.length || selectedDebts.length !== requestedDebtIds.length) {
+        setActionMessage("Selecione uma ou mais dívidas pendentes válidas.");
+        return false;
+      }
+
+      rawAmount = selectedDebts.reduce((total, debt) => total + debt.amount, 0);
+    }
+
     if (isNaN(rawAmount) || rawAmount <= 0) {
       setActionMessage("Informe um valor de pagamento válido.");
       return false;
@@ -1220,13 +1237,22 @@ function App() {
         fromId: row.fromId,
         toId: row.toId,
       };
-      const affectedShares = isFullPayment ? collectPendingSettlementShares(expenses, row) : [];
+      const affectedShares = isFullPayment
+        ? collectPendingSettlementShares(expenses, row)
+        : selectedDebts.map((debt) => ({
+            expenseId: debt.expenseId,
+            personId: debt.personId,
+            direction: debt.direction,
+            previousStatus: debt.previousStatus,
+            previousPayment: debt.previousPayment,
+          }));
 
-      if (isFullPayment) {
-        if (!affectedShares.length) {
-          setActionMessage("Nenhum rateio pendente foi encontrado para quitar.");
-          return false;
-        }
+      if (isFullPayment && !affectedShares.length) {
+        setActionMessage("Nenhum rateio pendente foi encontrado para quitar.");
+        return false;
+      }
+
+      if (affectedShares.length) {
         queueAffectedShareUpdates(batch, expenses, affectedShares, settlement, {
           isSettled: true,
           paidAt,
@@ -1236,7 +1262,7 @@ function App() {
       }
 
       batch.set(settlementRef, {
-        schemaVersion: 2,
+        schemaVersion: 3,
         kind: "payment",
         monthKey: selectedMonth,
         fromId: row.fromId,
@@ -1249,13 +1275,26 @@ function App() {
         balanceBeforePayment: remainingAmount,
         balanceAfterPayment: roundMoney(remainingAmount - paymentAmount),
         affectedShares,
+        selectionMode,
+        selectedDebts: selectedDebts.map((debt) => ({
+          expenseId: debt.expenseId,
+          title: debt.title,
+          originalAmount: debt.originalAmount,
+          amount: debt.amount,
+        })),
         createdBy: profile.id,
         createdAtClient: now,
         createdAt: serverTimestamp(),
       });
 
       await batch.commit();
-      setActionMessage(isFullPayment ? "Dívida quitada com sucesso." : "Pagamento parcial registrado.");
+      setActionMessage(
+        isFullPayment
+          ? "Dívida quitada com sucesso."
+          : selectionMode === "debts"
+            ? `Pagamento de ${selectedDebts.length} dívida(s) registrado.`
+            : "Pagamento parcial registrado.",
+      );
       return true;
     } catch (error) {
       setActionMessage(getObservedActionError(error, "registrar o pagamento de acerto"));
@@ -1278,9 +1317,14 @@ function App() {
       const paymentAmount = roundMoney(rawAmount);
       const currentAmount = roundMoney(currentPayment.amount);
       const amountChanged = paymentAmount !== currentAmount;
+      const isDebtSelection = currentPayment.selectionMode === "debts";
       const balanceBeforePayment = Number(currentPayment.balanceBeforePayment || currentPayment.amount || 0);
       if (balanceBeforePayment > 0 && paymentAmount > balanceBeforePayment) {
         setActionMessage(`O valor não pode passar de ${formatCurrency(balanceBeforePayment)}.`);
+        return false;
+      }
+      if (amountChanged && isDebtSelection) {
+        setActionMessage("O valor deste pagamento é definido pelas dívidas selecionadas e não pode ser alterado.");
         return false;
       }
       if (amountChanged && hasLaterSettlementPayment(currentPayment, context.persistedPayments)) {
@@ -1297,7 +1341,15 @@ function App() {
       const now = new Date().toISOString();
       let affectedShares = [];
 
-      if (wasSettled) {
+      if (isDebtSelection) {
+        affectedShares = getAffectedSharesForExistingPayment(currentPayment, context.monthExpenses);
+        queueAffectedShareUpdates(batch, context.monthExpenses, affectedShares, currentPayment, {
+          isSettled: true,
+          paidAt,
+          paymentType,
+          now,
+        });
+      } else if (wasSettled) {
         affectedShares = getAffectedSharesForExistingPayment(currentPayment, context.monthExpenses);
         queueAffectedShareUpdates(batch, context.monthExpenses, affectedShares, currentPayment, {
           isSettled,
@@ -1320,14 +1372,14 @@ function App() {
       }
 
       batch.update(doc(db, "settlements", currentPayment.id), {
-        schemaVersion: 2,
+        schemaVersion: 3,
         amount: paymentAmount,
         paidAt,
         type: paymentType,
         description,
         status: isSettled ? "settled" : "partial",
         balanceAfterPayment: balanceBeforePayment > 0 ? roundMoney(balanceBeforePayment - paymentAmount) : 0,
-        affectedShares: isSettled ? affectedShares : [],
+        affectedShares: isDebtSelection || isSettled ? affectedShares : [],
         updatedAt: serverTimestamp(),
         updatedBy: profile.id,
       });
@@ -1357,7 +1409,10 @@ function App() {
       }
 
       const batch = writeBatch(db);
-      if (currentPayment.status === "settled") {
+      if (
+        currentPayment.status === "settled" ||
+        (Array.isArray(currentPayment.affectedShares) && currentPayment.affectedShares.length)
+      ) {
         const affectedShares = getAffectedSharesForExistingPayment(currentPayment, context.monthExpenses);
         queueAffectedShareUpdates(batch, context.monthExpenses, affectedShares, currentPayment, {
           isSettled: false,
@@ -1918,6 +1973,7 @@ function App() {
 
         {canManageData && activeView === "settlement" && (
           <SettlementPanel
+            expenses={expenses}
             firebaseUser={firebaseUser}
             onMonthChange={setSelectedMonth}
             rows={settlementSummaries}

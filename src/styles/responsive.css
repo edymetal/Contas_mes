@@ -709,6 +709,24 @@
     grid-template-columns: 1fr;
   }
 
+  .settlement-payment-mode {
+    grid-template-columns: 1fr;
+  }
+
+  .settlement-debt-picker-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settlement-debt-option {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .settlement-debt-amount {
+    grid-column: 2;
+    justify-self: start;
+  }
+
   .settlement-people,
   .settlement-balance-summary,
   .settlement-payment-form,

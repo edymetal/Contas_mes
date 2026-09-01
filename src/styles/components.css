@@ -4164,6 +4164,145 @@ textarea:focus {
   font-size: 0.85rem;
 }
 
+.settlement-payment-mode {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px !important;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+}
+
+.settlement-payment-mode button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 4px);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.settlement-payment-mode button:hover,
+.settlement-payment-mode button.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.settlement-debt-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.settlement-debt-picker legend {
+  padding: 0 6px;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.settlement-debt-picker-heading {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px !important;
+}
+
+.settlement-select-all {
+  flex: 0 0 auto;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.settlement-debt-list {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.settlement-debt-option {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+  cursor: pointer;
+}
+
+.settlement-debt-option:hover,
+.settlement-debt-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.settlement-debt-option input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.settlement-debt-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settlement-debt-main strong {
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlement-debt-main small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.settlement-debt-amount {
+  color: var(--primary) !important;
+  font-size: 0.95rem !important;
+  white-space: nowrap;
+}
+
+.settlement-debt-empty {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.settlement-selected-total {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px !important;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.settlement-selected-total strong {
+  color: var(--primary);
+  font-size: 1.3rem;
+}
+
 .settlement-description-field,
 .settlement-payment-actions {
   grid-column: 1 / -1;
@@ -4266,6 +4405,15 @@ textarea:focus {
 .settlement-history-main span {
   color: var(--text);
   font-weight: 700;
+}
+
+.settlement-payment-actions.single {
+  grid-template-columns: 1fr;
+}
+
+.settlement-payment-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .settlement-history-people {
