@@ -34,6 +34,7 @@ test("Acerto usa o mês global para cálculos e histórico", () => {
 
   assert.match(settlementProps, /selectedMonth=\{selectedMonth\}/);
   assert.match(settlementProps, /onMonthChange=\{setSelectedMonth\}/);
+  assert.match(settlementProps, /expenses=\{expenses\}/);
   assert.doesNotMatch(settlementSource, /historyMonth/);
   assert.match(
     settlementSource,

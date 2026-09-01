@@ -5,6 +5,7 @@ import {
   calculateSettlementRows,
   calculateSettlementSummaries,
   collectPendingSettlementShares,
+  getSelectableSettlementDebts,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
   resolveLegacyAffectedShares,
@@ -200,6 +201,97 @@ test("seleciona somente os rateios pendentes envolvidos na quitação", () => {
       previousPayment: null,
     },
   ]);
+});
+
+test("lista dívidas selecionáveis com o valor restante após pagamentos e compensações", () => {
+  const expenses = [
+    expense({
+      id: "internet",
+      payerId: "edney",
+      shares: { sonia: { amount: 30, status: "pending", payment: null } },
+    }),
+    expense({
+      id: "energia",
+      payerId: "edney",
+      shares: { sonia: { amount: 40, status: "pending", payment: null } },
+    }),
+    expense({
+      id: "already-settled",
+      payerId: "edney",
+      shares: { sonia: { amount: 25, status: "settled", payment: { settlementId: "old" } } },
+    }),
+    expense({
+      id: "reverse-credit",
+      payerId: "sonia",
+      shares: { edney: { amount: 15, status: "pending", payment: null } },
+    }),
+  ];
+  expenses[0].title = "Internet";
+  expenses[0].dueDate = "2026-07-05";
+  expenses[1].title = "Energia";
+  expenses[1].dueDate = "2026-07-10";
+
+  assert.deepEqual(
+    getSelectableSettlementDebts(expenses, {
+      fromId: "sonia",
+      toId: "edney",
+      amount: 55,
+    }),
+    [
+      {
+        expenseId: "internet",
+        personId: "sonia",
+        direction: "direct",
+        previousStatus: "pending",
+        previousPayment: null,
+        title: "Internet",
+        category: "",
+        dueDate: "2026-07-05",
+        originalAmount: 30,
+        amount: 15,
+      },
+      {
+        expenseId: "energia",
+        personId: "sonia",
+        direction: "direct",
+        previousStatus: "pending",
+        previousPayment: null,
+        title: "Energia",
+        category: "",
+        dueDate: "2026-07-10",
+        originalAmount: 40,
+        amount: 40,
+      },
+    ],
+  );
+});
+
+test("não oferece como seleção dívidas já cobertas integralmente pelo saldo abatido", () => {
+  const expenses = [
+    expense({
+      id: "oldest",
+      payerId: "edney",
+      shares: { sonia: { amount: 20, status: "pending" } },
+    }),
+    expense({
+      id: "newest",
+      payerId: "edney",
+      shares: { sonia: { amount: 30, status: "pending" } },
+    }),
+  ];
+  expenses[0].title = "Mais antiga";
+  expenses[0].dueDate = "2026-07-01";
+  expenses[1].title = "Mais nova";
+  expenses[1].dueDate = "2026-07-02";
+
+  assert.deepEqual(
+    getSelectableSettlementDebts(expenses, {
+      fromId: "sonia",
+      toId: "edney",
+      amount: 30,
+    }).map(({ expenseId, amount }) => ({ expenseId, amount })),
+    [{ expenseId: "newest", amount: 30 }],
+  );
 });
 
 test("identifica pagamento posterior do mesmo par e mês, mesmo no sentido inverso", () => {

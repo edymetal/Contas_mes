@@ -213,6 +213,49 @@ test("Acerto oculta os usuários e o resumo quando não há dívida pendente", (
   assert.doesNotMatch(html, /Registrar pagamento/);
 });
 
+test("Acerto mantém pagamento por valor e oferece seleção de dívidas", () => {
+  const html = renderToStaticMarkup(
+    createElement(SettlementModule.SettlementPanel, {
+      expenses: [
+        {
+          id: "internet",
+          category: "Casa",
+          dueDate: "2026-07-10",
+          payerId: "edney",
+          shares: {
+            sonia: { amount: 80, status: "pending", payment: null },
+          },
+          title: "Internet",
+        },
+      ],
+      firebaseUser: null,
+      onDeletePayment() {},
+      onMonthChange() {},
+      onRegisterPayment() {},
+      onUpdatePayment() {},
+      rows: [
+        {
+          fromId: "sonia",
+          toId: "edney",
+          originalAmount: 80,
+          paidAmount: 0,
+          crossPaidAmount: 0,
+          amount: 80,
+        },
+      ],
+      selectedMonth: "2026-07",
+      settlementPayments: [],
+      userProfiles: {},
+    }),
+  );
+
+  assert.match(html, /Registrar pagamento/);
+  assert.match(html, /Informar valor/);
+  assert.match(html, /Selecionar dívidas/);
+  assert.match(html, /Valor do pagamento/);
+  assert.match(html, /Pagar tudo/);
+});
+
 test("resumo pessoal inclui valores a receber mesmo sem o pagador participar do rateio", () => {
   const html = renderToStaticMarkup(
     createElement(PersonExpensesModule.PersonExpenses, {

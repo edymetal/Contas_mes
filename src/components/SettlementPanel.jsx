@@ -5,6 +5,7 @@ import { PersonAvatar } from "./PersonExpenses";
 import { PAYMENT_TYPES, getPersonById } from "../config/people";
 import { roundMoney } from "../domain/expenses";
 import {
+  getSelectableSettlementDebts,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
 } from "../domain/settlements";
@@ -89,6 +90,7 @@ export function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
   );
 }
 export function SettlementPanel({
+  expenses = [],
   firebaseUser,
   onDeletePayment,
   onRegisterPayment,
@@ -104,6 +106,8 @@ export function SettlementPanel({
     [rows],
   );
   const [paymentForms, setPaymentForms] = useState({});
+  const [paymentModes, setPaymentModes] = useState({});
+  const [selectedDebtIds, setSelectedDebtIds] = useState({});
   const [activeSettlementKey, setActiveSettlementKey] = useState(
     () => pendingRows[0] ? getRowKey(pendingRows[0]) : null,
   );
@@ -151,6 +155,14 @@ export function SettlementPanel({
     };
   }
 
+  function getPaymentMode(row) {
+    return paymentModes[getRowKey(row)] || "amount";
+  }
+
+  function getSelectedDebtIds(row) {
+    return selectedDebtIds[getRowKey(row)] || [];
+  }
+
   useEffect(() => {
     if (!pendingRows.length) {
       setActiveSettlementKey(null);
@@ -180,13 +192,42 @@ export function SettlementPanel({
     }));
   }
 
-  async function submitPayment(event, row, amountOverride) {
+  function updatePaymentMode(row, mode) {
+    const key = getRowKey(row);
+    setPaymentModes((current) => ({ ...current, [key]: mode }));
+  }
+
+  function toggleSelectedDebt(row, expenseId) {
+    const key = getRowKey(row);
+    setSelectedDebtIds((current) => {
+      const currentIds = current[key] || [];
+      const nextIds = currentIds.includes(expenseId)
+        ? currentIds.filter((id) => id !== expenseId)
+        : [...currentIds, expenseId];
+      return { ...current, [key]: nextIds };
+    });
+  }
+
+  function selectAllDebts(row, debts) {
+    const key = getRowKey(row);
+    const availableIds = debts.map((debt) => debt.expenseId);
+    const allSelected = availableIds.length > 0 && availableIds.every(
+      (expenseId) => getSelectedDebtIds(row).includes(expenseId),
+    );
+    setSelectedDebtIds((current) => ({
+      ...current,
+      [key]: allSelected ? [] : availableIds,
+    }));
+  }
+
+  async function submitPayment(event, row, amountOverride, options = {}) {
     event?.preventDefault();
     const key = getRowKey(row);
     const form = getPaymentForm(row);
     const saved = await onRegisterPayment(row, {
       ...form,
       amount: amountOverride ?? form.amount,
+      ...options,
     });
 
     if (!saved) return;
@@ -199,6 +240,7 @@ export function SettlementPanel({
         description: "",
       },
     }));
+    setSelectedDebtIds((current) => ({ ...current, [key]: [] }));
   }
 
   function startEditingPayment(payment) {
@@ -268,6 +310,17 @@ export function SettlementPanel({
             <div className="settlement-grid">
               {[selectedRow].map((row) => {
             const form = getPaymentForm(row);
+            const paymentMode = getPaymentMode(row);
+            const selectableDebts = getSelectableSettlementDebts(expenses, row);
+            const availableDebtIds = new Set(selectableDebts.map((debt) => debt.expenseId));
+            const selectedIds = getSelectedDebtIds(row).filter((expenseId) => availableDebtIds.has(expenseId));
+            const selectedTotal = roundMoney(selectableDebts.reduce(
+              (total, debt) => selectedIds.includes(debt.expenseId) ? total + debt.amount : total,
+              0,
+            ));
+            const allDebtsSelected = selectableDebts.length > 0 && selectableDebts.every(
+              (debt) => selectedIds.includes(debt.expenseId),
+            );
 
             return (
               <article className="settlement-card settlement-payment-card" key={getRowKey(row)}>
@@ -304,25 +357,104 @@ export function SettlementPanel({
                   </div>
                 </div>
 
-                <form className="settlement-payment-form" onSubmit={(event) => submitPayment(event, row)}>
+                <form
+                  className="settlement-payment-form"
+                  onSubmit={(event) => paymentMode === "debts"
+                    ? submitPayment(event, row, selectedTotal, {
+                        selectionMode: "debts",
+                        selectedDebtIds: selectedIds,
+                      })
+                    : submitPayment(event, row, undefined, { selectionMode: "amount" })}
+                >
                     <div className="settlement-form-title">
                       <strong>Registrar pagamento</strong>
-                      <span>Informe um valor parcial ou quite o restante da dívida.</span>
+                      <span>Informe um valor ou escolha exatamente quais dívidas deseja pagar.</span>
                     </div>
 
-                    <label>
-                      <span>Valor do pagamento</span>
-                      <input
-                        inputMode="decimal"
-                        min="0.01"
-                        step="0.01"
-                        type="number"
-                        value={form.amount}
-                        onChange={(event) => updatePaymentForm(row, "amount", event.target.value)}
-                        placeholder={String(row.amount).replace(".", ",")}
-                        required
-                      />
-                    </label>
+                    <div className="settlement-payment-mode" aria-label="Forma de informar o pagamento" role="group">
+                      <button
+                        aria-pressed={paymentMode === "amount"}
+                        className={paymentMode === "amount" ? "active" : ""}
+                        onClick={() => updatePaymentMode(row, "amount")}
+                        type="button"
+                      >
+                        Informar valor
+                      </button>
+                      <button
+                        aria-pressed={paymentMode === "debts"}
+                        className={paymentMode === "debts" ? "active" : ""}
+                        onClick={() => updatePaymentMode(row, "debts")}
+                        type="button"
+                      >
+                        Selecionar dívidas
+                      </button>
+                    </div>
+
+                    {paymentMode === "amount" ? (
+                      <label>
+                        <span>Valor do pagamento</span>
+                        <input
+                          inputMode="decimal"
+                          min="0.01"
+                          step="0.01"
+                          type="number"
+                          value={form.amount}
+                          onChange={(event) => updatePaymentForm(row, "amount", event.target.value)}
+                          placeholder={String(row.amount).replace(".", ",")}
+                          required
+                        />
+                      </label>
+                    ) : (
+                      <fieldset className="settlement-debt-picker">
+                        <legend>Dívidas pendentes</legend>
+                        <div className="settlement-debt-picker-heading">
+                          <span>Selecione uma ou mais dívidas para calcular o pagamento.</span>
+                          {selectableDebts.length > 1 && (
+                            <button
+                              className="settlement-select-all"
+                              onClick={() => selectAllDebts(row, selectableDebts)}
+                              type="button"
+                            >
+                              {allDebtsSelected ? "Limpar seleção" : "Selecionar todas"}
+                            </button>
+                          )}
+                        </div>
+
+                        {selectableDebts.length ? (
+                          <div className="settlement-debt-list">
+                            {selectableDebts.map((debt) => (
+                              <label className="settlement-debt-option" key={debt.expenseId}>
+                                <input
+                                  checked={selectedIds.includes(debt.expenseId)}
+                                  onChange={() => toggleSelectedDebt(row, debt.expenseId)}
+                                  type="checkbox"
+                                />
+                                <span className="settlement-debt-main">
+                                  <strong>{debt.title}</strong>
+                                  <small>
+                                    {debt.category ? `${debt.category} • ` : ""}
+                                    {debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : "Sem vencimento"}
+                                    {debt.amount !== debt.originalAmount
+                                      ? ` • Original ${formatCurrency(debt.originalAmount)}`
+                                      : ""}
+                                  </small>
+                                </span>
+                                <strong className="settlement-debt-amount">{formatCurrency(debt.amount)}</strong>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="settlement-debt-empty">
+                            Não há dívidas individuais disponíveis para seleção neste saldo.
+                          </div>
+                        )}
+
+                        <div className="settlement-selected-total" aria-live="polite">
+                          <span>Valor a pagar</span>
+                          <strong>{formatCurrency(selectedTotal)}</strong>
+                        </div>
+                      </fieldset>
+                    )}
 
                     <label>
                       <span>Data</span>
@@ -351,17 +483,29 @@ export function SettlementPanel({
                       />
                     </label>
 
-                    <div className="settlement-payment-actions">
-                      <button className="primary-button" type="submit">
-                        Pagamento
-                      </button>
-                      <button
-                        className="secondary-button"
-                        onClick={(event) => submitPayment(event, row, row.amount)}
-                        type="button"
-                      >
-                        Pagar Tudo
-                      </button>
+                    <div className={`settlement-payment-actions${paymentMode === "debts" ? " single" : ""}`}>
+                      {paymentMode === "debts" ? (
+                        <button
+                          className="primary-button"
+                          disabled={!selectedIds.length}
+                          type="submit"
+                        >
+                          Registrar pagamento de {selectedIds.length || 0} dívida(s)
+                        </button>
+                      ) : (
+                        <>
+                          <button className="primary-button" type="submit">
+                            Registrar pagamento
+                          </button>
+                          <button
+                            className="secondary-button"
+                            onClick={(event) => submitPayment(event, row, row.amount, { selectionMode: "amount" })}
+                            type="button"
+                          >
+                            Pagar tudo
+                          </button>
+                        </>
+                      )}
                     </div>
                 </form>
               </article>
@@ -399,6 +543,8 @@ export function SettlementPanel({
                   {group.payments.map((payment) => {
                     const isEditing = editingPaymentId === payment.id;
                     const hasLaterPayment = hasLaterSettlementPayment(payment, settlementPayments);
+                    const isDebtSelection = payment.selectionMode === "debts";
+                    const isAmountLocked = hasLaterPayment || isDebtSelection;
                     const fromPerson = getPersonById(payment.fromId) || {
                       id: payment.fromId,
                       name: personName(payment.fromId),
@@ -423,8 +569,14 @@ export function SettlementPanel({
                           onChange={(event) =>
                             setEditingPaymentForm((current) => ({ ...current, amount: event.target.value }))
                           }
-                          readOnly={hasLaterPayment}
-                          title={hasLaterPayment ? "Ajuste primeiro os pagamentos mais recentes deste acerto." : ""}
+                          readOnly={isAmountLocked}
+                          title={
+                            isDebtSelection
+                              ? "O valor é definido pelas dívidas vinculadas a este pagamento."
+                              : hasLaterPayment
+                                ? "Ajuste primeiro os pagamentos mais recentes deste acerto."
+                                : ""
+                          }
                           required
                         />
                       </label>
@@ -465,9 +617,11 @@ export function SettlementPanel({
                         />
                       </label>
 
-                      {hasLaterPayment && (
+                      {isAmountLocked && (
                         <small className="settlement-history-description">
-                          O valor está protegido porque há pagamentos posteriores. Data, tipo e descrição ainda podem ser editados.
+                          {isDebtSelection
+                            ? "O valor está protegido porque foi calculado pelas dívidas selecionadas. Data, tipo e descrição ainda podem ser editados."
+                            : "O valor está protegido porque há pagamentos posteriores. Data, tipo e descrição ainda podem ser editados."}
                         </small>
                       )}
 
@@ -509,6 +663,16 @@ export function SettlementPanel({
                           {formatDate(payment.paidAt)} - {payment.type || "PIX"}
                           {payment.description ? ` - ${payment.description}` : ""}
                         </small>
+                        {isDebtSelection && (
+                          <small>
+                            {payment.selectedDebts?.length || payment.affectedShares?.filter(
+                              (share) => share.direction === "direct",
+                            ).length || 0} dívida(s) selecionada(s)
+                            {payment.selectedDebts?.length
+                              ? `: ${payment.selectedDebts.map((debt) => debt.title).join(", ")}`
+                              : ""}
+                          </small>
+                        )}
                         <small>Referente a {formatMonthLabel(payment.monthKey)}</small>
                       </div>
 

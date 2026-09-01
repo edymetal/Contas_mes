@@ -82,6 +82,53 @@ export function collectPendingSettlementShares(expenses = [], row = {}) {
   return affectedShares;
 }
 
+export function getSelectableSettlementDebts(expenses = [], row = {}) {
+  const pendingDebts = expenses
+    .flatMap((expense) => {
+      const share = expense?.shares?.[row.fromId];
+      const originalAmount = roundMoney(share?.amount);
+      if (
+        expense?.payerId !== row.toId ||
+        share?.status !== "pending" ||
+        originalAmount <= 0
+      ) {
+        return [];
+      }
+
+      return [{
+        expenseId: expense.id,
+        personId: row.fromId,
+        direction: "direct",
+        previousStatus: share.status,
+        previousPayment: share.payment ?? null,
+        title: expense.title || "Dívida sem descrição",
+        category: expense.category || "",
+        dueDate: expense.dueDate || "",
+        originalAmount,
+      }];
+    })
+    .sort((first, second) => (
+      (first.dueDate || "9999-12-31").localeCompare(second.dueDate || "9999-12-31") ||
+      first.title.localeCompare(second.title, "pt-BR") ||
+      String(first.expenseId).localeCompare(String(second.expenseId))
+    ));
+
+  const pendingTotal = roundMoney(
+    pendingDebts.reduce((total, debt) => total + debt.originalAmount, 0),
+  );
+  let reductionToApply = roundMoney(
+    Math.max(pendingTotal - Math.max(Number(row.amount || 0), 0), 0),
+  );
+
+  return pendingDebts.flatMap((debt) => {
+    const reduction = Math.min(debt.originalAmount, reductionToApply);
+    const amount = roundMoney(debt.originalAmount - reduction);
+    reductionToApply = roundMoney(reductionToApply - reduction);
+
+    return amount > 0 ? [{ ...debt, amount }] : [];
+  });
+}
+
 function isLegacyShareMatch(expense, personId, payment, direction) {
   const share = expense?.shares?.[personId];
   const sharePayment = share?.payment;
