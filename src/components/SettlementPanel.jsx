@@ -5,6 +5,7 @@ import { PersonAvatar } from "./PersonExpenses";
 import { PAYMENT_TYPES, getPersonById } from "../config/people";
 import { roundMoney } from "../domain/expenses";
 import {
+  calculateSettlementDebtSelection,
   getSelectableSettlementDebts,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
@@ -314,10 +315,11 @@ export function SettlementPanel({
             const selectableDebts = getSelectableSettlementDebts(expenses, row);
             const availableDebtIds = new Set(selectableDebts.map((debt) => debt.expenseId));
             const selectedIds = getSelectedDebtIds(row).filter((expenseId) => availableDebtIds.has(expenseId));
-            const selectedTotal = roundMoney(selectableDebts.reduce(
-              (total, debt) => selectedIds.includes(debt.expenseId) ? total + debt.amount : total,
-              0,
-            ));
+            const debtSelection = calculateSettlementDebtSelection(
+              selectableDebts.filter((debt) => selectedIds.includes(debt.expenseId)),
+              row,
+            );
+            const selectedTotal = debtSelection.amount;
             const allDebtsSelected = selectableDebts.length > 0 && selectableDebts.every(
               (debt) => selectedIds.includes(debt.expenseId),
             );
@@ -408,7 +410,7 @@ export function SettlementPanel({
                       <fieldset className="settlement-debt-picker">
                         <legend>Dívidas pendentes</legend>
                         <div className="settlement-debt-picker-heading">
-                          <span>Selecione uma ou mais dívidas para calcular o pagamento.</span>
+                          <span>Todas as dívidas pendentes deste mês entre {personName(row.fromId)} e {personName(row.toId)}. O pagamento considera os abatimentos e o saldo restante.</span>
                           {selectableDebts.length > 1 && (
                             <button
                               className="settlement-select-all"
@@ -434,9 +436,6 @@ export function SettlementPanel({
                                   <small>
                                     {debt.category ? `${debt.category} • ` : ""}
                                     {debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : "Sem vencimento"}
-                                    {debt.amount !== debt.originalAmount
-                                      ? ` • Original ${formatCurrency(debt.originalAmount)}`
-                                      : ""}
                                   </small>
                                 </span>
                                 <strong className="settlement-debt-amount">{formatCurrency(debt.amount)}</strong>
@@ -453,6 +452,14 @@ export function SettlementPanel({
                           <span>Valor a pagar</span>
                           <strong>{formatCurrency(selectedTotal)}</strong>
                         </div>
+                        {selectedIds.length > 0 && selectedTotal >= row.amount && (
+                          <div className="settlement-debt-empty" role="status">
+                            {debtSelection.amount < debtSelection.originalAmount
+                              ? "O pagamento foi limitado ao saldo restante após os abatimentos. "
+                              : ""}
+                            Este pagamento quitará todo o acerto, incluindo as demais dívidas pendentes compensadas.
+                          </div>
+                        )}
                       </fieldset>
                     )}
 

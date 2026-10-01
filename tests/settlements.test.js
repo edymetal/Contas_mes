@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  calculateSettlementDebtSelection,
   calculatePersonSettlementSummary,
   calculateSettlementRows,
   calculateSettlementSummaries,
@@ -203,7 +204,7 @@ test("seleciona somente os rateios pendentes envolvidos na quitação", () => {
   ]);
 });
 
-test("lista dívidas selecionáveis com o valor restante após pagamentos e compensações", () => {
+test("lista todas as dívidas pendentes sem atribuir abatimentos antes da seleção", () => {
   const expenses = [
     expense({
       id: "internet",
@@ -248,7 +249,7 @@ test("lista dívidas selecionáveis com o valor restante após pagamentos e comp
         category: "",
         dueDate: "2026-07-05",
         originalAmount: 30,
-        amount: 15,
+        amount: 30,
       },
       {
         expenseId: "energia",
@@ -266,7 +267,7 @@ test("lista dívidas selecionáveis com o valor restante após pagamentos e comp
   );
 });
 
-test("não oferece como seleção dívidas já cobertas integralmente pelo saldo abatido", () => {
+test("mantém selecionável a dívida mais antiga mesmo quando o abatimento cobre seu valor", () => {
   const expenses = [
     expense({
       id: "oldest",
@@ -290,8 +291,54 @@ test("não oferece como seleção dívidas já cobertas integralmente pelo saldo
       toId: "edney",
       amount: 30,
     }).map(({ expenseId, amount }) => ({ expenseId, amount })),
-    [{ expenseId: "newest", amount: 30 }],
+    [{ expenseId: "oldest", amount: 20 }, { expenseId: "newest", amount: 30 }],
   );
+});
+
+test("permite pagar qualquer dívida e limita a seleção ao saldo restante", () => {
+  const expenses = [
+    expense({ id: "oldest", payerId: "edney", shares: { sonia: { amount: 20, status: "pending" } } }),
+    expense({ id: "newest", payerId: "edney", shares: { sonia: { amount: 30, status: "pending" } } }),
+    expense({ id: "credit", payerId: "sonia", shares: { edney: { amount: 20, status: "pending" } } }),
+  ];
+  const [row] = calculateSettlementRows(expenses);
+  const debts = getSelectableSettlementDebts(expenses, row);
+  const oldestDebt = debts.filter((debt) => debt.expenseId === "oldest");
+
+  assert.equal(calculateSettlementDebtSelection(oldestDebt, row).amount, 20);
+  const fullSelection = calculateSettlementDebtSelection(debts, row);
+  assert.equal(fullSelection.originalAmount, 50);
+  assert.equal(fullSelection.amount, 30);
+  assert.equal(fullSelection.debts.length, 2);
+  assert.equal(fullSelection.debts.reduce((total, debt) => total + debt.amount, 0), 30);
+
+  expenses[0].shares.sonia.status = "settled";
+  const payments = [{ fromId: row.fromId, toId: row.toId, amount: 20 }];
+  const [remainingRow] = calculateSettlementRows(expenses, payments);
+  const remainingDebts = getSelectableSettlementDebts(expenses, remainingRow);
+  assert.deepEqual(remainingDebts.map((debt) => debt.expenseId), ["newest"]);
+  assert.equal(calculateSettlementDebtSelection(remainingDebts, remainingRow).amount, 10);
+});
+
+test("seleção respeita pagamentos anteriores, centavos e saldos sem valor pendente", () => {
+  const expenses = [
+    expense({ id: "internet", payerId: "edney", shares: { sonia: { amount: 20.01, status: "pending" } } }),
+    expense({ id: "energia", payerId: "edney", shares: { sonia: { amount: 30.02, status: "pending" } } }),
+    expense({ id: "paid", payerId: "edney", shares: { sonia: { amount: 10, status: "paid" } } }),
+    expense({ id: "other-person", payerId: "edney", shares: { rodney: { amount: 15, status: "pending" } } }),
+    expense({ id: "no-value", payerId: "edney", shares: { sonia: { amount: 0, status: "pending" } } }),
+  ];
+  const payments = [{ fromId: "sonia", toId: "edney", amount: 20.01 }];
+  const row = calculateSettlementRows(expenses, payments).find((row) => row.fromId === "sonia");
+  const debts = getSelectableSettlementDebts(expenses, row);
+  assert.deepEqual(debts.map((debt) => debt.expenseId).sort(), ["energia", "internet"]);
+  const selection = calculateSettlementDebtSelection(debts, row);
+  assert.equal(selection.originalAmount, 50.03);
+  assert.equal(selection.amount, 30.02);
+  assert.equal(Math.round(selection.debts.reduce((total, debt) => total + debt.amount, 0) * 100), 3002);
+  assert.deepEqual(calculateSettlementDebtSelection([], row), { amount: 0, originalAmount: 0, debts: [] });
+  assert.equal(calculateSettlementDebtSelection(debts, { amount: 0 }).amount, 0);
+  assert.equal(calculateSettlementDebtSelection(debts, { amount: -10 }).amount, 0);
 });
 
 test("identifica pagamento posterior do mesmo par e mês, mesmo no sentido inverso", () => {
