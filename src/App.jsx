@@ -54,6 +54,7 @@ import { PaymentModal, SettlementPanel } from "./components/SettlementPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { canAccessView, isAdminProfile } from "./domain/access";
 import {
+  calculateSettlementDebtSelection,
   calculateSettlementSummaries,
   collectPendingSettlementShares,
   getSelectableSettlementDebts,
@@ -1208,7 +1209,9 @@ function App() {
         return false;
       }
 
-      rawAmount = selectedDebts.reduce((total, debt) => total + debt.amount, 0);
+      const debtSelection = calculateSettlementDebtSelection(selectedDebts, row);
+      selectedDebts = debtSelection.debts;
+      rawAmount = debtSelection.amount;
     }
 
     if (isNaN(rawAmount) || rawAmount <= 0) {
