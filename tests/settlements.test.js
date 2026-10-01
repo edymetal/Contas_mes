@@ -7,6 +7,7 @@ import {
   calculateSettlementSummaries,
   collectPendingSettlementShares,
   getSelectableSettlementDebts,
+  getSettlementDebts,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
   resolveLegacyAffectedShares,
@@ -265,6 +266,31 @@ test("lista todas as dívidas pendentes sem atribuir abatimentos antes da seleç
       },
     ],
   );
+});
+
+test("mantém dívidas pagas na consulta sem permitir selecioná-las novamente", () => {
+  const expenses = [
+    expense({ id: "pending", payerId: "edney", shares: { sonia: { amount: 30, status: "pending" } } }),
+    expense({ id: "selected-paid", payerId: "edney", shares: { sonia: { amount: 20, status: "settled", payment: { paidAt: "2026-07-12", settlementId: "payment" } } } }),
+    expense({ id: "direct-paid", payerId: "edney", shares: { sonia: { amount: 10, status: "paid", payment: { paidAt: "2026-07-10" } } } }),
+    expense({ id: "other-person", payerId: "edney", shares: { rodney: { amount: 15, status: "paid" } } }),
+    expense({ id: "reverse", payerId: "sonia", shares: { edney: { amount: 15, status: "settled" } } }),
+    expense({ id: "self", payerId: "edney", shares: { sonia: { amount: 15, status: "self" } } }),
+    expense({ id: "empty", payerId: "edney", shares: { sonia: { amount: 0, status: "paid" } } }),
+  ];
+  const row = { fromId: "sonia", toId: "edney", amount: 30 };
+  const debts = getSettlementDebts(expenses, row);
+  assert.deepEqual(debts.map((debt) => debt.expenseId).sort(), ["direct-paid", "pending", "selected-paid"]);
+  assert.equal(debts.find((debt) => debt.expenseId === "selected-paid").previousPayment.paidAt, "2026-07-12");
+  assert.deepEqual(getSelectableSettlementDebts(expenses, row).map((debt) => debt.expenseId), ["pending"]);
+
+  expenses[0].shares.sonia.status = "settled";
+  assert.equal(getSettlementDebts(expenses, { ...row, amount: 0 }).length, 3);
+  assert.equal(getSelectableSettlementDebts(expenses, { ...row, amount: 0 }).length, 0);
+
+  expenses[1].shares.sonia.status = "pending";
+  expenses[1].shares.sonia.payment = null;
+  assert.deepEqual(getSelectableSettlementDebts(expenses, row).map((debt) => debt.expenseId), ["selected-paid"]);
 });
 
 test("mantém selecionável a dívida mais antiga mesmo quando o abatimento cobre seu valor", () => {

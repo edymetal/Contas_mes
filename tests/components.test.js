@@ -153,7 +153,7 @@ test("dashboard renderiza indicadores, categoria e próximo vencimento", () => {
   assert.match(html, /150,00/);
 });
 
-test("Acerto oculta os usuários e o resumo quando não há dívida pendente", () => {
+test("Acerto oculta os usuários e o resumo quando não há dívidas para consultar", () => {
   const html = renderToStaticMarkup(
     createElement(SettlementModule.SettlementPanel, {
       firebaseUser: null,
@@ -254,6 +254,54 @@ test("Acerto mantém pagamento por valor e oferece seleção de dívidas", () =>
   assert.match(html, /Selecionar dívidas/);
   assert.match(html, /Valor do pagamento/);
   assert.match(html, /Pagar tudo/);
+});
+
+test("lista de dívidas indica pagamentos e compensações com seleção bloqueada", () => {
+  const html = renderToStaticMarkup(
+    createElement(SettlementModule.SettlementDebtList, {
+      debts: [
+        { expenseId: "internet", title: "Internet", amount: 20, previousStatus: "settled", previousPayment: { paidAt: "2026-07-12", type: "PIX" } },
+        { expenseId: "energia", title: "Energia", amount: 30, previousStatus: "pending", previousPayment: null },
+        { expenseId: "credit", title: "Crédito", amount: 10, previousStatus: "settled", previousPayment: { paidAt: "2026-07-11", type: "Compensação" } },
+      ],
+      selectedIds: ["energia"],
+      onToggleDebt() {},
+    }),
+  );
+
+  assert.match(html, /Internet/);
+  assert.match(html, /Paga em 12\/07\/2026/);
+  assert.match(html, /Compensada em 11\/07\/2026/);
+  assert.match(html, /status-badge paid/);
+  assert.match(html, /status-badge pending/);
+  assert.equal((html.match(/disabled=""/g) || []).length, 2);
+  assert.equal((html.match(/checked=""/g) || []).length, 3);
+  assert.equal((html.match(/settlement-debt-option is-paid/g) || []).length, 2);
+});
+
+test("Acerto mantém a consulta às dívidas pagas após quitar todo o saldo", () => {
+  const html = renderToStaticMarkup(
+    createElement(SettlementModule.SettlementPanel, {
+      expenses: [
+        { id: "internet", title: "Internet", payerId: "edney", shares: { sonia: { amount: 20, status: "settled", payment: { paidAt: "2026-07-12", type: "PIX" } } } },
+        { id: "energia", title: "Energia", payerId: "edney", shares: { sonia: { amount: 30, status: "settled", payment: { paidAt: "2026-07-15", type: "PIX" } } } },
+      ],
+      rows: [{ fromId: "sonia", toId: "edney", originalAmount: 50, paidAmount: 50, crossPaidAmount: 0, amount: 0 }],
+      selectedMonth: "2026-07",
+      onMonthChange() {},
+    }),
+  );
+
+  assert.match(html, /0 acerto\(s\) pendente\(s\)/);
+  assert.match(html, /Quitado/);
+  assert.match(html, /Selecionar dívidas/);
+  assert.match(html, /Internet/);
+  assert.match(html, /Energia/);
+  assert.equal((html.match(/disabled=""/g) || []).length, 2);
+  assert.equal((html.match(/checked=""/g) || []).length, 2);
+  assert.doesNotMatch(html, /Registrar pagamento/);
+  assert.doesNotMatch(html, /Selecionar todas/);
+  assert.doesNotMatch(html, /Valor a pagar/);
 });
 
 test("resumo pessoal inclui valores a receber mesmo sem o pagador participar do rateio", () => {

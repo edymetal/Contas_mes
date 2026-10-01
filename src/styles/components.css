@@ -4242,10 +4242,20 @@ textarea:focus {
   cursor: pointer;
 }
 
-.settlement-debt-option:hover,
-.settlement-debt-option:has(input:checked) {
+.settlement-debt-option:not(.is-paid):hover,
+.settlement-debt-option:not(.is-paid):has(input:checked) {
   border-color: var(--primary);
   background: var(--primary-soft);
+}
+
+.settlement-debt-option.is-paid {
+  border-color: var(--success);
+  background: var(--success-soft);
+  cursor: default;
+}
+
+.settlement-debt-option.is-paid input {
+  accent-color: var(--success);
 }
 
 .settlement-debt-option input {
@@ -4266,6 +4276,10 @@ textarea:focus {
   font-size: 0.95rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settlement-debt-main .status-badge {
+  justify-self: start;
 }
 
 .settlement-debt-main small {

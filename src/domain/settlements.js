@@ -82,14 +82,14 @@ export function collectPendingSettlementShares(expenses = [], row = {}) {
   return affectedShares;
 }
 
-export function getSelectableSettlementDebts(expenses = [], row = {}) {
+export function getSettlementDebts(expenses = [], row = {}) {
   return expenses
     .flatMap((expense) => {
       const share = expense?.shares?.[row.fromId];
       const originalAmount = roundMoney(share?.amount);
       if (
         expense?.payerId !== row.toId ||
-        share?.status !== "pending" ||
+        !["pending", "paid", "settled"].includes(share?.status) ||
         originalAmount <= 0
       ) {
         return [];
@@ -113,6 +113,10 @@ export function getSelectableSettlementDebts(expenses = [], row = {}) {
       first.title.localeCompare(second.title, "pt-BR") ||
       String(first.expenseId).localeCompare(String(second.expenseId))
     ));
+}
+
+export function getSelectableSettlementDebts(expenses = [], row = {}) {
+  return getSettlementDebts(expenses, row).filter((debt) => debt.previousStatus === "pending");
 }
 
 export function calculateSettlementDebtSelection(debts = [], row = {}) {

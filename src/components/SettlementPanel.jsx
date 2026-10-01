@@ -6,7 +6,7 @@ import { PAYMENT_TYPES, getPersonById } from "../config/people";
 import { roundMoney } from "../domain/expenses";
 import {
   calculateSettlementDebtSelection,
-  getSelectableSettlementDebts,
+  getSettlementDebts,
   getSettlementAccountingMonth,
   hasLaterSettlementPayment,
 } from "../domain/settlements";
@@ -90,6 +90,42 @@ export function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
     </div>
   );
 }
+export function SettlementDebtList({ debts = [], selectedIds = [], onToggleDebt }) {
+  return (
+    <div className="settlement-debt-list">
+      {debts.map((debt) => {
+        const isPaid = debt.previousStatus !== "pending";
+        const isCompensated = isPaid && debt.previousPayment?.type === "Compensação";
+
+        return (
+          <label className={`settlement-debt-option${isPaid ? " is-paid" : ""}`} key={debt.expenseId}>
+            <input
+              checked={isPaid || selectedIds.includes(debt.expenseId)}
+              disabled={isPaid}
+              onChange={() => onToggleDebt(debt.expenseId)}
+              type="checkbox"
+            />
+            <span className="settlement-debt-main">
+              <strong>{debt.title}</strong>
+              <span className={`status-badge ${isPaid ? "paid" : "pending"}`}>
+                {isCompensated ? "Compensada" : isPaid ? "Paga" : "Pendente"}
+              </span>
+              <small>
+                {debt.category ? `${debt.category} • ` : ""}
+                {debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : "Sem vencimento"}
+                {isPaid && debt.previousPayment?.paidAt
+                  ? ` • ${isCompensated ? "Compensada" : "Paga"} em ${formatDate(debt.previousPayment.paidAt)}`
+                  : ""}
+              </small>
+            </span>
+            <strong className="settlement-debt-amount">{formatCurrency(debt.amount)}</strong>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SettlementPanel({
   expenses = [],
   firebaseUser,
@@ -106,11 +142,17 @@ export function SettlementPanel({
     () => rows.filter((row) => Number(row.amount || 0) > 0),
     [rows],
   );
+  const visibleRows = useMemo(
+    () => rows.filter((row) => Number(row.amount || 0) > 0 || getSettlementDebts(expenses, row).some(
+      (debt) => debt.previousStatus !== "pending",
+    )).sort((first, second) => Number(second.amount > 0) - Number(first.amount > 0)),
+    [expenses, rows],
+  );
   const [paymentForms, setPaymentForms] = useState({});
   const [paymentModes, setPaymentModes] = useState({});
   const [selectedDebtIds, setSelectedDebtIds] = useState({});
   const [activeSettlementKey, setActiveSettlementKey] = useState(
-    () => pendingRows[0] ? getRowKey(pendingRows[0]) : null,
+    () => visibleRows[0] ? getRowKey(visibleRows[0]) : null,
   );
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [editingPaymentForm, setEditingPaymentForm] = useState({
@@ -157,6 +199,7 @@ export function SettlementPanel({
   }
 
   function getPaymentMode(row) {
+    if (Number(row.amount || 0) <= 0) return "debts";
     return paymentModes[getRowKey(row)] || "amount";
   }
 
@@ -165,15 +208,15 @@ export function SettlementPanel({
   }
 
   useEffect(() => {
-    if (!pendingRows.length) {
+    if (!visibleRows.length) {
       setActiveSettlementKey(null);
       return;
     }
 
-    if (!activeSettlementKey || !pendingRows.some((row) => getRowKey(row) === activeSettlementKey)) {
-      setActiveSettlementKey(getRowKey(pendingRows[0]));
+    if (!activeSettlementKey || !visibleRows.some((row) => getRowKey(row) === activeSettlementKey)) {
+      setActiveSettlementKey(getRowKey(visibleRows[0]));
     }
-  }, [activeSettlementKey, pendingRows]);
+  }, [activeSettlementKey, visibleRows]);
 
   useEffect(() => {
     if (editingPaymentId && !filteredSettlementPayments.some((payment) => payment.id === editingPaymentId)) {
@@ -268,7 +311,7 @@ export function SettlementPanel({
     });
   }
 
-  const selectedRow = pendingRows.find((row) => getRowKey(row) === activeSettlementKey);
+  const selectedRow = visibleRows.find((row) => getRowKey(row) === activeSettlementKey);
 
   return (
     <section className="panel">
@@ -283,12 +326,12 @@ export function SettlementPanel({
         />
       </div>
 
-      {!pendingRows.length ? (
+      {!visibleRows.length ? (
         <div className="empty-state">Nenhuma dívida pendente neste mês.</div>
       ) : (
         <>
           <div className="settlement-selector" aria-label="Escolha o saldo para visualizar">
-            {pendingRows.map((row) => {
+            {visibleRows.map((row) => {
               const key = getRowKey(row);
               const isActive = key === activeSettlementKey;
 
@@ -301,7 +344,7 @@ export function SettlementPanel({
                   aria-expanded={isActive}
                 >
                   <span>{personName(row.fromId)}</span>
-                  <small>{formatCurrency(row.amount)}</small>
+                  <small>{row.amount > 0 ? formatCurrency(row.amount) : "Quitado"}</small>
                 </button>
               );
             })}
@@ -312,7 +355,9 @@ export function SettlementPanel({
               {[selectedRow].map((row) => {
             const form = getPaymentForm(row);
             const paymentMode = getPaymentMode(row);
-            const selectableDebts = getSelectableSettlementDebts(expenses, row);
+            const hasPendingBalance = Number(row.amount || 0) > 0;
+            const debts = getSettlementDebts(expenses, row);
+            const selectableDebts = debts.filter((debt) => debt.previousStatus === "pending");
             const availableDebtIds = new Set(selectableDebts.map((debt) => debt.expenseId));
             const selectedIds = getSelectedDebtIds(row).filter((expenseId) => availableDebtIds.has(expenseId));
             const debtSelection = calculateSettlementDebtSelection(
@@ -369,10 +414,13 @@ export function SettlementPanel({
                     : submitPayment(event, row, undefined, { selectionMode: "amount" })}
                 >
                     <div className="settlement-form-title">
-                      <strong>Registrar pagamento</strong>
-                      <span>Informe um valor ou escolha exatamente quais dívidas deseja pagar.</span>
+                      <strong>{hasPendingBalance ? "Registrar pagamento" : "Dívidas do acerto"}</strong>
+                      <span>{hasPendingBalance
+                        ? "Informe um valor ou escolha exatamente quais dívidas deseja pagar."
+                        : "Acerto quitado. Consulte abaixo as dívidas pagas e compensadas."}</span>
                     </div>
 
+                    {hasPendingBalance && (
                     <div className="settlement-payment-mode" aria-label="Forma de informar o pagamento" role="group">
                       <button
                         aria-pressed={paymentMode === "amount"}
@@ -391,6 +439,7 @@ export function SettlementPanel({
                         Selecionar dívidas
                       </button>
                     </div>
+                    )}
 
                     {paymentMode === "amount" ? (
                       <label>
@@ -408,10 +457,10 @@ export function SettlementPanel({
                       </label>
                     ) : (
                       <fieldset className="settlement-debt-picker">
-                        <legend>Dívidas pendentes</legend>
+                        <legend>Selecionar dívidas</legend>
                         <div className="settlement-debt-picker-heading">
-                          <span>Todas as dívidas pendentes deste mês entre {personName(row.fromId)} e {personName(row.toId)}. O pagamento considera os abatimentos e o saldo restante.</span>
-                          {selectableDebts.length > 1 && (
+                          <span>Dívidas deste mês entre {personName(row.fromId)} e {personName(row.toId)}. As pagas ficam marcadas e não podem ser selecionadas novamente.</span>
+                          {hasPendingBalance && selectableDebts.length > 1 && (
                             <button
                               className="settlement-select-all"
                               onClick={() => selectAllDebts(row, selectableDebts)}
@@ -422,37 +471,25 @@ export function SettlementPanel({
                           )}
                         </div>
 
-                        {selectableDebts.length ? (
-                          <div className="settlement-debt-list">
-                            {selectableDebts.map((debt) => (
-                              <label className="settlement-debt-option" key={debt.expenseId}>
-                                <input
-                                  checked={selectedIds.includes(debt.expenseId)}
-                                  onChange={() => toggleSelectedDebt(row, debt.expenseId)}
-                                  type="checkbox"
-                                />
-                                <span className="settlement-debt-main">
-                                  <strong>{debt.title}</strong>
-                                  <small>
-                                    {debt.category ? `${debt.category} • ` : ""}
-                                    {debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : "Sem vencimento"}
-                                  </small>
-                                </span>
-                                <strong className="settlement-debt-amount">{formatCurrency(debt.amount)}</strong>
-                              </label>
-                            ))}
-                          </div>
+                        {debts.length ? (
+                          <SettlementDebtList
+                            debts={debts}
+                            selectedIds={selectedIds}
+                            onToggleDebt={(expenseId) => toggleSelectedDebt(row, expenseId)}
+                          />
                         ) : (
                           <div className="settlement-debt-empty">
                             Não há dívidas individuais disponíveis para seleção neste saldo.
                           </div>
                         )}
 
+                        {hasPendingBalance && (
                         <div className="settlement-selected-total" aria-live="polite">
                           <span>Valor a pagar</span>
                           <strong>{formatCurrency(selectedTotal)}</strong>
                         </div>
-                        {selectedIds.length > 0 && selectedTotal >= row.amount && (
+                        )}
+                        {hasPendingBalance && selectedIds.length > 0 && selectedTotal >= row.amount && (
                           <div className="settlement-debt-empty" role="status">
                             {debtSelection.amount < debtSelection.originalAmount
                               ? "O pagamento foi limitado ao saldo restante após os abatimentos. "
@@ -463,6 +500,8 @@ export function SettlementPanel({
                       </fieldset>
                     )}
 
+                    {hasPendingBalance && (
+                    <>
                     <label>
                       <span>Data</span>
                       <input
@@ -514,6 +553,8 @@ export function SettlementPanel({
                         </>
                       )}
                     </div>
+                    </>
+                    )}
                 </form>
               </article>
             );
