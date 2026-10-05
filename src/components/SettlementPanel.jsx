@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CircleCheck, Pencil, Trash2 } from "lucide-react";
 import { ResourceMonthSwitcher } from "./MonthSwitcher";
 import { PersonAvatar } from "./PersonExpenses";
 import { PAYMENT_TYPES, getPersonById } from "../config/people";
@@ -91,37 +91,64 @@ export function PaymentModal({ form, onChange, onClose, onSubmit, target }) {
   );
 }
 export function SettlementDebtList({ debts = [], selectedIds = [], onToggleDebt }) {
+  const paidDebts = debts.filter((debt) => debt.previousStatus !== "pending");
+  const groups = [
+    { id: "pending", label: "Pendentes", debts: debts.filter((debt) => debt.previousStatus === "pending") },
+    {
+      id: "paid",
+      label: paidDebts.some((debt) => debt.previousPayment?.type === "Compensação")
+        ? "Pagas e compensadas"
+        : "Pagas",
+      debts: paidDebts,
+    },
+  ].filter((group) => group.debts.length > 0);
+
   return (
     <div className="settlement-debt-list">
-      {debts.map((debt) => {
-        const isPaid = debt.previousStatus !== "pending";
-        const isCompensated = isPaid && debt.previousPayment?.type === "Compensação";
+      {groups.map((group) => (
+        <section aria-label={group.label} className="settlement-debt-group" key={group.id}>
+          <div className="settlement-debt-group-heading">
+            <h3>{group.label}</h3>
+            <span>{group.debts.length}</span>
+          </div>
+          <div className="settlement-debt-group-items">
+            {group.debts.map((debt) => {
+              const isPaid = group.id === "paid";
+              const paidLabel = debt.previousPayment?.type === "Compensação" ? "Compensada" : "Paga";
+              const content = (
+                <>
+                  <span className="settlement-debt-main">
+                    <strong title={debt.title}>{debt.title}</strong>
+                    <small title={isPaid && debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : undefined}>
+                      {debt.category ? `${debt.category} • ` : ""}
+                      {isPaid
+                        ? `${paidLabel}${debt.previousPayment?.paidAt ? ` em ${formatDate(debt.previousPayment.paidAt)}` : ""}`
+                        : debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : "Sem vencimento"}
+                    </small>
+                  </span>
+                  <strong className="settlement-debt-amount">{formatCurrency(debt.amount)}</strong>
+                </>
+              );
 
-        return (
-          <label className={`settlement-debt-option${isPaid ? " is-paid" : ""}`} key={debt.expenseId}>
-            <input
-              checked={isPaid || selectedIds.includes(debt.expenseId)}
-              disabled={isPaid}
-              onChange={() => onToggleDebt(debt.expenseId)}
-              type="checkbox"
-            />
-            <span className="settlement-debt-main">
-              <strong>{debt.title}</strong>
-              <span className={`status-badge ${isPaid ? "paid" : "pending"}`}>
-                {isCompensated ? "Compensada" : isPaid ? "Paga" : "Pendente"}
-              </span>
-              <small>
-                {debt.category ? `${debt.category} • ` : ""}
-                {debt.dueDate ? `Vencimento ${formatDate(debt.dueDate)}` : "Sem vencimento"}
-                {isPaid && debt.previousPayment?.paidAt
-                  ? ` • ${isCompensated ? "Compensada" : "Paga"} em ${formatDate(debt.previousPayment.paidAt)}`
-                  : ""}
-              </small>
-            </span>
-            <strong className="settlement-debt-amount">{formatCurrency(debt.amount)}</strong>
-          </label>
-        );
-      })}
+              return isPaid ? (
+                <div className="settlement-debt-option is-paid" key={debt.expenseId}>
+                  <CircleCheck aria-hidden="true" className="settlement-debt-paid-icon" size={18} />
+                  {content}
+                </div>
+              ) : (
+                <label className="settlement-debt-option" key={debt.expenseId}>
+                  <input
+                    checked={selectedIds.includes(debt.expenseId)}
+                    onChange={() => onToggleDebt(debt.expenseId)}
+                    type="checkbox"
+                  />
+                  {content}
+                </label>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
@@ -459,7 +486,7 @@ export function SettlementPanel({
                       <fieldset className="settlement-debt-picker">
                         <legend>Selecionar dívidas</legend>
                         <div className="settlement-debt-picker-heading">
-                          <span>Dívidas deste mês entre {personName(row.fromId)} e {personName(row.toId)}. As pagas ficam marcadas e não podem ser selecionadas novamente.</span>
+                          <span>Dívidas deste mês entre {personName(row.fromId)} e {personName(row.toId)}. Selecione as pendentes para pagar. As pagas aparecem abaixo para consulta.</span>
                           {hasPendingBalance && selectableDebts.length > 1 && (
                             <button
                               className="settlement-select-all"

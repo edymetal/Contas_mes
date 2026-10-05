@@ -719,12 +719,40 @@
   }
 
   .settlement-debt-option {
-    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 6px 8px;
+    padding: 10px;
+  }
+
+  .settlement-debt-main {
+    display: contents;
+  }
+
+  .settlement-debt-main strong {
+    grid-column: 2;
+    grid-row: 1;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .settlement-debt-main small {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .settlement-debt-option input,
+  .settlement-debt-paid-icon {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: center;
   }
 
   .settlement-debt-amount {
-    grid-column: 2;
-    justify-self: start;
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 0.85rem !important;
   }
 
   .settlement-people,

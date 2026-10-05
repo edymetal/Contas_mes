@@ -256,7 +256,7 @@ test("Acerto mantém pagamento por valor e oferece seleção de dívidas", () =>
   assert.match(html, /Pagar tudo/);
 });
 
-test("lista de dívidas indica pagamentos e compensações com seleção bloqueada", () => {
+test("lista de dívidas separa pagamentos e compensações das opções pendentes", () => {
   const html = renderToStaticMarkup(
     createElement(SettlementModule.SettlementDebtList, {
       debts: [
@@ -272,10 +272,10 @@ test("lista de dívidas indica pagamentos e compensações com seleção bloquea
   assert.match(html, /Internet/);
   assert.match(html, /Paga em 12\/07\/2026/);
   assert.match(html, /Compensada em 11\/07\/2026/);
-  assert.match(html, /status-badge paid/);
-  assert.match(html, /status-badge pending/);
-  assert.equal((html.match(/disabled=""/g) || []).length, 2);
-  assert.equal((html.match(/checked=""/g) || []).length, 3);
+  assert.match(html, /aria-label="Pendentes"/);
+  assert.match(html, /aria-label="Pagas e compensadas"/);
+  assert.equal((html.match(/type="checkbox"/g) || []).length, 1);
+  assert.equal((html.match(/checked=""/g) || []).length, 1);
   assert.equal((html.match(/settlement-debt-option is-paid/g) || []).length, 2);
 });
 
@@ -297,8 +297,8 @@ test("Acerto mantém a consulta às dívidas pagas após quitar todo o saldo", (
   assert.match(html, /Selecionar dívidas/);
   assert.match(html, /Internet/);
   assert.match(html, /Energia/);
-  assert.equal((html.match(/disabled=""/g) || []).length, 2);
-  assert.equal((html.match(/checked=""/g) || []).length, 2);
+  assert.match(html, /aria-label="Pagas"/);
+  assert.doesNotMatch(html, /type="checkbox"/);
   assert.doesNotMatch(html, /Registrar pagamento/);
   assert.doesNotMatch(html, /Selecionar todas/);
   assert.doesNotMatch(html, /Valor a pagar/);

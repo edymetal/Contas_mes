@@ -4227,7 +4227,39 @@ textarea:focus {
 
 .settlement-debt-list {
   display: grid !important;
+  gap: 20px !important;
+}
+
+.settlement-debt-group,
+.settlement-debt-group-items {
+  display: grid !important;
   gap: 8px !important;
+  min-width: 0;
+}
+
+.settlement-debt-group-heading {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px !important;
+  padding: 0 2px;
+  color: var(--muted);
+}
+
+.settlement-debt-group-heading h3 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.settlement-debt-group-heading > span {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--panel-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .settlement-debt-option {
@@ -4249,13 +4281,19 @@ textarea:focus {
 }
 
 .settlement-debt-option.is-paid {
-  border-color: var(--success);
-  background: var(--success-soft);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--panel-muted) 40%, var(--panel));
   cursor: default;
 }
 
-.settlement-debt-option.is-paid input {
-  accent-color: var(--success);
+.settlement-debt-paid-icon {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.settlement-debt-option.is-paid .settlement-debt-main strong,
+.settlement-debt-option.is-paid .settlement-debt-amount {
+  color: var(--muted) !important;
 }
 
 .settlement-debt-option input {
@@ -4276,10 +4314,6 @@ textarea:focus {
   font-size: 0.95rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.settlement-debt-main .status-badge {
-  justify-self: start;
 }
 
 .settlement-debt-main small {
