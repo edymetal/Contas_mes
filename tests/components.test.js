@@ -361,6 +361,29 @@ test("Minhas contas mostra liquidação calculada, pagamento manual e saldo pend
   assert.match(cards[2], /Em 12\/07\/2026 • PIX/);
 });
 
+test("Minhas contas deixa pendente a conta que corresponde ao saldo restante", () => {
+  const html = renderToStaticMarkup(
+    createElement(PersonExpensesModule.PersonExpenses, {
+      expenses: [
+        { id: "train", title: "Trem aeroporto", dueDate: "2026-10-01", payerId: "edney", participants: ["sonia"], shares: { sonia: { amount: 29, status: "pending" } } },
+        { id: "insurance", title: "Seguro do carro", dueDate: "2026-10-05", payerId: "edney", participants: ["sonia"], shares: { sonia: { amount: 47.75, status: "pending" } } },
+      ],
+      personId: "sonia",
+      selectedMonth: "2026-10",
+      settlementPayments: [{ fromId: "sonia", toId: "edney", amount: 47.75 }],
+      onMonthChange() {},
+    }),
+  );
+  const cards = html.match(/<article class="expense-card"[\s\S]*?<\/article>/g);
+  assert.match(cards[0], /Trem aeroporto/);
+  assert.match(cards[0], /status-badge pending">Pendente/);
+  assert.match(cards[0], /Pendente: 29,00/);
+  assert.match(cards[1], /Seguro do carro/);
+  assert.match(cards[1], /status-badge settled">Liquidado/);
+  assert.match(cards[1], /Pago\/abatido: 47,75/);
+  assert.match(html, /valor igual ou mais próximo/);
+});
+
 test("formulário de conta preserva participantes e ação principal", () => {
   const html = renderToStaticMarkup(
     createElement(NewExpenseFormModule.NewExpenseForm, {

@@ -342,29 +342,54 @@ export function calculatePersonExpensePayments(expenses = [], settlementPayments
     const row = first.fromId === personId ? first : second.fromId === personId ? second : null;
     if (!row) return;
 
-    let remainingCoverage = roundMoney(row.paidAmount + row.crossPaidAmount);
-    const debts = getSettlementDebts(expenses, row)
-      .filter((debt) => debt.previousStatus !== "paid")
-      // Reserve coverage for recorded settlements before distributing the rest by due date.
-      .sort((a, b) => Number(b.previousStatus === "settled") - Number(a.previousStatus === "settled"));
+    const debts = getSettlementDebts(expenses, row);
+    // Recorded settlements keep their coverage, including manually selected accounts.
+    const settledCents = debts
+      .filter((debt) => debt.previousStatus === "settled")
+      .reduce((total, debt) => total + Math.round(debt.originalAmount * 100), 0);
+    const coverageCents = Math.max(
+      Math.round(roundMoney(row.paidAmount + row.crossPaidAmount) * 100) - settledCents,
+      0,
+    );
+    // getSettlementDebts supplies a stable due-date order for equal-value matches.
+    const candidates = debts
+      .filter((debt) => debt.previousStatus === "pending")
+      .map((debt) => ({ debt, amountCents: Math.round(debt.originalAmount * 100) }));
+    let remainingPendingCents = Math.max(
+      candidates.reduce((total, candidate) => total + candidate.amountCents, 0) - coverageCents,
+      0,
+    );
 
-    debts.forEach((debt) => {
-      const detail = details.get(debt.expenseId);
-      if (debt.previousStatus === "settled") {
-        remainingCoverage = roundMoney(Math.max(remainingCoverage - debt.originalAmount, 0));
-        return;
-      }
-
-      const coveredAmount = roundMoney(Math.min(debt.originalAmount, remainingCoverage));
-      const pendingAmount = roundMoney(debt.originalAmount - coveredAmount);
-      remainingCoverage = roundMoney(remainingCoverage - coveredAmount);
+    candidates.forEach(({ debt }) => {
       details.set(debt.expenseId, {
-        ...detail,
-        status: pendingAmount === 0 ? "settled" : "pending",
-        coveredAmount,
-        pendingAmount,
+        ...details.get(debt.expenseId),
+        status: "settled",
+        coveredAmount: debt.originalAmount,
+        pendingAmount: 0,
       });
     });
+
+    while (remainingPendingCents > 0 && candidates.length) {
+      const closestIndex = candidates.reduce((bestIndex, candidate, index) => {
+        const best = candidates[bestIndex];
+        const distance = Math.abs(candidate.amountCents - remainingPendingCents);
+        const bestDistance = Math.abs(best.amountCents - remainingPendingCents);
+        // On a tie, prefer an account that can hold the whole balance without splitting it.
+        return distance < bestDistance || (
+          distance === bestDistance && candidate.amountCents >= remainingPendingCents &&
+          best.amountCents < remainingPendingCents
+        ) ? index : bestIndex;
+      }, 0);
+      const [{ debt, amountCents }] = candidates.splice(closestIndex, 1);
+      const pendingCents = Math.min(amountCents, remainingPendingCents);
+      remainingPendingCents -= pendingCents;
+      details.set(debt.expenseId, {
+        ...details.get(debt.expenseId),
+        status: "pending",
+        coveredAmount: (amountCents - pendingCents) / 100,
+        pendingAmount: pendingCents / 100,
+      });
+    }
   });
 
   return details;

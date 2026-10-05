@@ -191,6 +191,110 @@ test("lista pessoal distribui pagamentos e abatimentos sem alterar a seleção d
   assert.equal(calculatePersonExpensePayments(expenses, [], "edney").get("credit").status, "settled");
 });
 
+test("saldo pessoal mantém pendente a conta de valor exato em vez da última por vencimento", () => {
+  const expenses = [
+    { ...expense({ id: "train", payerId: "edney", shares: { sonia: { amount: 29, status: "pending" } } }), dueDate: "2026-10-01" },
+    { ...expense({ id: "insurance", payerId: "edney", shares: { sonia: { amount: 47.75, status: "pending" } } }), dueDate: "2026-10-05" },
+  ];
+  const payments = [{ fromId: "sonia", toId: "edney", amount: 47.75 }];
+  const original = structuredClone(expenses);
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+
+  assert.equal(details.get("train").status, "pending");
+  assert.equal(details.get("train").pendingAmount, 29);
+  assert.equal(details.get("train").coveredAmount, 0);
+  assert.equal(details.get("insurance").status, "settled");
+  assert.equal(details.get("insurance").coveredAmount, 47.75);
+  assert.deepEqual(expenses, original);
+  assert.deepEqual(getSelectableSettlementDebts(expenses, { fromId: "sonia", toId: "edney" }).map((debt) => debt.expenseId), ["train", "insurance"]);
+});
+
+test("saldo de 29,08 prioriza a conta de 29 e preserva os oito centavos restantes", () => {
+  const expenses = [
+    expense({ id: "train", payerId: "edney", shares: { sonia: { amount: 29, status: "pending" } } }),
+    expense({ id: "insurance", payerId: "edney", shares: { sonia: { amount: 47.75, status: "pending" } } }),
+  ];
+  const payments = [{ fromId: "sonia", toId: "edney", amount: 47.67 }];
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+
+  assert.equal(details.get("train").pendingAmount, 29);
+  assert.equal(details.get("train").coveredAmount, 0);
+  assert.equal(details.get("insurance").pendingAmount, 0.08);
+  assert.equal(details.get("insurance").coveredAmount, 47.67);
+  assert.equal(Math.round([...details.values()].reduce((total, detail) => total + detail.pendingAmount, 0) * 100), 2908);
+});
+
+test("sem valor exato deixa o saldo na conta mais próxima, limitando-o ao valor da conta", () => {
+  const expenses = [
+    expense({ id: "small", payerId: "edney", shares: { sonia: { amount: 29, status: "pending" } } }),
+    expense({ id: "large", payerId: "edney", shares: { sonia: { amount: 47.75, status: "pending" } } }),
+  ];
+  const detailsForBalance = (amount) => calculatePersonExpensePayments(
+    expenses,
+    [{ fromId: "sonia", toId: "edney", amount: 76.75 - amount }],
+    "sonia",
+  );
+  const lower = detailsForBalance(28);
+  assert.equal(lower.get("small").pendingAmount, 28);
+  assert.equal(lower.get("small").coveredAmount, 1);
+  assert.equal(lower.get("large").status, "settled");
+  const higher = detailsForBalance(40);
+  assert.equal(higher.get("large").pendingAmount, 40);
+  assert.equal(higher.get("small").status, "settled");
+  const split = detailsForBalance(30);
+  assert.equal(split.get("small").pendingAmount, 29);
+  assert.equal(split.get("large").pendingAmount, 1);
+});
+
+test("distribui saldos maiores em várias contas sem perder cobertura ou aumentar a dívida", () => {
+  const expenses = [29, 47.75, 100].map((amount, index) => expense({
+    id: `account-${index}`,
+    payerId: "edney",
+    shares: { sonia: { amount, status: "pending" } },
+  }));
+  const details = calculatePersonExpensePayments(expenses, [{ fromId: "sonia", toId: "edney", amount: 66.75 }], "sonia");
+
+  assert.equal(details.get("account-2").pendingAmount, 100);
+  assert.equal(details.get("account-0").pendingAmount, 10);
+  assert.equal(details.get("account-1").status, "settled");
+  const pendingCents = [...details.values()].reduce((total, detail) => total + Math.round(detail.pendingAmount * 100), 0);
+  const coveredCents = [...details.values()].reduce((total, detail) => total + Math.round(detail.coveredAmount * 100), 0);
+  assert.equal(pendingCents, 11000);
+  assert.equal(coveredCents, 6675);
+});
+
+test("desempata pela conta que comporta o saldo e pelo vencimento entre valores iguais", () => {
+  const expenses = [
+    { ...expense({ id: "small", payerId: "edney", shares: { sonia: { amount: 25, status: "pending" } } }), dueDate: "2026-10-01" },
+    { ...expense({ id: "large", payerId: "edney", shares: { sonia: { amount: 35, status: "pending" } } }), dueDate: "2026-10-05" },
+  ];
+  const details = calculatePersonExpensePayments(expenses, [{ fromId: "sonia", toId: "edney", amount: 30 }], "sonia");
+  assert.equal(details.get("large").pendingAmount, 30);
+  assert.equal(details.get("small").status, "settled");
+  expenses[0].shares.sonia.amount = 35;
+  const equalAmounts = calculatePersonExpensePayments(expenses, [{ fromId: "sonia", toId: "edney", amount: 35 }], "sonia");
+  assert.equal(equalAmounts.get("small").pendingAmount, 35);
+  assert.equal(equalAmounts.get("large").status, "settled");
+});
+
+test("ignora contas pagas manualmente mesmo quando seu valor coincide com o saldo", () => {
+  const expenses = [
+    expense({ id: "manual", payerId: "edney", shares: { sonia: { amount: 29, status: "settled", payment: { settlementId: "selected-payment" } } } }),
+    expense({ id: "direct", payerId: "edney", shares: { sonia: { amount: 29, status: "paid", payment: { type: "PIX", registeredBy: "sonia" } } } }),
+    expense({ id: "pending", payerId: "edney", shares: { sonia: { amount: 47.75, status: "pending" } } }),
+  ];
+  const payments = [
+    { id: "selected-payment", fromId: "sonia", toId: "edney", amount: 29, selectionMode: "debts", selectedDebts: [{ expenseId: "manual", amount: 29 }] },
+    { id: "amount-payment", fromId: "sonia", toId: "edney", amount: 18.75, selectionMode: "amount" },
+  ];
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+  assert.equal(details.get("manual").isManualPayment, true);
+  assert.equal(details.get("manual").pendingAmount, 0);
+  assert.equal(details.get("direct").isManualPayment, true);
+  assert.equal(details.get("direct").pendingAmount, 0);
+  assert.equal(details.get("pending").pendingAmount, 29);
+});
+
 test("reserva pagamentos manuais nas contas selecionadas mesmo fora da ordem de vencimento", () => {
   const expenses = [
     { ...expense({ id: "oldest", payerId: "edney", shares: { sonia: { amount: 20, status: "pending" } } }), dueDate: "2026-07-01" },

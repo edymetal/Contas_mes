@@ -282,7 +282,7 @@ export function PersonExpenses({
             <span>Detalhamento</span>
             <h3 id="person-expense-list-title">Lista de contas</h3>
             <p className="person-expense-payment-note">
-              Pagamentos e abatimentos são considerados por ordem de vencimento, preservando as contas pagas manualmente.
+              O saldo pendente prioriza contas de valor igual ou mais próximo, preservando as contas pagas manualmente.
             </p>
           </div>
           <small>
