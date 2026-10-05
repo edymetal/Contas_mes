@@ -308,6 +308,68 @@ export function calculateSettlementSummaries(expenses, settlementPayments = []) 
   });
 }
 
+export function calculatePersonExpensePayments(expenses = [], settlementPayments = [], personId) {
+  const paymentsById = new Map(settlementPayments.map((payment) => [payment.id, payment]));
+  const details = new Map();
+
+  expenses.forEach((expense) => {
+    const share = expense?.shares?.[personId];
+    if (!share) return;
+
+    const status = expense.payerId === personId ? "self" : share.status;
+    const originalAmount = roundMoney(share.amount);
+    const isPaid = ["paid", "settled", "self"].includes(status);
+    const payment = share.payment?.settlementId ? paymentsById.get(share.payment.settlementId) : null;
+    const isSelectedPayment = status === "settled" &&
+      payment?.fromId === personId && payment?.toId === expense.payerId &&
+      payment?.selectionMode === "debts" &&
+      payment.selectedDebts?.some((debt) => debt.expenseId === expense.id);
+    // Historical installments use "Pago" without a manual registration.
+    const isDirectPayment = status === "paid" && (
+      share.payment?.type !== "Pago" || share.payment?.registeredBy || share.payment?.registeredAt
+    );
+
+    details.set(expense.id, {
+      status,
+      isManualPayment: Boolean(isSelectedPayment || isDirectPayment),
+      payment: share.payment ?? null,
+      coveredAmount: isPaid ? originalAmount : 0,
+      pendingAmount: isPaid ? 0 : originalAmount,
+    });
+  });
+
+  calculateSettlementPairs(expenses, settlementPayments).forEach(({ first, second }) => {
+    const row = first.fromId === personId ? first : second.fromId === personId ? second : null;
+    if (!row) return;
+
+    let remainingCoverage = roundMoney(row.paidAmount + row.crossPaidAmount);
+    const debts = getSettlementDebts(expenses, row)
+      .filter((debt) => debt.previousStatus !== "paid")
+      // Reserve coverage for recorded settlements before distributing the rest by due date.
+      .sort((a, b) => Number(b.previousStatus === "settled") - Number(a.previousStatus === "settled"));
+
+    debts.forEach((debt) => {
+      const detail = details.get(debt.expenseId);
+      if (debt.previousStatus === "settled") {
+        remainingCoverage = roundMoney(Math.max(remainingCoverage - debt.originalAmount, 0));
+        return;
+      }
+
+      const coveredAmount = roundMoney(Math.min(debt.originalAmount, remainingCoverage));
+      const pendingAmount = roundMoney(debt.originalAmount - coveredAmount);
+      remainingCoverage = roundMoney(remainingCoverage - coveredAmount);
+      details.set(debt.expenseId, {
+        ...detail,
+        status: pendingAmount === 0 ? "settled" : "pending",
+        coveredAmount,
+        pendingAmount,
+      });
+    });
+  });
+
+  return details;
+}
+
 export function calculatePersonSettlementSummary(
   expenses = [],
   settlementPayments = [],

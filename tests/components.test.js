@@ -334,6 +334,33 @@ test("resumo pessoal inclui valores a receber mesmo sem o pagador participar do 
   assert.match(html, /Nenhuma conta para este mês/);
 });
 
+test("Minhas contas mostra liquidação calculada, pagamento manual e saldo pendente", () => {
+  const html = renderToStaticMarkup(
+    createElement(PersonExpensesModule.PersonExpenses, {
+      expenses: [
+        { id: "covered", title: "Conta abatida", dueDate: "2026-07-01", payerId: "edney", participants: ["sonia"], shares: { sonia: { amount: 20, status: "pending" } } },
+        { id: "partial", title: "Conta parcial", dueDate: "2026-07-10", payerId: "edney", participants: ["sonia"], shares: { sonia: { amount: 30, status: "pending" } } },
+        { id: "manual", title: "Conta escolhida", dueDate: "2026-07-20", payerId: "edney", participants: ["sonia"], shares: { sonia: { amount: 10, status: "settled", payment: { settlementId: "selected-payment", paidAt: "2026-07-12", type: "PIX" } } } },
+        { id: "credit", payerId: "sonia", participants: ["edney"], shares: { edney: { amount: 25, status: "pending" } } },
+      ],
+      personId: "sonia",
+      selectedMonth: "2026-07",
+      settlementPayments: [{ id: "selected-payment", fromId: "sonia", toId: "edney", amount: 10, selectionMode: "debts", selectedDebts: [{ expenseId: "manual", amount: 10 }] }],
+      onMonthChange() {},
+    }),
+  );
+  const cards = html.match(/<article class="expense-card"[\s\S]*?<\/article>/g);
+  assert.equal(cards.length, 3);
+  assert.match(cards[0], /Conta abatida/);
+  assert.match(cards[0], /status-badge settled">Liquidado/);
+  assert.match(cards[0], /Pago\/abatido: 20,00/);
+  assert.match(cards[1], /status-badge pending">Pendente/);
+  assert.match(cards[1], /Pago\/abatido: 5,00/);
+  assert.match(cards[1], /Pendente: 25,00/);
+  assert.match(cards[2], /Pago manualmente/);
+  assert.match(cards[2], /Em 12\/07\/2026 • PIX/);
+});
+
 test("formulário de conta preserva participantes e ação principal", () => {
   const html = renderToStaticMarkup(
     createElement(NewExpenseFormModule.NewExpenseForm, {

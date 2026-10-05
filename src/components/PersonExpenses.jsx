@@ -9,7 +9,7 @@ import {
   roundMoney,
   shiftMonth,
 } from "../domain/expenses";
-import { calculatePersonSettlementSummary } from "../domain/settlements";
+import { calculatePersonExpensePayments, calculatePersonSettlementSummary } from "../domain/settlements";
 import {
   formatCurrency,
   formatDate,
@@ -106,6 +106,10 @@ export function PersonExpenses({
       settlementPayments,
       personId,
     ),
+    [expenses, settlementPayments, personId],
+  );
+  const expensePayments = useMemo(
+    () => calculatePersonExpensePayments(expenses, settlementPayments, personId),
     [expenses, settlementPayments, personId],
   );
 
@@ -277,6 +281,9 @@ export function PersonExpenses({
           <div>
             <span>Detalhamento</span>
             <h3 id="person-expense-list-title">Lista de contas</h3>
+            <p className="person-expense-payment-note">
+              Pagamentos e abatimentos são considerados por ordem de vencimento, preservando as contas pagas manualmente.
+            </p>
           </div>
           <small>
             {personExpenses.length} {personExpenses.length === 1 ? "conta no mês" : "contas no mês"}
@@ -308,7 +315,8 @@ export function PersonExpenses({
                     {payerExpenses.map((expense) => {
                       const share = getShare(expense, personId);
                       const isPayer = expense.payerId === personId;
-                      const displayStatus = isPayer ? "self" : share?.status;
+                      const paymentDetail = expensePayments.get(expense.id);
+                      const displayStatus = isPayer ? "self" : paymentDetail?.status || share?.status;
                       const isPaidOrSettled = isSettledStatus(displayStatus);
                       const amountClassName = isPaidOrSettled ? "money-positive" : "money-negative";
                       const amountLabel = isPaidOrSettled
@@ -332,7 +340,23 @@ export function PersonExpenses({
 
                           <div className="expense-side">
                             <strong className={amountClassName}>{amountLabel}</strong>
-                            <StatusBadge status={displayStatus} />
+                            <StatusBadge status={displayStatus} isManualPayment={paymentDetail?.isManualPayment} />
+                            {!isPayer && paymentDetail && (
+                              <div className="expense-payment-details">
+                                {paymentDetail.coveredAmount > 0 && (
+                                  <small>Pago/abatido: {formatCurrency(paymentDetail.coveredAmount)}</small>
+                                )}
+                                {paymentDetail.pendingAmount > 0 && (
+                                  <small className="money-negative">Pendente: {formatCurrency(paymentDetail.pendingAmount)}</small>
+                                )}
+                                {paymentDetail.isManualPayment && paymentDetail.payment?.paidAt && (
+                                  <small>
+                                    Em {formatDate(paymentDetail.payment.paidAt)}
+                                    {paymentDetail.payment.type ? ` • ${paymentDetail.payment.type}` : ""}
+                                  </small>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </article>
                       );
@@ -369,7 +393,7 @@ export function PersonAvatar({ decorative = false, person, photoUrl, size = "def
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, isManualPayment = false }) {
   const labels = {
     pending: "Pendente",
     paid: "Pago",
@@ -377,5 +401,5 @@ function StatusBadge({ status }) {
     self: "Pago",
   };
 
-  return <span className={`status-badge ${status}`}>{labels[status] || "Pendente"}</span>;
+  return <span className={`status-badge ${status}`}>{isManualPayment ? "Pago manualmente" : labels[status] || "Pendente"}</span>;
 }

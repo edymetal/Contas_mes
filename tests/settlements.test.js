@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   calculateSettlementDebtSelection,
+  calculatePersonExpensePayments,
   calculatePersonSettlementSummary,
   calculateSettlementRows,
   calculateSettlementSummaries,
@@ -166,6 +167,94 @@ test("preserva dívida, abatimento e pagamento após a quitação de três usuá
     amount: 0,
     receivableAmount: 0,
   });
+});
+
+test("lista pessoal distribui pagamentos e abatimentos sem alterar a seleção do acerto", () => {
+  const expenses = [
+    { ...expense({ id: "newest", payerId: "edney", shares: { sonia: { amount: 30, status: "pending" } } }), dueDate: "2026-07-10" },
+    { ...expense({ id: "oldest", payerId: "edney", shares: { sonia: { amount: 20, status: "pending" } } }), dueDate: "2026-07-01" },
+    expense({ id: "credit", payerId: "sonia", shares: { edney: { amount: 15, status: "pending" } } }),
+  ];
+  const payments = [{ fromId: "sonia", toId: "edney", amount: 10 }];
+  const original = structuredClone({ expenses, payments });
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+
+  assert.equal(details.get("oldest").status, "settled");
+  assert.equal(details.get("oldest").coveredAmount, 20);
+  assert.equal(details.get("oldest").isManualPayment, false);
+  assert.equal(details.get("newest").status, "pending");
+  assert.equal(details.get("newest").coveredAmount, 5);
+  assert.equal(details.get("newest").pendingAmount, 25);
+  const [row] = calculateSettlementRows(expenses, payments);
+  assert.deepEqual(getSelectableSettlementDebts(expenses, row).map((debt) => debt.expenseId), ["oldest", "newest"]);
+  assert.deepEqual({ expenses, payments }, original);
+  assert.equal(calculatePersonExpensePayments(expenses, [], "edney").get("credit").status, "settled");
+});
+
+test("reserva pagamentos manuais nas contas selecionadas mesmo fora da ordem de vencimento", () => {
+  const expenses = [
+    { ...expense({ id: "oldest", payerId: "edney", shares: { sonia: { amount: 20, status: "pending" } } }), dueDate: "2026-07-01" },
+    { ...expense({ id: "selected", payerId: "edney", shares: { sonia: { amount: 30, status: "settled", payment: { settlementId: "manual", paidAt: "2026-07-12", type: "PIX" } } } }), dueDate: "2026-07-10" },
+  ];
+  const payments = [{ id: "manual", selectionMode: "debts", selectedDebts: [{ expenseId: "selected", amount: 30 }], fromId: "sonia", toId: "edney", amount: 30 }];
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+
+  assert.equal(details.get("selected").isManualPayment, true);
+  assert.equal(details.get("selected").status, "settled");
+  assert.equal(details.get("selected").pendingAmount, 0);
+  assert.equal(details.get("oldest").status, "pending");
+  assert.equal(details.get("oldest").coveredAmount, 0);
+  assert.equal(details.get("oldest").pendingAmount, 20);
+});
+
+test("reserva também contas liquidadas no acerto e separa pagamentos diretos de parcelas históricas", () => {
+  const expenses = [
+    expense({ id: "pending", payerId: "edney", shares: { sonia: { amount: 30, status: "pending" } } }),
+    expense({ id: "settled", payerId: "edney", shares: { sonia: { amount: 20, status: "settled", payment: { settlementId: "automatic" } } } }),
+    expense({ id: "direct", payerId: "edney", shares: { sonia: { amount: 10, status: "paid", payment: { paidAt: "2026-07-12", type: "Dinheiro", registeredBy: "sonia" } } } }),
+    expense({ id: "historical", payerId: "edney", shares: { sonia: { amount: 10, status: "paid", payment: { type: "Pago" } } } }),
+    expense({ id: "self", payerId: "sonia", shares: { sonia: { amount: 10, status: "self" }, edney: { amount: 20, status: "pending" } } }),
+  ];
+  const payments = [{ id: "automatic", fromId: "sonia", toId: "edney", amount: 20, selectionMode: "amount" }];
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+
+  assert.equal(details.get("settled").isManualPayment, false);
+  assert.equal(details.get("direct").isManualPayment, true);
+  assert.equal(details.get("historical").isManualPayment, false);
+  assert.equal(details.get("self").status, "self");
+  assert.equal(details.get("self").isManualPayment, false);
+  assert.equal(details.get("pending").coveredAmount, 20);
+  assert.equal(details.get("pending").pendingAmount, 10);
+});
+
+test("cobertura pessoal respeita cada credor, os centavos e a remoção de pagamentos", () => {
+  const expenses = [
+    expense({ id: "a", payerId: "edney", shares: { sonia: { amount: 0.1, status: "pending" } } }),
+    expense({ id: "b", payerId: "edney", shares: { sonia: { amount: 0.2, status: "pending" } } }),
+    expense({ id: "other", payerId: "rodney", shares: { sonia: { amount: 20, status: "pending" } } }),
+  ];
+  const payment = { fromId: "sonia", toId: "edney", amount: 0.3 };
+  const paidDetails = calculatePersonExpensePayments(expenses, [payment], "sonia");
+  assert.equal(paidDetails.get("a").status, "settled");
+  assert.equal(paidDetails.get("b").status, "settled");
+  assert.equal(paidDetails.get("other").coveredAmount, 0);
+  assert.equal(paidDetails.get("other").pendingAmount, 20);
+  const pendingDetails = calculatePersonExpensePayments(expenses, [], "sonia");
+  assert.equal(pendingDetails.get("a").status, "pending");
+  assert.equal(pendingDetails.get("b").pendingAmount, 0.2);
+});
+
+test("a indicação manual usa somente as contas explicitamente escolhidas no pagamento vinculado", () => {
+  const expenses = [
+    expense({ id: "selected", payerId: "edney", shares: { sonia: { amount: 20, status: "settled", payment: { settlementId: "manual" } } } }),
+    expense({ id: "automatic", payerId: "edney", shares: { sonia: { amount: 30, status: "settled", payment: { settlementId: "manual" } } } }),
+    expense({ id: "reverse", payerId: "sonia", shares: { edney: { amount: 20, status: "settled", payment: { settlementId: "manual", type: "Compensação" } } } }),
+  ];
+  const payments = [{ id: "manual", selectionMode: "debts", selectedDebts: [{ expenseId: "selected", amount: 20 }], fromId: "sonia", toId: "edney", amount: 30 }];
+  const details = calculatePersonExpensePayments(expenses, payments, "sonia");
+  assert.equal(details.get("selected").isManualPayment, true);
+  assert.equal(details.get("automatic").isManualPayment, false);
+  assert.equal(calculatePersonExpensePayments(expenses, payments, "edney").get("reverse").isManualPayment, false);
 });
 
 test("seleciona somente os rateios pendentes envolvidos na quitação", () => {

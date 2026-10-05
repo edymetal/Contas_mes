@@ -3968,6 +3968,23 @@ textarea:focus {
   color: var(--text);
 }
 
+.person-expense-payment-note {
+  max-width: 680px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.expense-payment-details {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: inherit;
+  overflow-wrap: anywhere;
+}
+
 /* Badges */
 .status-badge {
   display: inline-flex;
