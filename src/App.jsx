@@ -476,6 +476,7 @@ function App() {
             reference: doc(collection(db, "expenses")),
             data: {
               title: firstExpense.title || "Conta parcelada",
+              description: firstExpense.description || "",
               totalValue: Number(firstExpense.totalValue || 0),
               expenseDate: "",
               expensePaymentMethod: "",
@@ -1005,6 +1006,7 @@ function App() {
       const docRef = doc(collection(db, "expenses"));
       const expenseData = {
         title: form.title.trim(),
+        description: (form.description || "").trim(),
         totalValue: valuePerMonth,
         expenseDate: currentExpenseDate,
         expensePaymentMethod:
@@ -1592,6 +1594,7 @@ function App() {
           reference: doc(db, "expenses", item.id),
           data: {
             title: updatedData.title.trim(),
+            description: (updatedData.description || "").trim(),
             totalValue: rawValue,
             dueDate,
             monthKey: getExpenseMonthKey({ dueDate, expenseDate: "", type: "recurring" }),
@@ -1659,6 +1662,7 @@ function App() {
         const existingExpense = futureByCurrent.get(oldCurrent);
         const expenseData = {
           title: updatedData.title.trim(),
+          description: (updatedData.description || "").trim(),
           totalValue: rawValue,
           dueDate,
           monthKey: getExpenseMonthKey({ dueDate, expenseDate: "", type: "installment" }),
@@ -1714,6 +1718,7 @@ function App() {
 
     const updateFields = {
       title: updatedData.title.trim(),
+      description: (updatedData.description || "").trim(),
       totalValue: rawValue,
       dueDate: updatedData.dueDate,
       monthKey: getExpenseMonthKey({

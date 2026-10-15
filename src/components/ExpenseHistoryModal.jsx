@@ -151,6 +151,9 @@ export function ExpenseHistoryModal({
                       <div className="expense-history-period">
                         <strong>Vencimento em {formatDate(historyExpense.dueDate)}</strong>
                         <small>{historyExpense.title}</small>
+                        {historyExpense.description && (
+                          <small className="expense-description-text">{historyExpense.description}</small>
+                        )}
                       </div>
 
                       <div className="expense-history-details">

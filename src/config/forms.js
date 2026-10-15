@@ -17,6 +17,7 @@ export const MONTHS_PT = [
 
 export const emptyExpenseForm = {
   title: "",
+  description: "",
   totalValue: "",
   expenseDate: "",
   expensePaymentMethod: "Dinheiro",

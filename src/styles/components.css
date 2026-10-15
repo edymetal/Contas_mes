@@ -2034,6 +2034,12 @@ td small {
   font-size: 0.8rem;
 }
 
+.expense-description-text {
+  max-width: 50ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tag {
   display: inline-flex;
   align-items: center;

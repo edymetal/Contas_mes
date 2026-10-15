@@ -467,6 +467,9 @@ export function ManagePanel({ allExpenses = [], expenses, selectedMonth, onEdit,
                     >
                       {expense.title}
                     </button>
+                    {expense.description && (
+                      <small className="expense-description-text">{expense.description}</small>
+                    )}
                     {expense.installment && (
                       <small style={{ display: "block", marginTop: "4px" }}>
                         {formatInstallmentLabel(expense.installment)}
@@ -807,6 +810,7 @@ export function EditResourceItemModal({
 export function EditExpenseModal({ expense, onClose, onSave }) {
   const dialogRef = useDialogAccessibility(onClose);
   const [title, setTitle] = useState(expense.title);
+  const [description, setDescription] = useState(expense.description || "");
   const [totalValue, setTotalValue] = useState(expense.totalValue);
   const [dueDate, setDueDate] = useState(expense.dueDate || "");
   const [category, setCategory] = useState(expense.category);
@@ -855,6 +859,7 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
     try {
       await onSave(expense.id, {
         title,
+        description,
         totalValue,
         dueDate,
         category,
@@ -905,6 +910,15 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
+              />
+            </label>
+            <label>
+              <span>Descrição (opcional)</span>
+              <textarea
+                placeholder="Informações adicionais sobre a conta"
+                rows={3}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
               />
             </label>
           </div>

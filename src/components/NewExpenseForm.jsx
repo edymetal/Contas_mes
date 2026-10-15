@@ -173,6 +173,16 @@ export function NewExpenseForm({
           </label>
         </div>
 
+        <label>
+          <span>Descrição (opcional)</span>
+          <textarea
+            placeholder="Informações adicionais sobre a conta"
+            rows={3}
+            value={form.description || ""}
+            onChange={(event) => onChange("description", event.target.value)}
+          />
+        </label>
+
         {form.type !== "normal" && (
           <div
             style={{
