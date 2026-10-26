@@ -23,12 +23,10 @@ import {
   getExpenseSplitConfiguration,
   getExpenseDisplayMonthKey,
   getExpenseKind,
-  getExpenseSettledValue,
   getExpensesForMonth,
   getFixedExpenseMonthGroups,
   getInstallmentInfo,
   getInstallmentSeriesKey,
-  getInstallmentSeriesExpenses,
   getInstallmentSeriesSummaries,
   getNormalizedExpenses,
   isExpenseFullySettled,
@@ -809,7 +807,7 @@ export function EditResourceItemModal({
   );
 }
 
-export function EditExpenseModal({ expense, allExpenses = [expense], onClose, onSave }) {
+export function EditExpenseModal({ expense, onClose, onSave }) {
   const dialogRef = useDialogAccessibility(onClose);
   const [title, setTitle] = useState(expense.title);
   const [description, setDescription] = useState(expense.description || "");
@@ -831,25 +829,16 @@ export function EditExpenseModal({ expense, allExpenses = [expense], onClose, on
   const installmentSummary = useMemo(() => {
     if (!isInstallment) return null;
     const count = Number(totalInstallments);
+    const current = Number(currentInstallment);
     const value = Number(totalValue);
-    if (!Number.isInteger(count) || count < 1 || !Number.isFinite(value) || value < 0) return null;
+    if (!Number.isInteger(count) || count < 1 || !Number.isInteger(current)
+      || current < 1 || current > count || !Number.isFinite(value) || value < 0) return null;
 
-    const series = new Map();
-    for (const item of getInstallmentSeriesExpenses([...allExpenses, expense], expense)) {
-      const info = getInstallmentInfo(item);
-      if (info.current <= count) series.set(info.current, item);
-    }
-    // Older series may start after the first installment; their missing history was paid.
-    const firstTracked = Math.min(installmentInfo.current, ...series.keys());
-    const historicalPaid = Math.min(count, Math.max(0, firstTracked - 1)) * Number(expense.totalValue || 0);
-    const paid = roundMoney(historicalPaid + [...series.values()].reduce(
-      (sum, item) => sum + getExpenseSettledValue(item), 0,
-    ));
+    const paidCount = current - 1;
+    const paid = roundMoney(value * paidCount);
     const total = roundMoney(value * count);
-    const paidCount = Math.min(count, Math.max(0, firstTracked - 1))
-      + [...series.values()].filter(isExpenseFullySettled).length;
     return { total, paid, remaining: roundMoney(Math.max(0, total - paid)), remainingCount: Math.max(0, count - paidCount) };
-  }, [allExpenses, expense, isInstallment, totalInstallments, totalValue]);
+  }, [currentInstallment, isInstallment, totalInstallments, totalValue]);
 
   function toggleParticipant(personId) {
     setParticipants((current) => {
@@ -1024,7 +1013,7 @@ export function EditExpenseModal({ expense, allExpenses = [expense], onClose, on
               <div><span>Já pago</span><strong>{formatCurrency(installmentSummary.paid)}</strong></div>
               <div><span>Falta pagar</span><strong>{formatCurrency(installmentSummary.remaining)}</strong></div>
               <div><span>Parcelas ainda em aberto</span><strong>{installmentSummary.remainingCount}</strong></div>
-              <small>O saldo considera os pagamentos registrados, incluindo pagamentos parciais.</small>
+              <small>As parcelas anteriores à atual são consideradas pagas. O valor restante inclui a parcela atual e as seguintes.</small>
             </div>
           )}
 

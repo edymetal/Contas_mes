@@ -2024,7 +2024,6 @@ function App() {
       {canManageData && editingExpense && (
         <EditExpenseModal
           expense={editingExpense}
-          allExpenses={allExpenses}
           onClose={() => setEditingExpense(null)}
           onSave={handleUpdateExpense}
         />

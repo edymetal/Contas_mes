@@ -436,7 +436,7 @@ test("formulário de conta preserva participantes e ação principal", () => {
   assert.match(html, /Salvar conta/);
 });
 
-test("Editar despesa resume total e saldo do parcelamento com histórico e pagamento parcial", () => {
+test("Editar despesa calcula o saldo pela parcela atual sem contar rateios futuros como pagos", () => {
   const makeExpense = (current, shares) => ({
     id: `installment-${current}`, title: "Compra parcelada", totalValue: 90,
     category: "Casa", payerId: "edney", participants: ["edney", "sonia"],
@@ -451,18 +451,26 @@ test("Editar despesa resume total e saldo do parcelamento com histórico e pagam
   );
   const html = renderEdit(expenses[1], expenses);
   assert.match(html, /Total de todas as 4 parcelas<\/span><strong>360,00/);
-  assert.match(html, /Já pago<\/span><strong>225,00/);
-  assert.match(html, /Falta pagar<\/span><strong>135,00/);
+  assert.match(html, /Já pago<\/span><strong>90,00/);
+  assert.match(html, /Falta pagar<\/span><strong>270,00/);
   assert.match(html, /Parcelas ainda em aberto<\/span><strong>3/);
   assert.match(html, /por parcela · Total: 180,00/);
 
   const completed = expenses.map((item) => ({ ...item, shares: paid }));
-  assert.match(renderEdit(completed[1], completed), /Falta pagar<\/span><strong>0,00/);
-  assert.match(renderEdit(completed[1], completed), /Parcelas ainda em aberto<\/span><strong>0/);
+  assert.match(renderEdit(completed[1], completed), /Falta pagar<\/span><strong>270,00/);
+  assert.match(renderEdit(completed[1], completed), /Parcelas ainda em aberto<\/span><strong>3/);
+  assert.match(renderEdit(expenses[0], expenses), /Já pago<\/span><strong>0,00/);
+  assert.match(renderEdit(expenses[3], expenses), /Parcelas ainda em aberto<\/span><strong>1/);
 
   const legacy = { ...makeExpense(3, partial), installmentMeta: undefined, installment: "Parcela 3 de 4" };
-  assert.match(renderEdit(legacy, [legacy]), /Já pago<\/span><strong>225,00/);
-  assert.match(renderEdit(legacy, [legacy]), /Falta pagar<\/span><strong>135,00/);
+  assert.match(renderEdit(legacy, [legacy]), /Já pago<\/span><strong>180,00/);
+  assert.match(renderEdit(legacy, [legacy]), /Falta pagar<\/span><strong>180,00/);
+  const reportedExpense = { ...expenses[1], totalValue: 119, installmentMeta: { current: 2, total: 6 } };
+  const reportedHtml = renderEdit(reportedExpense, [reportedExpense]);
+  assert.match(reportedHtml, /Total de todas as 6 parcelas<\/span><strong>714,00/);
+  assert.match(reportedHtml, /Já pago<\/span><strong>119,00/);
+  assert.match(reportedHtml, /Falta pagar<\/span><strong>595,00/);
+  assert.match(reportedHtml, /Parcelas ainda em aberto<\/span><strong>5/);
   assert.doesNotMatch(renderEdit({ ...expenses[0], installmentMeta: undefined }, []), /installment-edit-summary/);
 });
 
