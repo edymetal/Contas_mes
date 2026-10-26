@@ -239,6 +239,7 @@ export function NewExpenseForm({
           splitMode={form.splitMode}
           splitValues={form.splitValues}
           totalValue={form.totalValue}
+          installmentsCount={form.type === "installment" ? form.installmentsCount : undefined}
           onModeChange={(value) => onChange("splitMode", value)}
           onValuesChange={(value) => onChange("splitValues", value)}
         />

@@ -4752,6 +4752,14 @@ textarea:focus {
   text-align: right;
 }
 
+.split-installment-total {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
 .split-person-row > label {
   align-items: center;
   display: grid;

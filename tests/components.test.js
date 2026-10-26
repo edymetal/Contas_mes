@@ -436,6 +436,43 @@ test("formulário de conta preserva participantes e ação principal", () => {
   assert.match(html, /Salvar conta/);
 });
 
+test("Nova conta mostra totais das parcelas no rateio igual, percentual e por valor", () => {
+  const renderForm = (overrides) => renderToStaticMarkup(
+    createElement(NewExpenseFormModule.NewExpenseForm, {
+      form: {
+        ...FormsModule.emptyExpenseForm,
+        type: "installment",
+        totalValue: "90",
+        installmentsCount: 12,
+        currentInstallment: 3,
+        participants: ["edney", "sonia"],
+        ...overrides,
+      },
+      onChange() {},
+      onSubmit() {},
+      onToggleParticipant() {},
+    }),
+  );
+
+  for (const [splitMode, splitValues, expectedTotals] of [
+    ["equal", {}, ["540,00", "540,00"]],
+    ["percentage", { edney: 25, sonia: 75 }, ["270,00", "810,00"]],
+    ["fixed", { edney: 30, sonia: 60 }, ["360,00", "720,00"]],
+  ]) {
+    const html = renderForm({ splitMode, splitValues });
+    assert.match(html, /Total de todas as 12 parcelas/);
+    assert.match(html, /1\.080,00/);
+    const totals = [...html.matchAll(/por parcela · Total: ([\s\S]*?)<\/small>/g)];
+    assert.equal(totals.length, 2);
+    expectedTotals.forEach((total, index) => assert.ok(totals[index][1].includes(total)));
+  }
+
+  for (const type of ["normal", "recurring"]) {
+    assert.doesNotMatch(renderForm({ type }), /split-installment-total|Total de todas as/);
+  }
+  assert.doesNotMatch(renderForm({ installmentsCount: "" }), /split-installment-total|Total de todas as/);
+});
+
 test("relatórios comparam períodos e oferecem as duas exportações", () => {
   const html = renderToStaticMarkup(
     createElement(ReportsModule.ReportsPanel, {

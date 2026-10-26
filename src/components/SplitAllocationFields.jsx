@@ -6,6 +6,7 @@ import {
   calculateSplitAmounts,
   createEqualSplitValues,
   normalizeSplitMode,
+  roundMoney,
 } from "../domain/expenses";
 import { formatCurrency } from "../utils/presentation";
 
@@ -35,6 +36,7 @@ export function SplitAllocationFields({
   splitMode,
   splitValues,
   totalValue,
+  installmentsCount,
   onModeChange,
   onValuesChange,
 }) {
@@ -45,6 +47,8 @@ export function SplitAllocationFields({
   );
   const selectedPeople = PEOPLE.filter((person) => participants.includes(person.id));
   const currentOption = MODE_OPTIONS.find((option) => option.value === mode);
+  const installmentCount = Number(installmentsCount);
+  const showInstallmentTotals = Number.isInteger(installmentCount) && installmentCount > 0;
 
   function changeMode(nextMode) {
     onModeChange(nextMode);
@@ -107,27 +111,30 @@ export function SplitAllocationFields({
             {selectedPeople.map((person) => (
               <div className="split-person-row" key={person.id}>
                 <span>{person.name}</span>
-                {mode === SPLIT_MODES.EQUAL ? (
-                  <strong>{formatCurrency(result.amounts[person.id] || 0)}</strong>
-                ) : (
-                  <>
-                    <label>
-                      <span className="sr-only">
-                        {mode === SPLIT_MODES.PERCENTAGE ? "Percentual" : "Valor"} de {person.name}
-                      </span>
-                      <input
-                        inputMode="decimal"
-                        min="0"
-                        onChange={(event) => updatePersonValue(person.id, event.target.value)}
-                        step="0.01"
-                        type="number"
-                        value={splitValues?.[person.id] ?? ""}
-                      />
-                      <span aria-hidden="true">{mode === SPLIT_MODES.PERCENTAGE ? "%" : "€"}</span>
-                    </label>
-                    <strong>{formatCurrency(result.amounts[person.id] || 0)}</strong>
-                  </>
+                {mode !== SPLIT_MODES.EQUAL && (
+                  <label>
+                    <span className="sr-only">
+                      {mode === SPLIT_MODES.PERCENTAGE ? "Percentual" : "Valor"} de {person.name}
+                    </span>
+                    <input
+                      inputMode="decimal"
+                      min="0"
+                      onChange={(event) => updatePersonValue(person.id, event.target.value)}
+                      step="0.01"
+                      type="number"
+                      value={splitValues?.[person.id] ?? ""}
+                    />
+                    <span aria-hidden="true">{mode === SPLIT_MODES.PERCENTAGE ? "%" : "€"}</span>
+                  </label>
                 )}
+                <strong>
+                  {formatCurrency(result.amounts[person.id] || 0)}
+                  {showInstallmentTotals && (
+                    <small className="split-installment-total">
+                      por parcela · Total: {formatCurrency(roundMoney((result.amounts[person.id] || 0) * installmentCount))}
+                    </small>
+                  )}
+                </strong>
               </div>
             ))}
           </div>
@@ -143,6 +150,12 @@ export function SplitAllocationFields({
             </span>
             <strong>{result.isValid ? "Rateio completo" : result.error}</strong>
           </div>
+          {showInstallmentTotals && (
+            <div className="split-allocation-summary" aria-live="polite">
+              <span>Total de todas as {installmentCount} parcelas</span>
+              <strong>{formatCurrency(roundMoney(Number(totalValue) * installmentCount))}</strong>
+            </div>
+          )}
         </div>
       )}
     </fieldset>
