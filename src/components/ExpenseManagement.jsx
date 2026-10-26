@@ -23,10 +23,12 @@ import {
   getExpenseSplitConfiguration,
   getExpenseDisplayMonthKey,
   getExpenseKind,
+  getExpenseSettledValue,
   getExpensesForMonth,
   getFixedExpenseMonthGroups,
   getInstallmentInfo,
   getInstallmentSeriesKey,
+  getInstallmentSeriesExpenses,
   getInstallmentSeriesSummaries,
   getNormalizedExpenses,
   isExpenseFullySettled,
@@ -807,7 +809,7 @@ export function EditResourceItemModal({
   );
 }
 
-export function EditExpenseModal({ expense, onClose, onSave }) {
+export function EditExpenseModal({ expense, allExpenses = [expense], onClose, onSave }) {
   const dialogRef = useDialogAccessibility(onClose);
   const [title, setTitle] = useState(expense.title);
   const [description, setDescription] = useState(expense.description || "");
@@ -821,11 +823,33 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
   const [splitValues, setSplitValues] = useState(initialSplit.values);
   const [error, setError] = useState("");
 
-  const match = expense.installment ? expense.installment.match(/Parcela (\d+) de (\d+)/) : null;
-  const isInstallment = !!match;
+  const installmentInfo = getInstallmentInfo(expense);
+  const isInstallment = !!installmentInfo;
   const isFixed = isFixedExpense(expense);
-  const [currentInstallment, setCurrentInstallment] = useState(match ? Number(match[1]) : 1);
-  const [totalInstallments, setTotalInstallments] = useState(match ? Number(match[2]) : 1);
+  const [currentInstallment, setCurrentInstallment] = useState(installmentInfo?.current || 1);
+  const [totalInstallments, setTotalInstallments] = useState(installmentInfo?.total || 1);
+  const installmentSummary = useMemo(() => {
+    if (!isInstallment) return null;
+    const count = Number(totalInstallments);
+    const value = Number(totalValue);
+    if (!Number.isInteger(count) || count < 1 || !Number.isFinite(value) || value < 0) return null;
+
+    const series = new Map();
+    for (const item of getInstallmentSeriesExpenses([...allExpenses, expense], expense)) {
+      const info = getInstallmentInfo(item);
+      if (info.current <= count) series.set(info.current, item);
+    }
+    // Older series may start after the first installment; their missing history was paid.
+    const firstTracked = Math.min(installmentInfo.current, ...series.keys());
+    const historicalPaid = Math.min(count, Math.max(0, firstTracked - 1)) * Number(expense.totalValue || 0);
+    const paid = roundMoney(historicalPaid + [...series.values()].reduce(
+      (sum, item) => sum + getExpenseSettledValue(item), 0,
+    ));
+    const total = roundMoney(value * count);
+    const paidCount = Math.min(count, Math.max(0, firstTracked - 1))
+      + [...series.values()].filter(isExpenseFullySettled).length;
+    return { total, paid, remaining: roundMoney(Math.max(0, total - paid)), remainingCount: Math.max(0, count - paidCount) };
+  }, [allExpenses, expense, isInstallment, totalInstallments, totalValue]);
 
   function toggleParticipant(personId) {
     setParticipants((current) => {
@@ -952,7 +976,7 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
 
           <div className="form-grid">
             <label>
-              <span>Valor em euros</span>
+              <span>{isInstallment ? "Valor da parcela em euros" : "Valor em euros"}</span>
               <input
                 type="number"
                 min="0"
@@ -994,6 +1018,16 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
             </label>
           </div>
 
+          {installmentSummary && (
+            <div className="installment-edit-summary" aria-live="polite">
+              <div><span>Total de todas as {totalInstallments} parcelas</span><strong>{formatCurrency(installmentSummary.total)}</strong></div>
+              <div><span>Já pago</span><strong>{formatCurrency(installmentSummary.paid)}</strong></div>
+              <div><span>Falta pagar</span><strong>{formatCurrency(installmentSummary.remaining)}</strong></div>
+              <div><span>Parcelas ainda em aberto</span><strong>{installmentSummary.remainingCount}</strong></div>
+              <small>O saldo considera os pagamentos registrados, incluindo pagamentos parciais.</small>
+            </div>
+          )}
+
           <fieldset className="people-fieldset">
             <legend>Quem participa do rateio?</legend>
             <div className="checkbox-grid">
@@ -1015,6 +1049,7 @@ export function EditExpenseModal({ expense, onClose, onSave }) {
             splitMode={splitMode}
             splitValues={splitValues}
             totalValue={totalValue}
+            installmentsCount={isInstallment ? totalInstallments : undefined}
             onModeChange={setSplitMode}
             onValuesChange={setSplitValues}
           />

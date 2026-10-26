@@ -4653,6 +4653,26 @@ textarea:focus {
   padding: 20px;
 }
 
+.installment-edit-summary {
+  background: var(--panel-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.installment-edit-summary > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+}
+
+.installment-edit-summary small {
+  color: var(--muted);
+}
+
 .split-allocation-fieldset > legend {
   color: var(--text);
   font-size: 0.95rem;

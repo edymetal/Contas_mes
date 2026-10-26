@@ -436,6 +436,36 @@ test("formulário de conta preserva participantes e ação principal", () => {
   assert.match(html, /Salvar conta/);
 });
 
+test("Editar despesa resume total e saldo do parcelamento com histórico e pagamento parcial", () => {
+  const makeExpense = (current, shares) => ({
+    id: `installment-${current}`, title: "Compra parcelada", totalValue: 90,
+    category: "Casa", payerId: "edney", participants: ["edney", "sonia"],
+    dueDate: `2026-0${current}-10`, installmentMeta: { current, total: 4 },
+    installmentSeriesId: "purchase", shares,
+  });
+  const paid = { edney: { amount: 45, status: "self" }, sonia: { amount: 45, status: "paid" } };
+  const partial = { edney: { amount: 45, status: "self" }, sonia: { amount: 45, status: "pending" } };
+  const expenses = [makeExpense(1, paid), makeExpense(2, partial), makeExpense(3, partial), makeExpense(4, partial)];
+  const renderEdit = (expense, allExpenses) => renderToStaticMarkup(
+    createElement(ExpenseManagementModule.EditExpenseModal, { expense, allExpenses, onClose() {}, onSave() {} }),
+  );
+  const html = renderEdit(expenses[1], expenses);
+  assert.match(html, /Total de todas as 4 parcelas<\/span><strong>360,00/);
+  assert.match(html, /Já pago<\/span><strong>225,00/);
+  assert.match(html, /Falta pagar<\/span><strong>135,00/);
+  assert.match(html, /Parcelas ainda em aberto<\/span><strong>3/);
+  assert.match(html, /por parcela · Total: 180,00/);
+
+  const completed = expenses.map((item) => ({ ...item, shares: paid }));
+  assert.match(renderEdit(completed[1], completed), /Falta pagar<\/span><strong>0,00/);
+  assert.match(renderEdit(completed[1], completed), /Parcelas ainda em aberto<\/span><strong>0/);
+
+  const legacy = { ...makeExpense(3, partial), installmentMeta: undefined, installment: "Parcela 3 de 4" };
+  assert.match(renderEdit(legacy, [legacy]), /Já pago<\/span><strong>225,00/);
+  assert.match(renderEdit(legacy, [legacy]), /Falta pagar<\/span><strong>135,00/);
+  assert.doesNotMatch(renderEdit({ ...expenses[0], installmentMeta: undefined }, []), /installment-edit-summary/);
+});
+
 test("Nova conta mostra totais das parcelas no rateio igual, percentual e por valor", () => {
   const renderForm = (overrides) => renderToStaticMarkup(
     createElement(NewExpenseFormModule.NewExpenseForm, {
