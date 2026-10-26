@@ -5,6 +5,7 @@ import { MONTHS_PT } from "../config/forms";
 import { getPersonById } from "../config/people";
 import {
   formatInstallmentLabel,
+  getInstallmentInfo,
   isSettledStatus,
   roundMoney,
   shiftMonth,
@@ -313,6 +314,10 @@ export function PersonExpenses({
 
                   <div className="expense-payer-items">
                     {payerExpenses.map((expense) => {
+                      const installmentInfo = getInstallmentInfo(expense);
+                      const installmentLabel = installmentInfo
+                        ? `Parcela ${installmentInfo.current} de ${installmentInfo.total}`
+                        : formatInstallmentLabel(expense.installment);
                       const share = getShare(expense, personId);
                       const isPayer = expense.payerId === personId;
                       const paymentDetail = expensePayments.get(expense.id);
@@ -329,9 +334,9 @@ export function PersonExpenses({
                             <h3>{expense.title}</h3>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                               <CategoryTag category={expense.category} />
-                              {expense.installment && (
+                              {installmentLabel && (
                                 <span className="tag" style={{ background: "var(--panel-muted)", color: "var(--muted)", borderColor: "var(--line)" }}>
-                                  {formatInstallmentLabel(expense.installment)}
+                                  {installmentLabel}
                                 </span>
                               )}
                             </div>

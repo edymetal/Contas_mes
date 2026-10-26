@@ -361,6 +361,36 @@ test("Minhas contas mostra liquidação calculada, pagamento manual e saldo pend
   assert.match(cards[2], /Em 12\/07\/2026 • PIX/);
 });
 
+test("Minhas contas informa parcela atual e total pelos metadados e pelo formato antigo", () => {
+  const html = renderToStaticMarkup(
+    createElement(PersonExpensesModule.PersonExpenses, {
+      expenses: [
+        { id: "metadata", title: "Compra parcelada", installmentMeta: { current: 3, total: 12 } },
+        { id: "legacy", title: "Compra antiga", installment: "Parcela 2 de 6" },
+        { id: "updated", title: "Compra atualizada", installment: "Parcela 1 de 8", installmentMeta: { current: 4, total: 8 } },
+        { id: "fixed", title: "Conta fixa", installment: "Fixa mensal" },
+        { id: "normal", title: "Conta única" },
+      ].map((expense) => ({
+        ...expense,
+        dueDate: "2026-07-10",
+        payerId: "edney",
+        participants: ["sonia"],
+        shares: { sonia: { amount: 10, status: "pending" } },
+      })),
+      personId: "sonia",
+      selectedMonth: "2026-07",
+      onMonthChange() {},
+    }),
+  );
+  const cards = html.match(/<article class="expense-card"[\s\S]*?<\/article>/g);
+  assert.match(cards[0], /Parcela 3 de 12/);
+  assert.match(cards[1], /Parcela 2 de 6/);
+  assert.match(cards[2], /Parcela 4 de 8/);
+  assert.doesNotMatch(cards[2], /Parcela 1 de 8/);
+  assert.match(cards[3], />Fixo<\/span>/);
+  assert.doesNotMatch(cards[4], /Parcela|>Fixo<\/span>/);
+});
+
 test("Minhas contas deixa pendente a conta que corresponde ao saldo restante", () => {
   const html = renderToStaticMarkup(
     createElement(PersonExpensesModule.PersonExpenses, {
