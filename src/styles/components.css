@@ -4666,6 +4666,10 @@ textarea:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.modal .split-mode-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .split-mode-option {
   align-items: flex-start;
   background: var(--panel-muted);
@@ -4674,7 +4678,8 @@ textarea:focus {
   cursor: pointer;
   display: grid;
   gap: 10px;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: 18px 19px minmax(0, 1fr);
+  min-width: 0;
   margin: 0;
   padding: 14px;
   transition: border-color 160ms ease, background 160ms ease;
@@ -4686,7 +4691,11 @@ textarea:focus {
 }
 
 .split-mode-option input {
-  margin-top: 3px;
+  height: 18px;
+  min-height: 0;
+  width: 18px;
+  margin: 3px 0 0;
+  padding: 0;
 }
 
 .split-mode-option svg {
@@ -4694,9 +4703,11 @@ textarea:focus {
   margin-top: 1px;
 }
 
-.split-mode-option span {
+.split-mode-option > span {
   display: grid;
   gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .split-mode-option small,
